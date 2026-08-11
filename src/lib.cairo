@@ -10,6 +10,12 @@ pub mod MACI;
 /// functionality used throughout the library.
 pub mod crypto;
 
+/// Policy implementations and interfaces.
+///
+/// Provides checkers and enforcers used to validate subjects
+/// and apply policy decisions throughout the library.
+pub mod policies;
+
 /// Tree data structures and related operations.
 ///
 /// Provides implementations and utilities for cryptographic tree structures, including

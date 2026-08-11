@@ -10,7 +10,7 @@ starknet = "2.20.0"
 openzeppelin = "3.0.0"
 
 [dev-dependencies]
-snforge_std = "0.62.1"
+snforge_std = "0.63.0"
 assert_macros = "2.20.0"
 
 [[target.starknet-contract]]
@@ -24,9 +24,6 @@ allow-prebuilt-plugins = ["snforge_std"]
 
 [tool.snforge]
 coverage = true
-coverage-ignore-files = [
-    "tests/**",
-]
 
 # Visit https://foundry-rs.github.io/starknet-foundry/appendix/scarb-toml.html for more information
 
