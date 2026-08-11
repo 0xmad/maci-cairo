@@ -23,6 +23,8 @@ pub struct ConstructorParams {
     pub state_tree_address: ContractAddress,
     /// Precomputed empty ballot tree roots for supported depths.
     pub empty_ballot_roots: (u256, u256, u256, u256, u256),
+    /// Address of the enforcer contract used to enforce policy restrict
+    pub enforcer: ContractAddress,
 }
 
 /// Interface for the MACI contract.
@@ -83,10 +85,10 @@ pub mod Constants {
 /// Errors returned by the MACI contract.
 pub mod Errors {
     /// The state tree has reached its maximum signup capacity.
-    pub const TOO_MANY_SIGNUPS: felt252 = 0;
+    pub const TOO_MANY_SIGNUPS: felt252 = 'Too many signups';
 
     /// The supplied public key is not a valid BabyJubJub curve point.
-    pub const INVALID_PUBLIC_KEY: felt252 = 1;
+    pub const INVALID_PUBLIC_KEY: felt252 = 'Invalid public key';
 }
 
 #[starknet::contract]
@@ -100,12 +102,15 @@ pub mod MACI {
         MutableVecTrait, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
     };
     use crate::crypto::BabyJubJub::BabyJubJub;
+    use crate::policies::interfaces::IEnforcer::{IEnforcerDispatcher, IEnforcerDispatcherTrait};
     use crate::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait};
     use super::{Constants, ConstructorParams, Errors, PublicKey};
 
     /// Persistent storage for the MACI contract.
     #[storage]
     struct Storage {
+        /// Dispatcher for the external enforcer contract used to enforce policy restrictions.
+        enforcer: IEnforcerDispatcher,
         /// Configured depth of the state tree.
         state_tree_depth: u8,
         /// Maximum number of leaves that can be stored in the state tree.
@@ -156,6 +161,7 @@ pub mod MACI {
     /// - Inserts the padding key hash as the initial state leaf.
     /// - Stores the initial state-tree root.
     /// - Persists the tree configuration and empty ballot roots.
+    /// - Creates a dispatcher for the supplied enforcer.
     #[constructor]
     fn constructor(ref self: ContractState, params: ConstructorParams) {
         let arity: u256 = Constants::STATE_TREE_ARITY.into();
@@ -164,6 +170,7 @@ pub mod MACI {
 
         state_tree.insert(Constants::PAD_KEY_HASH);
 
+        self.enforcer.write(IEnforcerDispatcher { contract_address: params.enforcer });
         self.state_roots_on_signup.push(Constants::PAD_KEY_HASH);
         self.state_tree_depth.write(params.state_tree_depth);
         self.max_signups.write(max_signups);
@@ -195,12 +202,19 @@ pub mod MACI {
         /// Registers a new user in the MACI state tree.
         ///
         /// The signup fails if the state tree has reached its maximum
-        /// capacity or if the supplied public key is not on the BabyJubJub
-        /// curve.
+        /// capacity, if the supplied public key is not on the BabyJubJub
+        /// curve, or if the configured enforcer rejects the caller.
         ///
-        /// The public key is hashed with Poseidon and inserted into the
-        /// LeanIMT state tree. The resulting root is recorded and a
-        /// `Signup` event is emitted.
+        /// The configured enforcer is called with the caller's address and
+        /// the supplied signup data before the public key is inserted into
+        /// the LeanIMT state tree. The public key is then hashed with Poseidon
+        /// and inserted into the state tree. The resulting root is recorded
+        /// and a `Signup` event is emitted.
+        ///
+        /// Arguments:
+        /// - `public_key`: BabyJubJub public key to register.
+        /// - `sign_up_data`: Data supplied to the configured enforcer for policy
+        ///   validation.
         fn sign_up(ref self: ContractState, public_key: PublicKey, sign_up_data: ByteArray) {
             let state_tree = self.state_tree.read();
             let size = state_tree.get_size();
@@ -208,6 +222,8 @@ pub mod MACI {
 
             assert(size < max_signups, Errors::TOO_MANY_SIGNUPS);
             assert(BabyJubJub::is_on_curve(public_key.x, public_key.y), Errors::INVALID_PUBLIC_KEY);
+
+            self.enforcer.read().enforce(starknet::get_caller_address(), sign_up_data);
 
             let root = state_tree.insert(hash_public_key(public_key));
             self.state_roots_on_signup.push(root);

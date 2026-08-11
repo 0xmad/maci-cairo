@@ -5,7 +5,8 @@ build:
 
 test:
 	rm -rf coverage
-	scarb test --coverage
+	snforge test --coverage
+	lcov --remove coverage/coverage.lcov '*/tests/*' --output-file coverage/coverage.lcov
 	genhtml ./coverage/coverage.lcov --output-directory coverage
 
 coverage: test

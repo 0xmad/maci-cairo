@@ -3,10 +3,12 @@ use maci_cairo::MACI::{
     Constants, ConstructorParams, IMACIDispatcher, IMACIDispatcherTrait, MACI, PublicKey,
 };
 use maci_cairo::crypto::BabyJubJub::BabyJubJub;
+use maci_cairo::policies::interfaces::IEnforcer::{IEnforcerDispatcher, IEnforcerDispatcherTrait};
 use maci_cairo::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait};
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, declare, spy_events,
-    start_cheat_block_timestamp, stop_cheat_block_timestamp,
+    start_cheat_block_timestamp, start_cheat_caller_address, stop_cheat_block_timestamp,
+    stop_cheat_caller_address,
 };
 use starknet::SyscallResultTrait;
 
@@ -27,16 +29,27 @@ fn generate_public_key(private_key: u256) -> PublicKey {
 fn deploy() -> (IMACIDispatcher, ILeanIMTDispatcher) {
     let maci_contract = declare("MACI").unwrap_syscall().contract_class();
     let imt_contract = declare("LeanIMT").unwrap_syscall().contract_class();
-
     let (state_tree_address, _) = imt_contract.deploy(@array![]).unwrap_syscall();
+    let checker_contract = declare("FreeForAllChecker").unwrap_syscall().contract_class();
+    let enforcer_contract = declare("FreeForAllEnforcer").unwrap_syscall().contract_class();
+    let (checker_address, _) = checker_contract.deploy(@array![]).unwrap_syscall();
+    let (enforcer_address, _) = enforcer_contract
+        .deploy(@array![checker_address.into()])
+        .unwrap_syscall();
 
     let params = ConstructorParams {
-        state_tree_depth: 5, state_tree_address, empty_ballot_roots: TEST_EMPTY_BALLOT_ROOTS,
+        state_tree_depth: 5,
+        state_tree_address,
+        empty_ballot_roots: TEST_EMPTY_BALLOT_ROOTS,
+        enforcer: enforcer_address,
     };
     let mut calldata = array![];
     params.serialize(ref calldata);
 
     let (maci_address, _) = maci_contract.deploy(@calldata).unwrap_syscall();
+
+    let enforcer = IEnforcerDispatcher { contract_address: enforcer_address };
+    enforcer.set_target(maci_address);
 
     (
         IMACIDispatcher { contract_address: maci_address },
@@ -56,21 +69,37 @@ fn test_constructor() {
 }
 
 #[test]
-#[should_panic(expected: 0)]
+#[should_panic(expected: 'Too many signups')]
 fn test_signup_too_many_signups() {
     let (maci, _) = deploy();
 
     for private_key in 1_u32..33_u32 {
+        let value: felt252 = private_key.into();
+        let caller = value.try_into().unwrap();
+        start_cheat_caller_address(maci.contract_address, caller);
         maci.sign_up(generate_public_key(private_key.into()), "");
     }
+
+    stop_cheat_caller_address(maci.contract_address);
 }
 
 #[test]
-#[should_panic(expected: 1)]
+#[should_panic(expected: 'Invalid public key')]
 fn test_signup_invalid_public_key() {
     let (maci, _) = deploy();
 
     maci.sign_up(PublicKey { x: 1, y: 2 }, "");
+}
+
+#[test]
+#[should_panic(expected: 'Already enforced')]
+fn test_double_signup_same_address() {
+    let (maci, _) = deploy();
+    let public_key1 = generate_public_key(9000);
+    let public_key2 = generate_public_key(9001);
+
+    maci.sign_up(public_key1, "");
+    maci.sign_up(public_key2, "");
 }
 
 
@@ -84,9 +113,13 @@ fn test_signup() {
     let public_key2 = generate_public_key(9001);
 
     start_cheat_block_timestamp(maci.contract_address, timestamp);
+    start_cheat_caller_address(maci.contract_address, 1.try_into().unwrap());
     maci.sign_up(public_key1, "");
+
+    start_cheat_caller_address(maci.contract_address, 2.try_into().unwrap());
     maci.sign_up(public_key2, "");
     stop_cheat_block_timestamp(maci.contract_address);
+    stop_cheat_caller_address(maci.contract_address);
 
     let public_key1_hash = MACI::hash_public_key(public_key1);
     let public_key2_hash = MACI::hash_public_key(public_key2);

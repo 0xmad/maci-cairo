@@ -59,7 +59,7 @@ fn test_fuzz_insert(leaf: u256) {
 }
 
 #[test]
-#[should_panic(expected: 1)]
+#[should_panic(expected: 'Invalid leaf')]
 fn test_zero_leaf() {
     let imt = deploy();
 
@@ -67,7 +67,7 @@ fn test_zero_leaf() {
 }
 
 #[test]
-#[should_panic(expected: 1)]
+#[should_panic(expected: 'Invalid leaf')]
 fn test_max_leaf() {
     let imt = deploy();
 
@@ -75,7 +75,7 @@ fn test_max_leaf() {
 }
 
 #[test]
-#[should_panic(expected: 0)]
+#[should_panic(expected: 'Leaf already exists')]
 fn test_duplicated_leaf() {
     let imt = deploy();
 

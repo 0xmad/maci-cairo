@@ -53,13 +53,13 @@ pub trait ILeanIMT<TContractState> {
 /// Errors returned by the LeanIMT contract.
 mod Errors {
     /// The leaf has already been inserted into the tree.
-    pub const ALREADY_EXISTS: felt252 = 0;
+    pub const ALREADY_EXISTS: felt252 = 'Leaf already exists';
 
     /// The leaf is invalid.
     ///
     /// A leaf is invalid when it is zero or greater than or equal to
     /// `SNARK_SCALAR_FIELD`.
-    pub const INVALID_LEAF: felt252 = 1;
+    pub const INVALID_LEAF: felt252 = 'Invalid leaf';
 }
 
 /// Scalar field modulus used to validate tree leaves.
