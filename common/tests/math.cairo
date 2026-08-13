@@ -1,4 +1,4 @@
-use maci_cairo::utils::math::math;
+use maci_common::utils::math::math;
 
 const Q: u256 = 0x30644E72E131A029B85045B68181585D2833E84879B9709143E1F593F0000001;
 

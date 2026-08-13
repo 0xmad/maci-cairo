@@ -96,12 +96,12 @@ pub mod MACI {
     use core::hash::{HashStateExTrait, HashStateTrait};
     use core::num::traits::Pow;
     use core::poseidon;
+    use maci_common::crypto::BabyJubJub::BabyJubJub;
     use poseidon::PoseidonTrait;
     use starknet::event::EventEmitter;
     use starknet::storage::{
         MutableVecTrait, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
     };
-    use crate::crypto::BabyJubJub::BabyJubJub;
     use crate::policies::interfaces::IEnforcer::{IEnforcerDispatcher, IEnforcerDispatcherTrait};
     use crate::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait};
     use super::{Constants, ConstructorParams, Errors, PublicKey};
