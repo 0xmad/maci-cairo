@@ -1,10 +1,12 @@
 use MACI::Signup;
-use maci_cairo::MACI::{
+use maci_common::crypto::BabyJubJub::BabyJubJub;
+use maci_contracts::MACI::{
     Constants, ConstructorParams, IMACIDispatcher, IMACIDispatcherTrait, MACI, PublicKey,
 };
-use maci_cairo::crypto::BabyJubJub::BabyJubJub;
-use maci_cairo::policies::interfaces::IEnforcer::{IEnforcerDispatcher, IEnforcerDispatcherTrait};
-use maci_cairo::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait};
+use maci_contracts::policies::interfaces::IEnforcer::{
+    IEnforcerDispatcher, IEnforcerDispatcherTrait,
+};
+use maci_contracts::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait};
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, declare, spy_events,
     start_cheat_block_timestamp, start_cheat_caller_address, stop_cheat_block_timestamp,

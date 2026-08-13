@@ -1,4 +1,4 @@
-use maci_cairo::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait, SNARK_SCALAR_FIELD};
+use maci_contracts::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait, SNARK_SCALAR_FIELD};
 use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
 use starknet::SyscallResultTrait;
 

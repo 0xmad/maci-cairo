@@ -1,0 +1,19 @@
+[package]
+name = "maci_common"
+version = "0.1.0"
+edition = "2024_07"
+
+[dependencies]
+
+[dev-dependencies]
+snforge_std = "0.63.0"
+assert_macros = "2.20.0"
+
+[scripts]
+test = "snforge test"
+
+[tool.scarb]
+allow-prebuilt-plugins = ["snforge_std"]
+
+[tool.snforge]
+coverage = true

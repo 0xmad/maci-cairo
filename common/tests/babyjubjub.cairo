@@ -1,5 +1,5 @@
-use maci_cairo::crypto::BabyJubJub::BabyJubJub;
-use maci_cairo::utils::math::math;
+use maci_common::crypto::BabyJubJub::BabyJubJub;
+use maci_common::utils::math::math;
 
 fn generate_point(s: u256) -> (u256, u256) {
     let scalar = s % BabyJubJub::SUBGROUP_ORDER;

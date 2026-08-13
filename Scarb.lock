@@ -2,9 +2,17 @@
 version = 1
 
 [[package]]
-name = "maci_cairo"
+name = "maci_common"
 version = "0.1.0"
 dependencies = [
+ "snforge_std",
+]
+
+[[package]]
+name = "maci_contracts"
+version = "0.1.0"
+dependencies = [
+ "maci_common",
  "openzeppelin",
  "snforge_std",
 ]
