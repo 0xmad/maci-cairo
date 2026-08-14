@@ -1,0 +1,8 @@
+{
+  "Ballot": {
+    "file": "./ballot/Ballot.circom",
+    "template": "Ballot",
+    "params": [5, 5],
+    "pubs": ["userTreeRoot", "pollId", "userCommitment", "pollPublicKey", "encryptedVotesC1", "encryptedVotesC2"]
+  }
+}
