@@ -1,0 +1,23 @@
+{
+  "name": "maci",
+  "version": "3.0.0",
+  "description": "Minimal Anti-Collusion Infrastructure",
+  "repository": "https://github.com/privacy-scaling-explorations/maci",
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm -r build",
+    "build:circuits-c": "pnpm -r exec build-test-circuits-c --scope \"maci-circuits\"",
+    "build:circuits-wasm": "pnpm -r exec build-test-circuits-wasm --scope \"maci-circuits\"",
+    "clean": "pnpm exec -- rm -rf node_modules build && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": "24 || 26",
+    "pnpm": "11"
+  }
+}
