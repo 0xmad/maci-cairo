@@ -9,4 +9,4 @@ members = [
 unstable-add-statements-code-locations-debug-info = true   # Should be used if you want to use coverage
 unstable-add-statements-functions-debug-info = true        # Should be used if you want to use coverage/profiler
 inlining-strategy = "avoid"
-enable-gas = true                            # Should be used if you want to use coverage
+enable-gas = true                                          # Should be used if you want to use coverage

@@ -1,6 +1,6 @@
 .PHONY: test test-contracts test-circuits build coverage clean
 
-build: build-common build-contracts build-circuits
+build: build-common build-contracts
 
 build-common:
 	scarb build --package maci_common
@@ -8,10 +8,7 @@ build-common:
 build-contracts:
 	scarb build --package maci_contracts
 
-build-circuits:
-	scarb --profile circuit build --package maci_circuits
-
-test: test-common test-contracts
+test: test-common test-contracts test-circuits
 
 test-contracts:
 	cd common && rm -rf coverage
@@ -32,9 +29,7 @@ test-common:
 		--output-directory coverage
 
 test-circuits:
-	scarb test --package maci_circuits
-
-coverage: test-contracts
+	cd circuits && pnpm run test
 
 clean:
 	rm -rf contracts/coverage

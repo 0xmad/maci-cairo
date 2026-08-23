@@ -1,5 +1,6 @@
 import { type BabyJub, buildBabyjub } from "circomlibjs";
 import fc from "fast-check";
+import { poseidon2 } from "poseidon-lite/poseidon2";
 import { beforeAll, describe, test } from "vitest";
 
 import type { WitnessTester } from "circomkit";
@@ -51,7 +52,8 @@ describe("Votes", () => {
           maxLength: VOTE_OPTIONS,
         }),
         fc.bigInt({ min: 1n, max: babyJub.subOrder - 1n }),
-        async (votes: bigint[], random: bigint[], privateKey: bigint) => {
+        fc.bigInt({ min: 0n, max: babyJub.subOrder - 1n }),
+        async (votes: bigint[], random: bigint[], privateKey: bigint, pollId: bigint) => {
           const publicKeyPoint = babyJub.mulPointEscalar(
             babyJub.Base8,
             privateKey,
@@ -61,6 +63,8 @@ describe("Votes", () => {
             babyJub.F.toObject(publicKeyPoint[0]),
             babyJub.F.toObject(publicKeyPoint[1]),
           ];
+
+          const userCommitment = poseidon2([privateKey, pollId]);
 
           const encryptionWitness = await encryptionCircuit.calculateWitness({
             votes,
@@ -89,6 +93,8 @@ describe("Votes", () => {
             votes,
             random,
             publicKey,
+            pollId,
+            userCommitment,
           });
 
           const isValidC1 = c1.every((point, index) => {

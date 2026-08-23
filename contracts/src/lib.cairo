@@ -4,7 +4,17 @@
 /// systems.
 pub mod MACI;
 
-pub mod circuits;
+/// Poll management and voting functionality.
+///
+/// Provides the core functionality and primitives used to create, configure,
+/// and interact with polls in MACI-based systems.
+pub mod Poll;
+
+/// Poll factory functionality.
+///
+/// Provides the functionality required to create and initialize polls with
+/// their associated configuration and dependencies.
+pub mod PollFactory;
 
 /// Policy implementations and interfaces.
 ///
