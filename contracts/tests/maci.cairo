@@ -28,7 +28,7 @@ fn generate_public_key(private_key: u256) -> PublicKey {
     PublicKey { x, y }
 }
 
-fn deploy() -> (IMACIDispatcher, ILeanIMTDispatcher) {
+pub fn deploy() -> (IMACIDispatcher, ILeanIMTDispatcher) {
     let maci_contract = declare("MACI").unwrap_syscall().contract_class();
     let imt_contract = declare("LeanIMT").unwrap_syscall().contract_class();
     let (state_tree_address, _) = imt_contract.deploy(@array![]).unwrap_syscall();

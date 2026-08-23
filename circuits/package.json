@@ -6,7 +6,11 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "test": "vitest"
+    "build:garaga": "docker build -t garaga .",
+    "test": "vitest --run",
+    "compile:ballot": "circomkit compile Ballot",
+    "setup:ballot": "circomkit setup Ballot",
+    "verifier:ballot": "docker run --rm -it -v \"$(pwd)/..:/workspace\" garaga gen --system groth16 --vk ./circuits/build/Ballot/groth16_vkey.json --project-name ballot_verifier"
   },
   "keywords": [],
   "author": "",

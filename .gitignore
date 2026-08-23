@@ -5,3 +5,5 @@ coverage/
 profile/
 node_modules/
 circuits/circom/test/
+circuits/circom/main/
+build/

@@ -15,6 +15,7 @@ const STATE_TREE_DEPTH = 5;
 describe("Ballot", () => {
   let ballotCircuit: WitnessTester<
     [
+      "ballotHash",
       "votes",
       "random",
       "userPrivateKey",
@@ -58,9 +59,11 @@ describe("Ballot", () => {
     const votes = [0n, 1n, 0n, 1n, 1n];
     const random = [9n, 12n, 56n, 3n, 2n];
 
-    const { c1, c2 } = await encryptVotes({
+    const { c1, c2, ballotHash } = await encryptVotes({
       votes,
       random,
+      pollId,
+      userCommitment,
       publicKey: pollPublicKey,
     });
 
@@ -78,6 +81,7 @@ describe("Ballot", () => {
       userCommitment,
       encryptedVotesC1: c1,
       encryptedVotesC2: c2,
+      ballotHash,
     });
 
     await ballotCircuit.expectConstraintPass(ballotWitness);
@@ -128,10 +132,12 @@ describe("Ballot", () => {
             poseidon3([...userPublicKey, userVotesBalance]),
           );
 
-          const { c1, c2 } = await encryptVotes({
+          const { c1, c2, ballotHash } = await encryptVotes({
             votes,
             random,
             publicKey: pollPublicKey,
+            pollId,
+            userCommitment,
           });
 
           const ballotWitness = await ballotCircuit.calculateWitness({
@@ -148,6 +154,7 @@ describe("Ballot", () => {
             userCommitment,
             encryptedVotesC1: c1,
             encryptedVotesC2: c2,
+            ballotHash,
           });
 
           return ballotCircuit
@@ -174,10 +181,12 @@ describe("Ballot", () => {
     const votes = [0n, 1n, 0n, 1n, 1n];
     const random = [9n, 12n, 56n, 3n, 2n];
 
-    const { c1, c2 } = await encryptVotes({
+    const { c1, c2, ballotHash } = await encryptVotes({
       votes,
       random,
       publicKey: pollPublicKey,
+      pollId,
+      userCommitment,
     });
 
     await ballotCircuit.expectFail({
@@ -194,6 +203,7 @@ describe("Ballot", () => {
       userCommitment,
       encryptedVotesC1: c1,
       encryptedVotesC2: c2,
+      ballotHash,
     });
   });
 
@@ -212,10 +222,12 @@ describe("Ballot", () => {
     const votes = [0n, 1n, 0n, 1n, 1n];
     const random = [9n, 12n, 56n, 3n, 2n];
 
-    const { c1, c2 } = await encryptVotes({
+    const { c1, c2, ballotHash } = await encryptVotes({
       votes,
       random,
       publicKey: pollPublicKey,
+      pollId,
+      userCommitment,
     });
 
     await ballotCircuit.expectFail({
@@ -232,6 +244,7 @@ describe("Ballot", () => {
       userCommitment,
       encryptedVotesC1: c1,
       encryptedVotesC2: c2,
+      ballotHash,
     });
   });
 
@@ -250,10 +263,12 @@ describe("Ballot", () => {
     const votes = [0n, 1n, 0n, 1n, 1n];
     const random = [9n, 12n, 56n, 3n, 2n];
 
-    const { c1, c2 } = await encryptVotes({
+    const { c1, ballotHash } = await encryptVotes({
       votes,
       random,
       publicKey: pollPublicKey,
+      pollId,
+      userCommitment,
     });
 
     await ballotCircuit.expectFail({
@@ -270,6 +285,7 @@ describe("Ballot", () => {
       userCommitment,
       encryptedVotesC1: c1,
       encryptedVotesC2: c1,
+      ballotHash,
     });
   });
 
@@ -302,6 +318,48 @@ describe("Ballot", () => {
       userCommitment,
       encryptedVotesC1: [0, 0, 0, 0, 0],
       encryptedVotesC2: [0, 0, 0, 0, 0],
+      ballotHash: 0n,
+    });
+  });
+
+  test("should fail if ballot hash is invalid", async () => {
+    const userPrivateKey = 0n;
+    const userPublicKey = [0n, 1n];
+    const pollId = 0n;
+    const pollPublicKey: [bigint, bigint] = [0n, 1n];
+    const userCommitment = poseidon2([userPrivateKey, pollId]);
+    const userVotesBalance = 3n;
+    const { index, siblings, root } = generateBinaryMerkleRoot(
+      STATE_TREE_DEPTH,
+      0,
+      poseidon3([...userPublicKey, userVotesBalance]),
+    );
+    const votes = [0n, 1n, 0n, 1n, 1n];
+    const random = [9n, 12n, 56n, 3n, 2n];
+
+    const { c1, c2 } = await encryptVotes({
+      votes,
+      random,
+      pollId,
+      userCommitment,
+      publicKey: pollPublicKey,
+    });
+
+    await ballotCircuit.expectFail({
+      votes,
+      random,
+      userVotesBalance,
+      userPrivateKey,
+      userPublicKey,
+      pollPublicKey,
+      userTreeIndex: index,
+      userTreePathElements: siblings,
+      userTreeRoot: root,
+      pollId,
+      userCommitment,
+      encryptedVotesC1: c1,
+      encryptedVotesC2: c2,
+      ballotHash: 1n,
     });
   });
 });

@@ -4,7 +4,6 @@ import { poseidon2 } from "poseidon-lite/poseidon2";
 
 import fs from "fs";
 import path from "path";
-import { randomBytes } from "crypto";
 
 const configFilePath = path.resolve(__dirname, "..", "circomkit.json");
 const config = JSON.parse(
@@ -99,19 +98,4 @@ export const generateBinaryMerkleRoot = (
     siblings,
     root: tree.root,
   };
-};
-
-export const SUB_ORDER =
-  2736030358979909402780800718157159386076813972158567259200215660948447373041n;
-
-const generateRandomScalar = (): bigint => {
-  while (true) {
-    const bytes = randomBytes(32);
-
-    const scalar = bytes.reduce((acc, byte) => (acc << 8n) + BigInt(byte), 0n);
-
-    if (scalar < SUB_ORDER) {
-      return scalar;
-    }
-  }
 };

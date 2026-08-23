@@ -6,6 +6,7 @@ include "./comparators.circom";
 include "./poseidon.circom";
 
 include "../utils/CalculateTotal.circom";
+include "../utils/CalculateTotalPoints.circom";
 include "../utils/PrivateToPublicKey.circom";
 include "../vote/VotesEncryption.circom";
 
@@ -39,8 +40,14 @@ template Ballot(STATE_TREE_DEPTH, VOTE_OPTIONS) {
     signal input userTreeIndex;
     // User Merkle tree path elements
     signal input userTreePathElements[STATE_TREE_DEPTH];
+    // Encrypted votes C1
+    signal input encryptedVotesC1[VOTE_OPTIONS][2];
+    // Encrypted votes C2
+    signal input encryptedVotesC2[VOTE_OPTIONS][2];
 
     // Public inputs
+    // Ballot hash (consists of poll id, userCommitment, sum of encrypted votes C1 points, sum of encrypted votes C2 points)
+    signal input ballotHash;
     // User state tree root
     signal input userTreeRoot;
     // Poll ID
@@ -49,10 +56,6 @@ template Ballot(STATE_TREE_DEPTH, VOTE_OPTIONS) {
     signal input userCommitment;
     // Poll public key
     signal input pollPublicKey[2];
-    // Encrypted votes C1
-    signal input encryptedVotesC1[VOTE_OPTIONS][2];
-    // Encrypted votes C2
-    signal input encryptedVotesC2[VOTE_OPTIONS][2];
 
     // Verify that the user's public key is a valid BabyJubJub point.
     component babyCheck = BabyCheck();
@@ -104,4 +107,18 @@ template Ballot(STATE_TREE_DEPTH, VOTE_OPTIONS) {
         encryptedVotesC2[index][0] === voteEncryption.c2[index][0];
         encryptedVotesC2[index][1] === voteEncryption.c2[index][1];
     }
+
+    signal totalC1[2] <== CalculateTotalPoints(VOTE_OPTIONS)(encryptedVotesC1);
+    signal totalC2[2] <== CalculateTotalPoints(VOTE_OPTIONS)(encryptedVotesC2);
+
+    component poseidon = Poseidon(6);
+
+    poseidon.inputs[0] <== pollId;
+    poseidon.inputs[1] <== userCommitment;
+    poseidon.inputs[2] <== totalC1[0];
+    poseidon.inputs[3] <== totalC1[1];
+    poseidon.inputs[4] <== totalC2[0];
+    poseidon.inputs[5] <== totalC2[1];
+
+    ballotHash === poseidon.out;
 }
