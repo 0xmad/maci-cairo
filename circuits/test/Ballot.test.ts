@@ -1,4 +1,4 @@
-import { type BabyJub, buildBabyjub } from "circomlibjs";
+import { buildBabyjub } from "circomlibjs";
 import fc from "fast-check";
 import { poseidon2 } from "poseidon-lite/poseidon2";
 import { poseidon3 } from "poseidon-lite/poseidon3";
@@ -6,8 +6,9 @@ import { beforeAll, describe, test } from "vitest";
 
 import type { WitnessTester } from "circomkit";
 
-import { circomkitInstance, generateBinaryMerkleRoot } from "./utils.js";
 import { encryptVotes } from "../ts/votes.js";
+
+import { circomkitInstance, generateBinaryMerkleRoot } from "./utils.js";
 
 const VOTE_OPTIONS = 5;
 const STATE_TREE_DEPTH = 5;
@@ -29,10 +30,9 @@ describe("Ballot", () => {
       "pollPublicKey",
       "encryptedVotesC1",
       "encryptedVotesC2",
-    ],
-    []
+    ]
   >;
-  let babyJub: BabyJub;
+  let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
     ballotCircuit = await circomkitInstance.WitnessTester("Ballot", {
@@ -101,25 +101,10 @@ describe("Ballot", () => {
         fc.bigInt({ min: 1n, max: babyJub.subOrder - 1n }),
         fc.bigInt({ min: 1n, max: babyJub.subOrder - 1n }),
         fc.bigInt({ min: 1n, max: babyJub.subOrder - 1n }),
-        async (
-          votes: bigint[],
-          random: bigint[],
-          userPrivateKey: bigint,
-          pollPrivateKey: bigint,
-          pollId: bigint,
-        ) => {
-          const userPublicKeyPoint = babyJub.mulPointEscalar(
-            babyJub.Base8,
-            userPrivateKey,
-          );
-          const pollPublicKeyPoint = babyJub.mulPointEscalar(
-            babyJub.Base8,
-            pollPrivateKey,
-          );
-          const userPublicKey = [
-            babyJub.F.toObject(userPublicKeyPoint[0]),
-            babyJub.F.toObject(userPublicKeyPoint[1]),
-          ];
+        async (votes: bigint[], random: bigint[], userPrivateKey: bigint, pollPrivateKey: bigint, pollId: bigint) => {
+          const userPublicKeyPoint = babyJub.mulPointEscalar(babyJub.Base8, userPrivateKey);
+          const pollPublicKeyPoint = babyJub.mulPointEscalar(babyJub.Base8, pollPrivateKey);
+          const userPublicKey = [babyJub.F.toObject(userPublicKeyPoint[0]), babyJub.F.toObject(userPublicKeyPoint[1])];
           const pollPublicKey: [bigint, bigint] = [
             babyJub.F.toObject(pollPublicKeyPoint[0]),
             babyJub.F.toObject(pollPublicKeyPoint[1]),

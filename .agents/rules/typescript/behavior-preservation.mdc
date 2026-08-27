@@ -1,0 +1,178 @@
+---
+description: Preserve observable behavior and contracts during TypeScript changes and refactoring.
+globs:
+  - "circuits/**/*.ts"
+  - "circuits/**/*.tsx"
+alwaysApply: false
+---
+
+# TypeScript Behavior Preservation
+
+TypeScript changes must preserve the existing observable contract unless the task explicitly requests a behavior or API change.
+
+## Runtime behavior
+
+Preserve:
+
+* return values;
+* thrown errors;
+* error types and relevant error fields;
+* error propagation;
+* error timing;
+* validation timing;
+* side effects;
+* side-effect ordering;
+* evaluation order where observable;
+* defaults;
+* coercion and truthiness semantics;
+* collection ordering and duplicate behavior;
+* mutation semantics;
+* object identity;
+* resource lifecycle;
+* state transitions.
+
+Do not treat a cleaner implementation as behavior-preserving without checking its observable consequences.
+
+## Errors
+
+Do not silently change:
+
+* throwing into returning an error value or `undefined`;
+* error types;
+* relevant error messages or fields;
+* when an error occurs;
+* where an error propagates.
+
+Moving validation across mutation, persistence, external calls, or state transitions can change behavior even when the same error is eventually produced.
+
+## Side effects
+
+Preserve observable effects including:
+
+* database and persistence writes;
+* filesystem operations;
+* cache updates;
+* RPC and network calls;
+* callbacks;
+* event emission;
+* state mutation;
+* logging or instrumentation when externally relied upon.
+
+Preserve their ordering when ordering can affect behavior.
+
+## Async and concurrency semantics
+
+Do not change sequential work into concurrent work, or vice versa, under a structural change.
+
+Treat changes involving:
+
+* `Promise.all`;
+* `Promise.race`;
+* queues;
+* workers;
+* locks;
+* event handlers;
+* async iterators;
+* scheduling;
+* cancellation;
+
+as behavior-sensitive.
+
+Preserve:
+
+* execution ordering;
+* completion semantics;
+* failure behavior;
+* retries;
+* cancellation;
+* cleanup;
+* resource usage where it affects correctness.
+
+## Evaluation semantics
+
+Do not reorder expressions merely because the result appears equivalent.
+
+Be especially careful with:
+
+* getters;
+* proxies;
+* function calls;
+* mutations;
+* exceptions;
+* logging;
+* external effects;
+* short-circuit evaluation.
+
+Do not mechanically replace:
+
+* `||` with `??`;
+* `==` with `===`;
+* equality checks with another comparison;
+* mutation with copying.
+
+Verify semantic equivalence first.
+
+## Mutation and identity
+
+Determine whether callers rely on:
+
+* input mutation;
+* returned copies;
+* object identity;
+* shared references;
+* array mutation;
+* cached objects.
+
+Changing mutation into immutable copying, or vice versa, is a behavioral change when consumers can observe it.
+
+## Collections
+
+Preserve:
+
+* ordering;
+* duplicates;
+* stable ordering;
+* empty versus missing values;
+* sorting behavior;
+* iteration behavior.
+
+Do not replace an array with a `Set`, or otherwise change collection semantics, merely for implementation convenience.
+
+## State
+
+For stateful code, preserve:
+
+* valid states;
+* valid transitions;
+* invalid transitions;
+* terminal states;
+* state invariants;
+* transition ordering.
+
+Do not move state mutations across validation, persistence, or external calls without verifying the resulting behavior.
+
+## Resource management
+
+Preserve:
+
+* acquisition;
+* use;
+* cleanup;
+* cleanup ordering;
+* exception safety;
+* cancellation behavior.
+
+Treat files, database connections, RPC subscriptions, timers, locks, child processes, and temporary resources as behavior-sensitive.
+
+## Scope
+
+Do not mix unrelated cleanup into a behavior-preserving change.
+
+Avoid:
+
+* unrelated renames;
+* dependency upgrades;
+* framework migrations;
+* broad formatting changes;
+* unrelated API changes;
+* speculative architecture changes.

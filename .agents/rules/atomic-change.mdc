@@ -1,0 +1,48 @@
+---
+description: Keep repository changes narrowly scoped, causally related, reviewable, and independently understandable.
+alwaysApply: true
+---
+
+# Atomic Change
+
+Keep each change to the smallest complete diff that satisfies one coherent
+outcome.
+
+Before editing, identify the purpose, affected package, required supporting
+changes, tests, generated outputs, and known out-of-scope work. Every changed
+file and section must directly support that outcome. Exclude work that is
+merely nearby, cleaner, or convenient.
+
+> Would the requested behavior be incomplete, incorrect, or untestable without
+> this change?
+
+If no, keep it out of scope. Expand scope only when implementation proves the
+additional change is necessary.
+
+Before introducing a helper, abstraction, module, type, or dependency:
+
+1. Search for an existing solution.
+2. Check package boundaries and dependencies.
+3. Reuse existing infrastructure when it correctly solves the task.
+4. Add new structure only when required.
+
+Preserve observable behavior unless intentionally changing it, including errors,
+serialization, ordering, persistence, concurrency, and side effects. Preserve
+public APIs by default; inspect exports, consumers, serialization, and
+compatibility before changing shared contracts.
+
+For generated files, change the source of truth and use the official generator.
+For dependencies, update only when required and include the lockfile
+consequence.
+
+Tests protecting changed behavior belong in scope. Never delete tests, weaken
+assertions, narrow valid property domains, add arbitrary sleeps or retries, or
+mock away the system under test.
+
+Before completion, inspect `git status`, `git diff --stat`, `git diff`, and
+`git diff --check`. At 20 or more changed files, reassess whether all files are
+required for one coherent change.
+
+Do not revert, reset, clean, stage, amend, or overwrite pre-existing worktree
+changes. Stop when the requested behavior, required validation, and final diff
+review are complete.

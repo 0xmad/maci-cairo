@@ -1,0 +1,27 @@
+---
+description: Apply repository-specific Cairo coding and package-boundary guidance.
+globs:
+  - "**/*.cairo"
+alwaysApply: false
+---
+
+# Cairo Coding
+
+Inspect the owning `Scarb.toml`, nearby modules, traits, interfaces, tests, and
+package dependencies before editing Cairo.
+
+Preserve Cairo-specific contracts, including:
+
+- public entrypoints, interfaces, traits, and event shapes;
+- storage keys, layout, defaults, and mutation ordering;
+- calldata and return-value ordering;
+- error conditions and validation timing;
+- explicit state transitions and cross-contract call ordering;
+- package dependency direction.
+
+Reuse existing Cairo types, traits, helpers, and test patterns. Do not add
+speculative abstractions or change public contract surfaces for convenience.
+
+Run the smallest relevant Scarb or `snforge` command, then broaden validation
+when a shared type, interface, storage contract, or cross-contract behavior
+changes.

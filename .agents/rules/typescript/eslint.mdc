@@ -1,0 +1,24 @@
+---
+description: Use repository-configured TypeScript validation when editing circuit TypeScript.
+globs:
+  - "circuits/**/*.ts"
+  - "circuits/**/*.tsx"
+alwaysApply: false
+---
+
+# TypeScript Validation
+
+Before editing TypeScript, inspect `circuits/package.json` and
+`circuits/tsconfig.json`. The repository currently defines TypeScript build and
+Vitest test scripts, and ESLint scripts.
+
+Use the live repository configuration rather than assuming Airbnb, ESLint
+plugins, Prettier integration, or type-aware linting are installed.
+
+Run the smallest applicable command:
+
+- `cd circuits && pnpm build`
+- `cd circuits && pnpm test`
+
+Do not add lint suppressions, weaken types, change tooling configuration, or
+invent validation commands merely to make a change pass.

@@ -1,0 +1,34 @@
+---
+description: Safety rules for Starknet contracts and Circom circuits.
+globs:
+  - "common/**/*.cairo"
+  - "contracts/**/*.cairo"
+  - "circuits/**/*.circom"
+  - "circuits/**/*.ts"
+alwaysApply: false
+---
+
+# Protocol safety
+
+Before editing protocol code, inspect the owning package manifest, public
+interfaces, direct consumers, nearby tests, and serialization boundaries.
+
+For Cairo, preserve constructor and entrypoint argument order, storage layout,
+events, authorization, validation-before-mutation/external-call ordering,
+cross-contract failure propagation, and state-transition invariants. Add
+focused `snforge` coverage for changed public behavior.
+
+For Circom and circuit-facing TypeScript, preserve signal visibility and
+ordering, field conversions, witness semantics, constraints, proof public
+signals, and malformed-input behavior. Test valid and invalid witnesses,
+boundary values, and proof verification where applicable. Never remove a
+constraint or patch generated artifacts instead of changing their source.
+
+Use the narrowest relevant commands first:
+
+- `scarb test --package maci_common`
+- `scarb test --package maci_contracts`
+- `cd circuits && pnpm test`
+- `cd circuits && pnpm build`
+- `cd circuits && pnpm compile:ballot`
+- `cd circuits && pnpm setup:ballot`

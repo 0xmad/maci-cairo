@@ -1,0 +1,337 @@
+---
+description: "Meaningful TypeScript test coverage guidance for behavioral changes, regression fixes, branches, boundaries, state transitions, side effects, public APIs, and property-based tests."
+globs:
+  - "circuits/**/*.{test,spec}.ts"
+  - "circuits/**/*.{test,spec}.tsx"
+alwaysApply: false
+---
+
+# TypeScript Test Coverage
+
+Coverage is a diagnostic and quality signal. It is not, by itself, evidence that behavior is correct.
+
+## Source of truth
+
+Use this precedence:
+
+1. Explicit task requirements.
+2. Repository coverage configuration.
+3. Existing repository testing conventions.
+4. Existing tests and property-based tests.
+5. General coverage guidance.
+
+If the repository defines coverage thresholds, those thresholds are authoritative.
+
+If it does not, do not invent a percentage such as 80%, 90%, or 100%.
+
+## Coverage goal
+
+For a behavior change, seek meaningful protection for:
+
+- requested behavior;
+- important successful paths;
+- meaningful failure paths;
+- relevant boundaries;
+- regression scenarios;
+- important state transitions;
+- meaningful side effects;
+- compatibility behavior when an existing API changes.
+
+Do not optimize for coverage numbers alone.
+
+## Behavioral coverage
+
+Prefer behavioral coverage over raw line execution.
+
+Weak:
+
+    it("executes the branch", () => {
+      functionUnderTest();
+      expect(true).toBe(true);
+    });
+
+Better:
+
+    it("rejects a non-positive duration", () => {
+      expect(() => createPoll({ duration: 0 })).toThrow();
+    });
+
+A test that executes a line without verifying behavior does not provide meaningful protection.
+
+## Changed branches
+
+When a change introduces a branch, determine whether each meaningful outcome requires coverage.
+
+Do not add a test solely because a coverage report identifies an uncovered line.
+
+Add coverage when the uncovered path represents meaningful behavior.
+
+## Negative paths
+
+When rejection behavior is part of the domain contract, cover relevant failures such as:
+
+invalid input
+missing value
+duplicate value
+out-of-range value
+invalid state transition
+serialization failure
+permission failure
+
+Test domain-relevant cases rather than mechanically enumerating errors.
+
+## Boundary coverage
+
+For numeric, collection, state, and protocol boundaries, consider:
+
+minimum valid
+maximum valid
+just below minimum
+just above maximum
+empty
+single value
+multiple values
+duplicate
+missing
+
+Only test boundaries that have behavioral significance.
+
+## Regression coverage
+
+Every bug fix should either:
+
+- add a regression test; or
+- identify existing coverage that already reproduces the bug.
+
+A regression test should fail against the buggy implementation when practical.
+
+A test that passes both before and after the fix does not prove that the regression is protected.
+
+## State coverage
+
+For stateful systems, consider:
+
+initial state
+→ valid transition
+→ resulting state
+
+When applicable, also cover:
+
+invalid transition
+repeated operation
+terminal state
+side effect
+
+Do not force state-transition tests onto stateless behavior.
+
+## Error coverage
+
+When error behavior is contractual, verify the meaningful failure semantics.
+
+Use:
+
+    expect(() => operation()).toThrow();
+
+or the repository's established error-type/message conventions.
+
+Do not assert incidental error details merely to increase coverage.
+
+## Side-effect coverage
+
+When a change affects meaningful side effects, cover them.
+
+Examples:
+
+- state mutation;
+- persistence;
+- event emission;
+- external calls;
+- avoided external calls;
+- avoiding persistence after validation failure.
+
+Do not assert every internal function call solely because a mock exposes it.
+
+## Public API coverage
+
+When an exported API changes:
+
+- test through the public boundary;
+- verify relevant input/output semantics;
+- verify meaningful errors and absence behavior;
+- inspect downstream consumers when appropriate.
+
+Do not rely only on an internal helper if public behavior is what changed.
+
+## Coverage and implementation details
+
+Coverage must not force tests to depend on private implementation details.
+
+If a branch is difficult to cover, ask:
+
+Is this branch observable behavior?
+Can it be tested through a public boundary?
+Is the implementation unnecessarily complex?
+
+Do not expose private implementation merely to obtain coverage.
+
+## Coverage and refactoring
+
+A behavior-preserving refactor should normally retain equivalent meaningful coverage.
+
+After refactoring:
+
+- run existing tests;
+- inspect coverage when appropriate;
+- verify important behavior remains exercised.
+
+Do not add tests merely because code moved between files.
+
+## Coverage and TDD
+
+After GREEN:
+
+RED
+→ GREEN
+→ inspect meaningful coverage
+→ add missing behavioral cases
+→ REFACTOR
+
+Coverage can reveal important paths the initial test did not specify.
+
+It should not turn into coverage-driven test spam.
+
+## Property-based coverage
+
+For property-based tests, verify:
+
+- the arbitrary represents the intended domain;
+- important input categories are reachable;
+- boundary values can be generated;
+- invalid values are generated when appropriate;
+- shrinking remains useful;
+- the run count is appropriate for the intended confidence.
+
+Do not reduce `numRuns` merely to make a property faster or prevent it from finding a failure.
+
+Do not change generators merely to exclude a legitimate failing case.
+
+## Coverage does not justify weakening properties
+
+Do not do this to avoid failures:
+
+    fc.pre(input.length > 0);
+
+when empty input is supported.
+
+Do not replace a meaningful generator with:
+
+    fc.constant(validInput);
+
+merely to make the property pass.
+
+Fix the implementation or correct the property/generator according to the actual domain contract.
+
+## Integration coverage
+
+Not every change requires integration tests.
+
+Consider integration coverage when behavior crosses meaningful boundaries such as:
+
+- package boundaries;
+- persistence;
+- RPC;
+- external services;
+- serialization;
+- protocol interactions.
+
+Use the smallest realistic integration boundary.
+
+Do not turn every unit test into an integration test.
+
+## Monorepo coverage
+
+In a pnpm monorepo:
+
+1. Determine the affected package.
+2. Use package-level coverage when sufficient.
+3. Expand to workspace-wide coverage when the change crosses package boundaries or CI requires it.
+
+Do not modify repository-wide coverage configuration unnecessarily.
+
+## Coverage configuration
+
+Do not change:
+
+- thresholds;
+- exclusions;
+- test collection rules;
+- instrumentation configuration;
+
+merely to make a task pass.
+
+A coverage configuration change requires a concrete repository/task reason.
+
+Do not exclude newly written production code merely because it is inconvenient to test.
+
+For generated code, first check existing repository conventions and the generator/source of truth.
+
+## Coverage failures
+
+When coverage validation fails:
+
+1. Identify what changed.
+2. Identify which meaningful behavior is uncovered.
+3. Determine whether the missing coverage is intentional.
+4. Add the smallest meaningful test.
+5. Rerun coverage.
+
+Do not immediately lower thresholds or exclude code.
+
+Treat test failures and coverage failures separately:
+
+Tests:
+behavioral correctness
+
+Coverage:
+test completeness signal
+
+## Coverage review priority
+
+When reviewing a coverage report, prioritize:
+
+1. changed code;
+2. new branches;
+3. new error paths;
+4. new state transitions;
+5. new public API paths;
+6. regression scenarios.
+
+Do not spend effort increasing coverage in unrelated code during a focused change.
+
+## Completion
+
+Coverage is adequate when, as applicable, the change has meaningful protection for:
+
+requested behavior
++
+meaningful success paths
++
+meaningful failure paths
++
+important boundaries
++
+regression protection
+
+Do not equate high line coverage with good behavioral or property-based coverage.
+
+Never game coverage by:
+
+- meaningless assertions;
+- execution-only tests;
+- trivial branch tests;
+- lowering thresholds;
+- excluding code;
+- deleting difficult behavior;
+- weakening tests;
+- mocking the behavior under test;
+- adding dead code solely for coverage.

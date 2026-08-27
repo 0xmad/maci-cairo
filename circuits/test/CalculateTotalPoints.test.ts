@@ -1,8 +1,9 @@
-import { BabyJub, buildBabyjub, Point } from "circomlibjs";
+import { buildBabyjub } from "circomlibjs";
 import fc from "fast-check";
-import { describe, test, beforeAll, expect } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 
 import type { WitnessTester } from "circomkit";
+import type { Point } from "circomlibjs";
 
 import { circomkitInstance } from "./utils.js";
 
@@ -10,7 +11,7 @@ const LENGTH = 6;
 
 describe("CalculateTotalPoints circuit", () => {
   let circuit: WitnessTester<["points"], ["out"]>;
-  let babyJub: BabyJub;
+  let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
     circuit = await circomkitInstance.WitnessTester("CalculateTotalPoints", {
@@ -33,10 +34,7 @@ describe("CalculateTotalPoints circuit", () => {
     }
 
     const circuitInputs = {
-      points: points.map(([x, y]) => [
-        babyJub.F.toObject(x),
-        babyJub.F.toObject(y),
-      ]),
+      points: points.map(([x, y]) => [babyJub.F.toObject(x), babyJub.F.toObject(y)]),
     };
 
     await circuit.expectPass(circuitInputs, {
@@ -45,23 +43,17 @@ describe("CalculateTotalPoints circuit", () => {
   });
 
   test("should correctly sum exactly two points", async () => {
-    const testCircuit = await circomkitInstance.WitnessTester(
-      "CalculateTotalPoints",
-      {
-        file: "./utils/CalculateTotalPoints",
-        template: "CalculateTotalPoints",
-        params: [2],
-      },
-    );
+    const testCircuit = await circomkitInstance.WitnessTester("CalculateTotalPoints", {
+      file: "./utils/CalculateTotalPoints",
+      template: "CalculateTotalPoints",
+      params: [2],
+    });
 
     const point1 = babyJub.mulPointEscalar(babyJub.Base8, 3n);
     const point2 = babyJub.mulPointEscalar(babyJub.Base8, 7n);
     const expected = babyJub.addPoint(point1, point2);
 
-    const points = [point1, point2].map(([x, y]) => [
-      babyJub.F.toObject(x),
-      babyJub.F.toObject(y),
-    ]);
+    const points = [point1, point2].map(([x, y]) => [babyJub.F.toObject(x), babyJub.F.toObject(y)]);
 
     await testCircuit.expectPass(
       { points },
@@ -75,19 +67,13 @@ describe("CalculateTotalPoints circuit", () => {
     const identity = babyJub.mulPointEscalar(babyJub.Base8, 0n);
     const expected = babyJub.mulPointEscalar(babyJub.Base8, 123n);
 
-    const points = [identity, expected].map(([x, y]) => [
-      babyJub.F.toObject(x),
-      babyJub.F.toObject(y),
-    ]);
+    const points = [identity, expected].map(([x, y]) => [babyJub.F.toObject(x), babyJub.F.toObject(y)]);
 
-    const testCircuit = await circomkitInstance.WitnessTester(
-      "CalculateTotalPoints",
-      {
-        file: "./utils/CalculateTotalPoints",
-        template: "CalculateTotalPoints",
-        params: [2],
-      },
-    );
+    const testCircuit = await circomkitInstance.WitnessTester("CalculateTotalPoints", {
+      file: "./utils/CalculateTotalPoints",
+      template: "CalculateTotalPoints",
+      params: [2],
+    });
 
     await testCircuit.expectPass(
       { points },
@@ -121,10 +107,7 @@ describe("CalculateTotalPoints circuit", () => {
       expected = babyJub.addPoint(expected, point);
     }
 
-    const points = Array.from({ length: LENGTH }, () => [
-      babyJub.F.toObject(point[0]),
-      babyJub.F.toObject(point[1]),
-    ]);
+    const points = Array.from({ length: LENGTH }, () => [babyJub.F.toObject(point[0]), babyJub.F.toObject(point[1])]);
 
     await circuit.expectPass(
       { points },
@@ -136,22 +119,16 @@ describe("CalculateTotalPoints circuit", () => {
 
   test("should correctly add inverse points", async () => {
     const point = babyJub.mulPointEscalar(babyJub.Base8, 123n);
-    const inverse: Point = [babyJub.F.neg(point[0]), point[1]];
+    const inverse = [babyJub.F.neg(point[0]), point[1]];
     const identity = babyJub.mulPointEscalar(babyJub.Base8, 0n);
 
-    const points = [point, inverse].map(([x, y]) => [
-      babyJub.F.toObject(x),
-      babyJub.F.toObject(y),
-    ]);
+    const points = [point, inverse].map(([x, y]) => [babyJub.F.toObject(x), babyJub.F.toObject(y)]);
 
-    const testCircuit = await circomkitInstance.WitnessTester(
-      "CalculateTotalPoints",
-      {
-        file: "./utils/CalculateTotalPoints",
-        template: "CalculateTotalPoints",
-        params: [2],
-      },
-    );
+    const testCircuit = await circomkitInstance.WitnessTester("CalculateTotalPoints", {
+      file: "./utils/CalculateTotalPoints",
+      template: "CalculateTotalPoints",
+      params: [2],
+    });
 
     await testCircuit.expectPass(
       { points },
@@ -182,14 +159,11 @@ describe("CalculateTotalPoints circuit", () => {
   });
 
   test("should handle negative field coordinates", async () => {
-    const testCircuit = await circomkitInstance.WitnessTester(
-      "CalculateTotalPoints",
-      {
-        file: "./utils/CalculateTotalPoints",
-        template: "CalculateTotalPoints",
-        params: [2],
-      },
-    );
+    const testCircuit = await circomkitInstance.WitnessTester("CalculateTotalPoints", {
+      file: "./utils/CalculateTotalPoints",
+      template: "CalculateTotalPoints",
+      params: [2],
+    });
 
     const identity = babyJub.mulPointEscalar(babyJub.Base8, 0n);
 
@@ -217,20 +191,14 @@ describe("CalculateTotalPoints circuit", () => {
 
     const points = [
       wrappedPoint,
-      ...[identity, identity, identity, identity].map(([x, y]) => [
-        babyJub.F.toObject(x),
-        babyJub.F.toObject(y),
-      ]),
+      ...[identity, identity, identity, identity].map((p) => [babyJub.F.toObject(p[0]), babyJub.F.toObject(p[1])]),
       [
         babyJub.F.toObject(babyJub.mulPointEscalar(babyJub.Base8, 456n)[0]),
         babyJub.F.toObject(babyJub.mulPointEscalar(babyJub.Base8, 456n)[1]),
       ],
     ];
 
-    const expected = babyJub.addPoint(
-      point,
-      babyJub.mulPointEscalar(babyJub.Base8, 456n),
-    );
+    const expected = babyJub.addPoint(point, babyJub.mulPointEscalar(babyJub.Base8, 456n));
 
     await circuit.expectPass(
       { points },
@@ -251,10 +219,7 @@ describe("CalculateTotalPoints circuit", () => {
     const points = [
       [x1 - babyJub.p, y1 - babyJub.p],
       [babyJub.F.toObject(point2[0]), babyJub.F.toObject(point2[1])],
-      ...[identity, identity, identity, identity].map(([x, y]) => [
-        babyJub.F.toObject(x),
-        babyJub.F.toObject(y),
-      ]),
+      ...[identity, identity, identity, identity].map(([x, y]) => [babyJub.F.toObject(x), babyJub.F.toObject(y)]),
     ];
 
     const expected = babyJub.addPoint(point1, point2);
@@ -276,18 +241,15 @@ describe("CalculateTotalPoints circuit", () => {
             .map((scalar) => babyJub.mulPointEscalar(babyJub.Base8, scalar))
             .map(([x, y]) => [babyJub.F.toObject(x), babyJub.F.toObject(y)]);
 
-          const testCircuit = await circomkitInstance.WitnessTester(
-            "CalculateTotalPoints",
-            {
-              file: "./utils/CalculateTotalPoints",
-              template: "CalculateTotalPoints",
-              params: [scalars.length],
-            },
-          );
+          const testCircuit = await circomkitInstance.WitnessTester("CalculateTotalPoints", {
+            file: "./utils/CalculateTotalPoints",
+            template: "CalculateTotalPoints",
+            params: [scalars.length],
+          });
 
           const witness = await testCircuit.calculateWitness({ points });
 
-          return await testCircuit
+          return testCircuit
             .expectConstraintPass(witness)
             .then(() => true)
             .catch(() => false);

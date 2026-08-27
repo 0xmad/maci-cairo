@@ -1,7 +1,8 @@
-import { type BigNumberish, buildBabyjub } from "circomlibjs";
+import { buildBabyjub } from "circomlibjs";
 import { poseidon6 } from "poseidon-lite/poseidon6";
 
 import type { SameLength } from "./types.js";
+import type { BigNumberish } from "circomlibjs";
 
 /**
  * Arguments used to encrypt a set of votes.
@@ -29,10 +30,7 @@ import type { SameLength } from "./types.js";
  * };
  * ```
  */
-export type TEncryptVotesArgs<
-  T1 extends BigNumberish[],
-  T2 extends BigNumberish[],
-> =
+export type TEncryptVotesArgs<T1 extends BigNumberish[], T2 extends BigNumberish[]> =
   SameLength<T1, T2> extends true
     ? {
         votes: T1;
@@ -110,10 +108,7 @@ export const encryptVotes = async <T1 extends bigint[], T2 extends bigint[]>({
   for (let index = 0; index < votes.length; index += 1) {
     const mG = babyJub.mulPointEscalar(babyJub.Base8, votes[index]);
     const rG = babyJub.mulPointEscalar(babyJub.Base8, random[index]);
-    const rA = babyJub.mulPointEscalar(
-      [babyJub.F.e(publicKey[0]), babyJub.F.e(publicKey[1])],
-      random[index],
-    );
+    const rA = babyJub.mulPointEscalar([babyJub.F.e(publicKey[0]), babyJub.F.e(publicKey[1])], random[index]);
 
     const mGrA = babyJub.addPoint(mG, rA);
     c1.push([babyJub.F.toObject(rG[0]), babyJub.F.toObject(rG[1])]);

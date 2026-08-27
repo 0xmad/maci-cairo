@@ -1,0 +1,39 @@
+---
+description: Test Cairo packages and Starknet contracts with focused snforge coverage.
+globs:
+  - "**/*test*.cairo"
+  - "common/tests/**/*.cairo"
+  - "contracts/tests/**/*.cairo"
+alwaysApply: false
+---
+
+# Cairo Testing
+
+Use existing `common/tests` and `contracts/tests` patterns before adding test
+helpers or fixtures. Prefer focused tests that exercise public functions,
+traits, contract entrypoints, and observable state rather than implementation
+details.
+
+For each behavior change, cover the meaningful success path and relevant
+failure, boundary, and repeated-operation cases. For contracts, verify:
+
+- storage and state transitions;
+- emitted events and event fields;
+- access control and policy behavior;
+- validation before mutation or external calls;
+- cross-contract call results and failure propagation;
+- constructor and entrypoint argument ordering.
+
+Use deterministic inputs and explicit expected values for cryptographic,
+serialization, and protocol behavior. Preserve exact field ordering, widths,
+canonical representations, and state-index semantics. Use known-answer,
+round-trip, or independently derived invariants where appropriate.
+
+Run the narrowest relevant command:
+
+- `scarb test --package maci_common`
+- `scarb test --package maci_contracts`
+- `make test` for the complete workflow
+
+Do not delete or weaken assertions, skip failures, add arbitrary sleeps, or
+change fixtures merely to obtain a passing test.

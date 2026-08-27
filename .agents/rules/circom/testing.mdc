@@ -1,0 +1,40 @@
+---
+description: Test Circom circuits and circuit-facing TypeScript for constraints, witnesses, proofs, and exact outputs.
+globs:
+  - "circuits/**/*.{circom,ts,tsx}"
+alwaysApply: false
+---
+
+# Circom Testing
+
+Before changing a circuit or its wrapper, inspect the existing tests,
+templates, inputs, outputs, component wiring, and TypeScript helpers. Test
+through the public circuit or wrapper boundary rather than reproducing its
+implementation in the test.
+
+Cover, when applicable:
+
+- valid witnesses and expected outputs;
+- invalid witnesses rejected by constraints;
+- zero, one, maximum, empty, duplicate, and malformed boundary cases;
+- public/private signal visibility and signal ordering;
+- field arithmetic and conversion boundaries;
+- deterministic witness and proof inputs;
+- serialization and deserialization round trips;
+- proof verification and meaningful failure behavior.
+
+Keep expected values independently derived. Do not use the same production
+calculation as the test oracle, remove constraints to make a test pass, or
+restrict valid inputs to hide a failure.
+
+Use the repository workflow:
+
+- `cd circuits && pnpm test`
+- `cd circuits && pnpm build`
+- `cd circuits && pnpm compile:ballot`
+- `cd circuits && pnpm setup:ballot`
+
+When compilation or setup changes generated artifacts, inspect exact output
+ordering and retain only output attributable to the source change. Keep
+external infrastructure setup outside arbitraries and clean up resources
+created by tests.

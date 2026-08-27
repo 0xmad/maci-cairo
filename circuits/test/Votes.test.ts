@@ -1,41 +1,33 @@
-import { type BabyJub, buildBabyjub } from "circomlibjs";
+import { buildBabyjub } from "circomlibjs";
 import fc from "fast-check";
 import { poseidon2 } from "poseidon-lite/poseidon2";
 import { beforeAll, describe, test } from "vitest";
 
 import type { WitnessTester } from "circomkit";
 
-import { circomkitInstance, getSignalArray } from "./utils.js";
 import { encryptVotes } from "../ts/votes.js";
+
+import { circomkitInstance, getSignalArray } from "./utils.js";
 
 describe("Votes", () => {
   const VOTE_OPTIONS = 5;
 
-  let encryptionCircuit: WitnessTester<
-    ["votes", "random", "publicKey"],
-    ["c1", "c2"]
-  >;
+  let encryptionCircuit: WitnessTester<["votes", "random", "publicKey"], ["c1", "c2"]>;
   let decryptionCircuit: WitnessTester<["privateKey", "c1", "c2"], ["out"]>;
-  let babyJub: BabyJub;
+  let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
-    encryptionCircuit = await circomkitInstance.WitnessTester(
-      "VotesEncryption",
-      {
-        file: "vote/VotesEncryption",
-        template: "VotesEncryption",
-        params: [VOTE_OPTIONS],
-      },
-    );
+    encryptionCircuit = await circomkitInstance.WitnessTester("VotesEncryption", {
+      file: "vote/VotesEncryption",
+      template: "VotesEncryption",
+      params: [VOTE_OPTIONS],
+    });
 
-    decryptionCircuit = await circomkitInstance.WitnessTester(
-      "VotesDecryption",
-      {
-        file: "vote/VotesDecryption",
-        template: "VotesDecryption",
-        params: [VOTE_OPTIONS],
-      },
-    );
+    decryptionCircuit = await circomkitInstance.WitnessTester("VotesDecryption", {
+      file: "vote/VotesDecryption",
+      template: "VotesDecryption",
+      params: [VOTE_OPTIONS],
+    });
 
     babyJub = await buildBabyjub();
   });
@@ -54,10 +46,7 @@ describe("Votes", () => {
         fc.bigInt({ min: 1n, max: babyJub.subOrder - 1n }),
         fc.bigInt({ min: 0n, max: babyJub.subOrder - 1n }),
         async (votes: bigint[], random: bigint[], privateKey: bigint, pollId: bigint) => {
-          const publicKeyPoint = babyJub.mulPointEscalar(
-            babyJub.Base8,
-            privateKey,
-          );
+          const publicKeyPoint = babyJub.mulPointEscalar(babyJub.Base8, privateKey);
 
           const publicKey: [bigint, bigint] = [
             babyJub.F.toObject(publicKeyPoint[0]),
@@ -73,20 +62,8 @@ describe("Votes", () => {
           });
 
           const [c1, c2] = await Promise.all([
-            getSignalArray(
-              encryptionCircuit,
-              encryptionWitness,
-              "c1",
-              VOTE_OPTIONS,
-              2,
-            ),
-            getSignalArray(
-              encryptionCircuit,
-              encryptionWitness,
-              "c2",
-              VOTE_OPTIONS,
-              2,
-            ),
+            getSignalArray(encryptionCircuit, encryptionWitness, "c1", VOTE_OPTIONS, 2),
+            getSignalArray(encryptionCircuit, encryptionWitness, "c2", VOTE_OPTIONS, 2),
           ]);
 
           const encryptedVotes = await encryptVotes({
@@ -101,14 +78,8 @@ describe("Votes", () => {
             const encryptedPoint = encryptedVotes.c1[index];
 
             return (
-              babyJub.F.eq(
-                babyJub.F.e(point[0]),
-                babyJub.F.e(encryptedPoint[0]),
-              ) &&
-              babyJub.F.eq(
-                babyJub.F.e(point[1]),
-                babyJub.F.e(encryptedPoint[1]),
-              )
+              babyJub.F.eq(babyJub.F.e(point[0]), babyJub.F.e(encryptedPoint[0])) &&
+              babyJub.F.eq(babyJub.F.e(point[1]), babyJub.F.e(encryptedPoint[1]))
             );
           });
 
@@ -116,14 +87,8 @@ describe("Votes", () => {
             const encryptedPoint = encryptedVotes.c2[index];
 
             return (
-              babyJub.F.eq(
-                babyJub.F.e(point[0]),
-                babyJub.F.e(encryptedPoint[0]),
-              ) &&
-              babyJub.F.eq(
-                babyJub.F.e(point[1]),
-                babyJub.F.e(encryptedPoint[1]),
-              )
+              babyJub.F.eq(babyJub.F.e(point[0]), babyJub.F.e(encryptedPoint[0])) &&
+              babyJub.F.eq(babyJub.F.e(point[1]), babyJub.F.e(encryptedPoint[1]))
             );
           });
 
@@ -135,17 +100,9 @@ describe("Votes", () => {
 
           await decryptionCircuit.expectConstraintPass(decryptionWitness);
 
-          const candidates = votes.map((vote) =>
-            babyJub.mulPointEscalar(babyJub.Base8, vote),
-          );
+          const candidates = votes.map((vote) => babyJub.mulPointEscalar(babyJub.Base8, vote));
 
-          const out = await getSignalArray(
-            decryptionCircuit,
-            decryptionWitness,
-            "out",
-            VOTE_OPTIONS,
-            2,
-          );
+          const out = await getSignalArray(decryptionCircuit, decryptionWitness, "out", VOTE_OPTIONS, 2);
 
           return (
             isValidC1 &&
@@ -202,15 +159,9 @@ describe("Votes", () => {
         }),
         fc.bigInt({ min: 1n, max: babyJub.subOrder - 1n }),
         async (votes: bigint[], random: bigint[], privateKey: bigint) => {
-          const publicKeyPoint = babyJub.mulPointEscalar(
-            babyJub.Base8,
-            privateKey,
-          );
+          const publicKeyPoint = babyJub.mulPointEscalar(babyJub.Base8, privateKey);
 
-          const publicKey = [
-            babyJub.F.toObject(publicKeyPoint[0]),
-            babyJub.F.toObject(publicKeyPoint[1]),
-          ];
+          const publicKey = [babyJub.F.toObject(publicKeyPoint[0]), babyJub.F.toObject(publicKeyPoint[1])];
 
           const encryptionWitness = await encryptionCircuit.calculateWitness({
             votes,
@@ -219,20 +170,8 @@ describe("Votes", () => {
           });
 
           const [c1, c2] = await Promise.all([
-            getSignalArray(
-              encryptionCircuit,
-              encryptionWitness,
-              "c1",
-              VOTE_OPTIONS,
-              2,
-            ),
-            getSignalArray(
-              encryptionCircuit,
-              encryptionWitness,
-              "c2",
-              VOTE_OPTIONS,
-              2,
-            ),
+            getSignalArray(encryptionCircuit, encryptionWitness, "c1", VOTE_OPTIONS, 2),
+            getSignalArray(encryptionCircuit, encryptionWitness, "c2", VOTE_OPTIONS, 2),
           ]);
 
           const decryptionWitness = await decryptionCircuit.calculateWitness({
@@ -249,17 +188,9 @@ describe("Votes", () => {
 
           await decryptionCircuit.expectConstraintPass(decryptionWitness);
 
-          const candidates = votes.map((vote) =>
-            babyJub.mulPointEscalar(babyJub.Base8, vote),
-          );
+          const candidates = votes.map((vote) => babyJub.mulPointEscalar(babyJub.Base8, vote));
 
-          const out = await getSignalArray(
-            decryptionCircuit,
-            decryptionWitness,
-            "out",
-            VOTE_OPTIONS,
-            2,
-          );
+          const out = await getSignalArray(decryptionCircuit, decryptionWitness, "out", VOTE_OPTIONS, 2);
 
           return out.every(
             ([x, y], index) =>

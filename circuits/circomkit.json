@@ -9,10 +9,7 @@
   "dirBuild": "./build",
   "optimization": 2,
   "inspect": false,
-  "include": [
-    "./node_modules/circomlib/circuits",
-    "./node_modules/@zk-kit/binary-merkle-root.circom/src"
-  ],
+  "include": ["./node_modules/circomlib/circuits", "./node_modules/@zk-kit/binary-merkle-root.circom/src"],
   "groth16numContributions": 0,
   "groth16askForEntropy": false,
   "logLevel": "INFO",

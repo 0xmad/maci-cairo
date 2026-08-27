@@ -1,0 +1,231 @@
+---
+description: "TypeScript/Vitest test quality standards for circuit tests."
+globs:
+  - "circuits/**/*.{test,spec}.ts"
+  - "circuits/**/*.{test,spec}.tsx"
+alwaysApply: false
+---
+
+# TypeScript Test Quality
+
+These rules apply when working on TypeScript test files.
+
+## Test behavior, not implementation
+
+Prefer observable contracts.
+
+Good:
+
+    it("rejects a non-positive duration", () => {
+      expect(() => createPoll({ duration: 0 })).toThrow();
+    });
+
+Avoid coupling tests to:
+
+- private implementation details;
+- local variable names;
+- incidental helper structure;
+- internal caches;
+- exact internal call order;
+- implementation-specific library behavior.
+
+A reasonable internal refactor should not require rewriting a behavioral test.
+
+## Public boundaries
+
+When behavior is exposed through a public API, test through that API.
+
+Prefer:
+
+    processor.process(message);
+
+over directly invoking private implementation details.
+
+Test meaningful:
+
+- inputs;
+- outputs;
+- error behavior;
+- side effects;
+- state transitions.
+
+## Assertions must prove behavior
+
+Prefer precise contractual assertions:
+
+    expect(result).toEqual({
+      id: expectedId,
+      status: "completed",
+    });
+
+Do not weaken them to execution checks:
+
+    expect(result).toBeDefined();
+
+Do not remove assertions merely because implementation changes make them inconvenient.
+
+A test that only executes a function without verifying behavior is not meaningful coverage.
+
+## Focused tests
+
+Each test should have one primary behavioral reason to fail.
+
+Multiple assertions are acceptable when they describe the same behavior.
+
+Avoid unrelated concerns in one test.
+
+## Error assertions
+
+Use the minimum specificity required by the contract:
+
+    expect(() => operation()).toThrow();
+
+or:
+
+    expect(() => operation()).toThrow(InvalidMessageError);
+
+or, only when contractual:
+
+    expect(() => operation()).toThrow("Invalid message");
+
+Do not assert incidental error details.
+
+## Negative and boundary cases
+
+When relevant, cover meaningful cases such as:
+
+empty
+single value
+multiple values
+minimum valid
+maximum valid
+just below minimum
+just above maximum
+invalid input
+missing value
+duplicate value
+invalid state transition
+repeated operation
+
+Do not mechanically enumerate values that have no behavioral significance.
+
+## Determinism
+
+Avoid uncontrolled:
+
+- current time;
+- randomness;
+- network state;
+- machine-specific filesystem state;
+- shared mutable state;
+- test ordering.
+
+Use repository-supported mechanisms for:
+
+- fake timers;
+- deterministic randomness;
+- fixtures;
+- cleanup;
+- environment setup.
+
+## No arbitrary sleeps
+
+Never use arbitrary sleeps to synchronize tests:
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+Prefer:
+
+- awaiting the actual operation;
+- explicit readiness/completion conditions;
+- repository test helpers;
+- fake timers where appropriate.
+
+Do not increase timeouts merely to hide a race or flaky test.
+
+## Mock boundaries
+
+Mocks are appropriate for external or nondeterministic boundaries.
+
+Do not mock the function or core behavior being tested.
+
+Avoid tests where every meaningful dependency is mocked and the test only verifies mocked return values.
+
+## Intentional fixtures
+
+Search for existing fixtures, factories, builders, matchers, and setup utilities before creating new ones.
+
+Prefer readable domain data:
+
+    const poll = createPoll({
+      duration: 60,
+    });
+
+over unexplained positional values.
+
+Do not create elaborate test-helper layers that hide the scenario.
+
+## Snapshot tests
+
+Use snapshots only when they already fit repository conventions or clearly represent the behavior.
+
+Never update snapshots blindly.
+
+Inspect snapshot diffs as behavioral changes.
+
+Do not introduce snapshots solely for convenience.
+
+## Regression tests
+
+A regression test should reproduce the actual defect.
+
+Prefer:
+
+known bug
+→ failing regression
+→ implementation fix
+→ passing regression
+
+Do not replace a specific regression with a weaker generic assertion.
+
+Do not duplicate an existing regression merely to satisfy a formal TDD RED step.
+
+## Test integrity
+
+Never:
+
+- delete tests to make the suite pass;
+- weaken assertions to match implementation;
+- skip failures;
+- change fixtures solely to hide a bug;
+- mock away the system under test;
+- add retries solely to hide flakiness;
+- add arbitrary sleeps;
+- modify expected values without investigating the behavior change.
+
+Tests are executable specifications, not obstacles to a green build.
+
+## Property-based tests
+
+When using property-based testing:
+
+- ensure arbitraries represent the intended domain;
+- ensure meaningful boundary values are reachable;
+- include invalid values when the property covers invalid domains;
+- preserve shrinking;
+- use an appropriate run count;
+- do not exclude legitimate failing inputs merely to make a property pass.
+
+Keep concrete examples for concrete regressions and business scenarios even when a property covers a broader invariant.
+
+## Test setup readability
+
+Prefer explicit setup when it makes the scenario easier to understand.
+
+A helper is justified when it:
+
+- removes meaningful repetition;
+- captures a stable convention;
+- makes scenarios clearer.
+
+Readable duplication is often better than opaque test infrastructure.

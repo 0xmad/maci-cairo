@@ -1,0 +1,22 @@
+---
+description: "Apply repository-configured formatting to circuit TypeScript files."
+globs:
+  - "circuits/**/*.ts"
+  - "circuits/**/*.tsx"
+alwaysApply: false
+---
+
+# TypeScript Formatting
+
+The repository defines Prettier configuration and formatting scripts. Follow
+the repository-configured Prettier settings and circuits/tsconfig.json.
+
+Use the repository's existing formatting script rather than inventing
+configuration or formatting commands.
+
+Keep formatting changes limited to touched files. Do not invent configuration,
+reformat unrelated files, or change tooling merely to make an implementation
+pass.
+- Do not change line endings unnecessarily.
+
+Formatting is a code-quality constraint, not a reason to expand task scope.

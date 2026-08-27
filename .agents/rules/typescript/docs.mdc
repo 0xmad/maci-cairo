@@ -1,0 +1,463 @@
+---
+description: Document public TypeScript APIs, exported types, modules, and package usage with accurate TSDoc/TypeDoc and consumer-facing examples.
+globs:
+  - "circuits/**/*.ts"
+  - "circuits/**/*.md"
+alwaysApply: false
+---
+
+# TypeScript Documentation
+
+## Scope
+
+Apply this rule only when documentation concerns:
+
+- exported TypeScript APIs;
+- TypeScript types, classes, functions, modules, or package usage;
+- TSDoc/TypeDoc comments;
+- TypeScript-specific consumer examples;
+- documentation directly affected by a TypeScript API change.
+
+Do not apply it merely because a Markdown file changed.
+
+Do not use this rule for:
+
+- general project documentation;
+- Cairo documentation;
+- Circom documentation;
+- circuit specifications;
+- protocol documentation unrelated to TypeScript APIs;
+- generic Markdown formatting;
+- test documentation;
+- implementation design;
+- change scope;
+- final reporting.
+
+Use repository-specific rules for TypeScript design, code style, atomic changes, and agent workflow when they exist.
+
+## Core principles
+
+Document contracts, not implementation details.
+
+Prioritize public APIs when their semantics are not already obvious from the name, type, nearby code, or existing documentation.
+
+Useful documentation explains:
+
+- behavior;
+- parameter semantics;
+- important constraints;
+- return semantics;
+- meaningful errors;
+- side effects;
+- lifecycle/state behavior;
+- serialization or compatibility requirements;
+- security or protocol assumptions relevant to the TypeScript API.
+
+Do not document obvious behavior merely to increase coverage.
+
+## Before writing documentation
+
+Determine:
+
+- what API or concept is being documented;
+- who consumes it;
+- whether it is public TypeScript;
+- whether the source of truth is TSDoc/TypeDoc or Markdown;
+- whether the repository already documents the concept elsewhere;
+- the highest appropriate documentation level.
+
+Inspect before writing:
+
+1. implementation;
+2. public signature/type;
+3. existing documentation;
+4. relevant tests;
+5. current examples/usages;
+6. serialization behavior when applicable;
+7. error behavior;
+8. downstream consumers when the API changed;
+9. current documentation configuration and scripts.
+
+Use the repository's configured documentation workflow. Do not assume a generic TypeDoc setup.
+
+## Documentation hierarchy
+
+Prefer the highest appropriate level:
+
+Project documentation
+→ package documentation
+→ module documentation
+→ public API documentation
+→ local source comment
+
+Use:
+
+Project level for project-wide purpose, onboarding, architecture, and high-level concepts.
+
+Package level for package purpose, consumers, major APIs, integration, and package constraints.
+
+Module level for module responsibility, important invariants, and relationships between modules.
+
+Public API level for function semantics, parameter constraints, return values, errors, side effects, and examples.
+
+Local source comments only for non-obvious implementation rationale or constraints future maintainers must preserve.
+
+Do not duplicate the same explanation at multiple levels.
+
+## Public API documentation
+
+Consider TSDoc for:
+
+- exported functions;
+- exported classes;
+- exported interfaces;
+- exported type aliases with non-obvious semantics;
+- exported constants or enums with non-obvious meaning;
+- public methods;
+- public properties.
+
+A symbol does not need a comment merely because it is exported.
+
+Prefer concise TSDoc containing only useful sections.
+
+Typical structure:
+
+/**
+ * <Summary of behavior.>
+ *
+ * <Important constraint, invariant, side effect, or lifecycle detail.>
+ *
+ * @param input <Meaning and important constraints.>
+ * @returns <Meaningful return semantics.>
+ * @throws {@link ErrorType} <When the error matters to callers.>
+ */
+
+Only include tags that add information.
+
+## What to document
+
+Document when callers need to know about:
+
+- valid or invalid inputs;
+- units;
+- special values;
+- state requirements;
+- returned value semantics;
+- expected failure conditions;
+- externally observable side effects;
+- ownership or mutability;
+- serialization requirements;
+- security assumptions;
+- compatibility constraints;
+- lifecycle behavior;
+- async completion semantics;
+- operational tradeoffs.
+
+Examples:
+
+- "duration in voting blocks" instead of "duration";
+- "returns undefined when no poll exists" instead of merely "returns Poll | undefined";
+- "promise resolves after persistence succeeds" when completion timing matters;
+- "field ordering is canonical because the value is hashed" when serialization order is a protocol requirement.
+
+## Avoid implementation narration
+
+Do not document:
+
+- internal helper calls;
+- internal control flow;
+- private data structures;
+- obvious assignments;
+- trivial getter behavior;
+- implementation details likely to change.
+
+Prefer stable abstraction-level statements.
+
+Bad:
+
+The function calls normalizeMessage, updates cache.pendingMessages, and then invokes MessageProcessorHelper.
+
+Good:
+
+Processes the message and updates coordinator state.
+
+For internal comments, explain why rather than what:
+
+Good:
+Keep this ordering stable because the serialized value is hashed by the proof system.
+
+Bad:
+Increment the index.
+
+## Tests
+
+Do not add TSDoc/JSDoc to ordinary tests or test-only code:
+
+- it;
+- test;
+- describe;
+- test callbacks;
+- property-based properties;
+- fast-check arbitraries;
+- test fixtures;
+- test factories;
+- test builders;
+- test-only mocks;
+- test-only helpers.
+
+Use test names, structure, and assertions to communicate intent.
+
+Use tests as behavioral evidence when determining production documentation.
+
+If a reusable testing-library API genuinely requires documentation, follow that library's documentation policy.
+
+## Examples
+
+Examples must be consumer-facing and use real, current public APIs.
+
+Before adding or updating an example, verify:
+
+- imports exist;
+- the API exists;
+- the signature is current;
+- argument types are correct;
+- required setup is present;
+- expected behavior is current.
+
+Validate examples when repository tooling makes this practical.
+
+Do not use:
+
+- test helpers;
+- private APIs;
+- obsolete APIs;
+- fake interfaces;
+- secrets;
+- sensitive data;
+- unnecessary setup.
+
+Do not turn test assertions into public API examples.
+
+Use @example only when it demonstrates useful consumer behavior.
+
+## Protocol, cryptographic, and ZK-related APIs
+
+For TypeScript that interfaces with Cairo, Circom, cryptography, or protocol code, document the TypeScript-facing contract:
+
+- input types;
+- output types;
+- serialization contracts;
+- consumer-visible invariants;
+- public/private boundaries;
+- compatibility requirements;
+- security assumptions.
+
+Do not duplicate a full protocol, Cairo, or Circom specification inside TypeScript API comments.
+
+Document stable protocol meaning rather than implementation mechanics.
+
+Examples of useful protocol invariants:
+
+- canonical field ordering;
+- deterministic input requirements;
+- validation before hashing;
+- monotonic state transitions;
+- identifier uniqueness;
+- stable wire encoding.
+
+Never include private keys, credentials, real secrets, production tokens, or sensitive user data.
+
+## API changes
+
+When a public TypeScript API changes, inspect and update only directly affected documentation:
+
+- TSDoc/TypeDoc;
+- @example blocks;
+- package README;
+- TypeScript usage guides;
+- migration documentation;
+- @see references;
+- links to moved symbols or files.
+
+Search for stale API names and old signatures.
+
+Keep directly related code, tests, and documentation in the same atomic change when practical.
+
+Do not mix unrelated documentation cleanup into the change.
+
+## Markdown documentation
+
+For Markdown:
+
+1. identify the appropriate document;
+2. read surrounding structure and repository conventions;
+3. update only the relevant section;
+4. preserve existing terminology;
+5. verify links;
+6. verify code examples;
+7. inspect rendered structure when practical.
+
+Avoid rewriting an entire README for a small documentation change.
+
+For package READMEs, prioritize:
+
+- package purpose;
+- installation/setup;
+- minimal usage;
+- important constraints;
+- integration;
+- links to deeper documentation.
+
+For the project README, keep content project-wide and avoid duplicating package documentation.
+
+## Links and symbol references
+
+For changed links:
+
+- verify the target exists;
+- find the current location if the target moved;
+- update relevant Markdown references;
+- update @see references;
+- update {@link ...} references;
+- update affected examples and migration instructions.
+
+Prefer symbol links when they improve navigation and the repository's documentation tooling supports them.
+
+Avoid excessive cross-linking.
+
+## TypeDoc and generated documentation
+
+If TypeDoc is configured:
+
+- inspect the live TypeDoc configuration;
+- inspect package scripts;
+- use the repository's configured documentation command;
+- respect configured entry points, exclusions, visibility, plugins, grouping, and output directories.
+
+Source TSDoc is authoritative.
+
+Do not manually edit generated documentation.
+
+After generation:
+
+- inspect git status;
+- inspect git diff --stat;
+- inspect git diff;
+- confirm expected pages and symbols changed;
+- confirm links and examples render correctly;
+- remove unrelated generated churn.
+
+If generated documentation changes unexpectedly, inspect the source comments and configuration before changing configuration.
+
+Do not modify TypeDoc configuration merely to hide errors.
+
+## Generated TypeScript
+
+When TypeScript source is generated from schemas, IDLs, protocol definitions, or templates:
+
+- identify the true source of truth;
+- document the source definition or generator where practical;
+- avoid editing generated source comments if regeneration overwrites them.
+
+## Validation
+
+Validate the documentation content before tooling:
+
+- parameter names match the signature;
+- return semantics match behavior;
+- documented errors actually occur;
+- examples use current APIs;
+- constraints are real;
+- state transitions are accurate;
+- serialization claims match reality;
+- security claims are accurate;
+- terminology matches the repository.
+
+Preferred validation order:
+
+1. review source documentation;
+2. validate examples and links;
+3. run the repository documentation generation/check;
+4. run TypeScript validation when source changed;
+5. run ESLint;
+6. run Prettier;
+7. inspect generated documentation;
+8. inspect the final git diff.
+
+Documentation-only changes do not weaken TypeScript, ESLint, or Prettier validation when those checks are relevant to the repository.
+
+Never claim a validation step passed unless it actually ran successfully.
+
+If documentation generation fails:
+
+1. read the first meaningful error;
+2. determine whether the change caused it;
+3. fix the source documentation or API issue;
+4. rerun the documentation command;
+5. distinguish pre-existing failures from regressions.
+
+## Scope discipline
+
+Keep documentation changes atomic.
+
+Do not combine documentation work with:
+
+- unrelated code cleanup;
+- test refactoring;
+- dependency upgrades;
+- API renaming unrelated to the documentation task;
+- broad formatting changes.
+
+If a documentation change touches 20 or more files, reassess:
+
+- generated-output churn;
+- repeated documentation;
+- package boundaries;
+- unrelated docs;
+- independent documentation tasks.
+
+Large changes are acceptable for coordinated API migrations, documentation-site restructures, or substantial generated documentation updates when the scope remains atomic.
+
+## Final review
+
+Before completion, verify:
+
+1. This is actually TypeScript API/package documentation.
+2. The information is at the correct documentation level.
+3. The documentation describes a public contract rather than implementation details.
+4. Important constraints, errors, side effects, lifecycle, serialization, or security semantics are documented when needed.
+5. Tests and test-only helpers were not documented unnecessarily.
+6. Examples are current, consumer-facing, and safe.
+7. Protocol, Cairo, and Circom documentation was not duplicated unnecessarily.
+8. Stale API references were updated.
+9. Generated documentation was regenerated and reviewed when applicable.
+10. Only documentation directly related to the TypeScript task changed.
+11. Relevant validation actually ran.
+12. The final diff contains no unrelated changes.
+
+## Completion report
+
+When reporting completion, use:
+
+Implementation:
+- <summary>
+
+Documentation:
+- public API: UPDATED / NOT NEEDED
+- README/package docs: UPDATED / NOT NEEDED
+- examples: UPDATED / NOT NEEDED
+- generated docs: UPDATED / NOT NEEDED
+
+Validation:
+- TypeScript: PASS / FAIL / NOT RUN
+- ESLint: PASS / FAIL / NOT RUN
+- Prettier: PASS / FAIL / NOT RUN
+- documentation generation: PASS / FAIL / NOT RUN
+- links/examples: PASS / FAIL / NOT RUN
+
+Scope:
+- files changed: <N>
+- unrelated changes: none / <details>
+
+Notes:
+- <pre-existing failures or validation limitations>

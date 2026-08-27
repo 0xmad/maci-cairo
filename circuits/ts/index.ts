@@ -6,6 +6,5 @@
  * - Shared utility types from `types.js`.
  * - Type-only exports from `votes.js`.
  */
-export * from "./votes.js";
 export type * from "./types.js";
 export type * from "./votes.js";

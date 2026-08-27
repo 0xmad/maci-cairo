@@ -1,0 +1,36 @@
+---
+description: Reusable planning, diagnosis, domain-modeling, and review practices.
+alwaysApply: true
+---
+
+# Engineering workflows
+
+## Planning and decomposition
+
+For substantial work, state the outcome, acceptance criteria, risks,
+dependencies, and explicit exclusions. Split the work into dependency-ordered
+vertical slices, each with one observable behavior and a verification command.
+Do not begin a later slice while the current slice is failing or unexplained.
+
+## Bug diagnosis
+
+Do not patch a symptom first. Reproduce the defect, minimize the input or call
+sequence, capture expected versus actual behavior, form a testable hypothesis,
+and run the smallest experiment that distinguishes it. Add a regression test,
+fix the root cause, then verify focused and affected-scope behavior.
+
+## Domain modeling
+
+Use the terminology in `CONTEXT.md` and nearby code. Before adding complex
+logic, identify the domain concepts, invariants, lifecycle, and boundary
+representations. Prefer names that match the protocol vocabulary. If
+terminology or invariants are genuinely ambiguous, ask instead of inventing
+parallel concepts; record durable decisions in `CONTEXT.md` or an ADR.
+
+## Review
+
+Before completion, review the complete diff as a separate engineer. Check
+observable correctness, tests and negative cases, compatibility, error
+handling, security invariants, dependency direction, naming, coupling,
+complexity, generated outputs, and accidental scope. Prefer concrete defects
+over stylistic preferences, and do not claim a check passed unless it ran.

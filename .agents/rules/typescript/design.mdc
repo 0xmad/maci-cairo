@@ -1,0 +1,48 @@
+---
+description: Design circuit TypeScript types, APIs, boundaries, and modules using existing repository patterns.
+globs:
+  - "circuits/**/*.ts"
+  - "circuits/**/*.tsx"
+alwaysApply: false
+---
+
+# TypeScript Design and APIs
+
+Before changing a type, abstraction, module, export, or public signature,
+inspect the owning package, existing representations, exports, consumers,
+tests, `circuits/tsconfig.json`, and `circuits/package.json`.
+
+Use this authority order:
+
+1. Task requirements
+2. Existing behavior and tests
+3. Existing public APIs and package boundaries
+4. Repository configuration and local patterns
+5. General TypeScript guidance
+
+Search before creating types, helpers, classes, factories, generics, or
+utilities. Reuse an existing concept when its semantics match. Prefer simple
+cohesive modules, functions, and data; introduce abstractions only for a
+meaningful responsibility, invariant, lifecycle, or boundary.
+
+Preserve meaningful type contracts: required and optional fields, nullability,
+readonly guarantees, discriminated unions, generic relationships, overloads,
+inference, and exported signatures. Never use `any`, weaken types, or add
+assertions merely to make code compile.
+
+Treat JSON, filesystem, RPC, blockchain, circuit, and serialized data as
+untrusted or representation-sensitive boundaries:
+
+external data → unknown → validation/conversion → domain type → internal API
+
+Keep transport and domain representations explicit. Preserve field ordering,
+encoding, widths, canonicalization, hash inputs, indices, and state semantics
+when TypeScript interfaces with circuits, cryptography, or protocols.
+
+Before changing an exported API, inspect exports, call sites, package
+consumers, serialization, error/absence semantics, and compatibility. Prefer
+the smallest compatible public surface and update only required consumers.
+
+Do not introduce speculative extension points, duplicate domain concepts,
+unnecessary generics, circular dependencies, or test-only production design
+changes.
