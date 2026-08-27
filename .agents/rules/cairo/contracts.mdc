@@ -1,0 +1,29 @@
+---
+description: Protect Starknet contract interfaces, storage, events, and cross-contract behavior.
+globs:
+  - "contracts/**/*.cairo"
+alwaysApply: false
+---
+
+# Starknet Contract Safety
+
+Treat changes to constructors, entrypoints, interfaces, storage, events,
+cross-contract calls, class-hash deployment, and protocol data as compatibility
+changes.
+
+Before editing, inspect direct callers, interfaces, events, storage access,
+constructor arguments, and relevant `contracts` and `common` tests.
+
+Preserve:
+
+- calldata and serialization ordering;
+- storage keys and state invariants;
+- access-control and policy enforcement;
+- validation-before-mutation and validation-before-external-call ordering;
+- event fields and emission conditions;
+- transaction, retry, receipt, and failure semantics;
+- cryptographic field ordering, widths, and canonical representations.
+
+For behavior changes, add or update a focused `snforge` regression test. For
+serialization or cryptographic changes, use exact vectors, round trips, or
+independent invariants rather than relying only on compilation.

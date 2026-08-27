@@ -14,9 +14,7 @@ pub mod FreeForAllEnforcer {
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use crate::policies::interfaces::IChecker::{
-        ICheckerDispatcher, ICheckerDispatcherTrait,
-    };
+    use crate::policies::interfaces::IChecker::{ICheckerDispatcher, ICheckerDispatcherTrait};
     use crate::policies::interfaces::IEnforcer::{Errors, IEnforcer};
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
@@ -88,9 +86,7 @@ pub mod FreeForAllEnforcer {
         /// - `UNSUCCESSFUL_CHECK`: The configured checker rejected the subject.
         /// - `NOT_OWNER`: The caller is not the current owner of the enforcer.
         fn enforce(
-            ref self: ContractState,
-            subject: starknet::ContractAddress,
-            evidence: ByteArray,
+            ref self: ContractState, subject: starknet::ContractAddress, evidence: ByteArray,
         ) {
             self.ownable.assert_only_owner();
             assert(!self.enforced_users.read(subject), Errors::ALREADY_ENFORCED);

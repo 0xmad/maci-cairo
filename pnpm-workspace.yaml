@@ -2,3 +2,4 @@ packages:
   - "circuits"
 allowBuilds:
   blake-hash: true
+  unrs-resolver: true

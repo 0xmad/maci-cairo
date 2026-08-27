@@ -8,10 +8,7 @@
  * type A = SameLength<[string, number], [boolean, Date]>;
  * type B = SameLength<[string], [boolean, Date]>;
  */
-export type SameLength<
-  A extends readonly unknown[],
-  B extends readonly unknown[],
-> = A["length"] extends B["length"]
+export type SameLength<A extends readonly unknown[], B extends readonly unknown[]> = A["length"] extends B["length"]
   ? B["length"] extends A["length"]
     ? true
     : false

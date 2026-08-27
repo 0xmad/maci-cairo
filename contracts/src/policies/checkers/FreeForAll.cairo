@@ -24,9 +24,7 @@ pub mod FreeForAllChecker {
         /// Returns:
         /// - `true` for every subject.
         fn check(
-            self: @ContractState,
-            subject: starknet::ContractAddress,
-            evidence: ByteArray,
+            self: @ContractState, subject: starknet::ContractAddress, evidence: ByteArray,
         ) -> bool {
             true
         }

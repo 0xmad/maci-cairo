@@ -1,8 +1,9 @@
-import { BabyJub, buildBabyjub } from "circomlibjs";
+import { buildBabyjub } from "circomlibjs";
 import fc from "fast-check";
-import { describe, test, beforeAll } from "vitest";
+import { beforeAll, describe, test } from "vitest";
 
 import type { WitnessTester } from "circomkit";
+import type { BabyJub } from "circomlibjs";
 
 import { circomkitInstance, getSignal } from "./utils.js";
 
@@ -37,40 +38,19 @@ describe("CalculateTotal circuit", () => {
   });
 
   test("should sum max value and loop back", async () => {
-    const nums: bigint[] = [
-      babyJub.p,
-      babyJub.p,
-      babyJub.p,
-      babyJub.p,
-      babyJub.p,
-      babyJub.p,
-    ];
+    const nums: bigint[] = [babyJub.p, babyJub.p, babyJub.p, babyJub.p, babyJub.p, babyJub.p];
 
     await circuit.expectPass({ nums }, { sum: 0n });
   });
 
   test("should sum max negative value and loop back", async () => {
-    const nums: bigint[] = [
-      -babyJub.p,
-      -babyJub.p,
-      -babyJub.p,
-      -babyJub.p,
-      -babyJub.p,
-      -babyJub.p,
-    ];
+    const nums: bigint[] = [-babyJub.p, -babyJub.p, -babyJub.p, -babyJub.p, -babyJub.p, -babyJub.p];
 
     await circuit.expectPass({ nums }, { sum: 0n });
   });
 
   test("should sum max positive and negative values without looping", async () => {
-    const nums: bigint[] = [
-      -babyJub.p,
-      babyJub.p,
-      -babyJub.p,
-      babyJub.p,
-      1n,
-      2n,
-    ];
+    const nums: bigint[] = [-babyJub.p, babyJub.p, -babyJub.p, babyJub.p, 1n, 2n];
 
     await circuit.expectPass({ nums }, { sum: 3n });
   });
@@ -85,14 +65,11 @@ describe("CalculateTotal circuit", () => {
           const sum = nums.reduce((a, b) => a + b, 0n);
           fc.pre(sum <= babyJub.p - 1n);
 
-          const testCircuit = await circomkitInstance.WitnessTester(
-            "calculateTotal",
-            {
-              file: "./utils/CalculateTotal",
-              template: "CalculateTotal",
-              params: [nums.length],
-            },
-          );
+          const testCircuit = await circomkitInstance.WitnessTester("calculateTotal", {
+            file: "./utils/CalculateTotal",
+            template: "CalculateTotal",
+            params: [nums.length],
+          });
 
           const witness = await testCircuit.calculateWitness({ nums });
           await testCircuit.expectConstraintPass(witness);

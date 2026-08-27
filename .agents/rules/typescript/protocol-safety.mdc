@@ -1,0 +1,204 @@
+---
+description: Protect serialization, cryptographic, protocol, persistence, concurrency, and other high-risk TypeScript invariants.
+globs:
+  - "circuits/**/*.ts"
+  - "circuits/**/*.tsx"
+alwaysApply: false
+---
+
+# High-Risk TypeScript Invariants
+
+Treat code affecting externally observable representations, state, persistence, cryptography, protocols, or concurrency as high-risk.
+
+Passing ordinary unit tests or TypeScript compilation is not by itself evidence that such a change is safe.
+
+## Serialization and encoding
+
+Preserve:
+
+* field names;
+* field ordering when significant;
+* encoding;
+* widths;
+* numeric representation;
+* binary layout;
+* canonicalization;
+* optional-field behavior;
+* default values.
+
+Treat positional serialized data as part of the API.
+
+Do not reorder protocol fields merely for readability.
+
+## Cryptography
+
+Treat the following as behavior-sensitive:
+
+* hash inputs;
+* input ordering;
+* field ordering;
+* byte representation;
+* encoding;
+* domain separation;
+* commitments;
+* nullifiers;
+* signatures;
+* proof inputs;
+* deterministic derivations;
+* randomness sources;
+* field conversions.
+
+Do not assume mathematically equivalent restructuring produces identical protocol outputs.
+
+Preserve known-answer behavior where it is part of the contract.
+
+## Zero-knowledge and circuit code
+
+Preserve:
+
+* witness ordering;
+* public input ordering;
+* private input ordering;
+* circuit input structure;
+* field conversions;
+* indexing;
+* serialization;
+* deterministic inputs;
+* state-transition semantics.
+
+Positional circuit inputs must be treated as API data.
+
+## Blockchain and RPC
+
+Preserve:
+
+* RPC methods;
+* argument ordering;
+* block or tag selection;
+* transaction construction;
+* gas and fee semantics;
+* retries;
+* timeouts;
+* confirmation behavior;
+* receipt handling;
+* error handling;
+* sequential versus concurrent calls.
+
+Do not introduce concurrency merely to shorten code.
+
+Preserve workflows such as:
+
+```text
+fetch state
+→ submit transaction
+→ wait for receipt
+→ read resulting state
+```
+
+unless the task explicitly changes those semantics.
+
+## Persistence
+
+Preserve:
+
+* keys;
+* schema;
+* serialization;
+* transaction boundaries;
+* write ordering;
+* duplicate handling;
+* consistency guarantees;
+* rollback behavior;
+* cleanup.
+
+Do not move writes across validation, state mutation, or transaction boundaries without verifying the consequences.
+
+## Concurrency
+
+Treat changes to:
+
+* `Promise.all`;
+* `Promise.race`;
+* queues;
+* locks;
+* workers;
+* scheduling;
+* event handlers;
+* async iterators;
+
+as behavior changes unless equivalence is established.
+
+Consider:
+
+* ordering;
+* races;
+* shared resources;
+* partial completion;
+* failure timing;
+* cancellation;
+* cleanup.
+
+## Generated artifacts
+
+Generated files are outputs, not a second source of truth.
+
+When generated code changes:
+
+* modify the generator, schema, or source when possible;
+* regenerate through the repository's normal process;
+* inspect the generated diff;
+* distinguish intended output changes from unrelated changes.
+
+Do not hand-edit generated output to hide differences.
+
+## Validation evidence
+
+For high-risk changes, appropriate evidence may include:
+
+* exact serialization comparisons;
+* known-answer vectors;
+* protocol fixtures;
+* round-trip tests;
+* property-based invariants;
+* differential testing against a trusted implementation;
+* independent reference implementations;
+* state-transition tests;
+* boundary-value tests.
+
+Do not rely solely on line coverage or successful compilation.
+
+## Independent validation
+
+Differential testing is useful only when the old implementation is sufficiently trusted and both implementations are independently exercised.
+
+Do not rely on two implementations that share the same changed helper or known defect.
+
+Prefer independent:
+
+* domain invariants;
+* mathematical relationships;
+* known-answer vectors;
+* round trips;
+* reference implementations.
+
+## Boundary values
+
+For high-risk code, consider domain-relevant boundaries such as:
+
+* zero;
+* one;
+* maximum valid values;
+* minimum valid values;
+* empty structures;
+* single-element structures;
+* malformed encodings;
+* duplicate values;
+* integer and field boundaries.
+
+Do not weaken generators or property coverage to make a refactor pass.
+
+## Generated and serialized representations
+
+If exact output is externally consumed, validate the representation itself, not merely the decoded meaning.
+
+Internal semantic equivalence does not imply wire-format equivalence.

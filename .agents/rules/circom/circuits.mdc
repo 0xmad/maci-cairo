@@ -1,0 +1,22 @@
+---
+description: Preserve Circom constraints, signal ordering, field semantics, and circuit compatibility.
+globs:
+  - "circuits/**/*.circom"
+alwaysApply: false
+---
+
+# Circom Circuits
+
+Inspect the circuit's templates, component wiring, inputs, outputs, includes,
+tests, and TypeScript callers before editing.
+
+Treat signal ordering, public/private visibility, field arithmetic, constraint
+count, witness generation, and component names as compatibility-sensitive.
+
+Do not replace constraints with assignments, remove constraints to make a test
+pass, or assume mathematically equivalent code has equivalent circuit behavior.
+Preserve malformed-input behavior and meaningful boundary cases.
+
+Validate with the repository's CircomKit workflow and inspect generated output
+when compilation, proving setup, verification keys, or verifier artifacts are
+affected.

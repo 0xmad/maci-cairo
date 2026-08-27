@@ -1,4 +1,5 @@
 {
+  "extends": "../tsconfig.json",
   "compilerOptions": {
     "target": "esnext",
     "module": "nodenext",
@@ -8,10 +9,12 @@
     "strict": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "types": ["node", "vitest"],
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"],
+    "typeRoots": ["./ts/@types", "./node_modules/@types"]
   },
+  "types": ["node", "vitest"],
   "include": ["ts", "test"],
   "exclude": ["node_modules", "build"]
 }

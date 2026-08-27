@@ -1,0 +1,37 @@
+---
+description: Follow the repository's actual Scarb, Starknet Foundry, pnpm, Vitest, and circuit workflows.
+alwaysApply: true
+---
+
+# Repository Workflow
+
+This repository is primarily a Scarb workspace containing Cairo packages
+(`common` and `contracts`) plus one pnpm package under `circuits`.
+
+Use the repository's actual manifests and scripts as the source of truth:
+
+- Cairo builds: `scarb build --package maci_common` and
+  `scarb build --package maci_contracts`
+- Cairo tests: `scarb test --package maci_common` and
+  `scarb test --package maci_contracts`
+- Full workflow: `make build` and `make test`
+- Circuit build: `cd circuits && pnpm build`
+- Circuit tests: `cd circuits && pnpm test`
+- Circuit compilation/setup: `cd circuits && pnpm compile:ballot` and
+  `pnpm setup:ballot`
+
+ESLint is configured in this repository.
+
+Before running linting:
+
+- Inspect the existing ESLint configuration.
+- Inspect the relevant package scripts.
+- Run the repository-defined ESLint command when available.
+- Follow the existing ESLint configuration rather than introducing new rules or configuration.
+
+Do not invent ESLint commands, rules, or repository requirements that are not supported by the existing configuration.
+When a package script exists for linting, prefer the package script over manually constructing an equivalent ESLint command.
+
+Keep package-local changes local unless a shared contract, generated artifact,
+or direct consumer requires a cross-package change. Inspect `git status` before
+editing and preserve pre-existing worktree changes.

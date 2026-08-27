@@ -1,0 +1,3 @@
+interface:
+  display_name: "Atomic change"
+  short_description: "Atomic change is a skill that allows to make small change to a codebase"

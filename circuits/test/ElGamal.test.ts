@@ -1,4 +1,4 @@
-import { type BabyJub, buildBabyjub } from "circomlibjs";
+import { buildBabyjub } from "circomlibjs";
 import fc from "fast-check";
 import { beforeAll, describe, test } from "vitest";
 
@@ -7,31 +7,22 @@ import type { WitnessTester } from "circomkit";
 import { circomkitInstance, getSignal } from "./utils.js";
 
 describe("ElGamalEncryption", () => {
-  let encryptionCircuit: WitnessTester<
-    ["random", "message", "publicKey"],
-    ["c1", "c2"]
-  >;
+  let encryptionCircuit: WitnessTester<["random", "message", "publicKey"], ["c1", "c2"]>;
   let decryptionCircuit: WitnessTester<["privateKey", "c1", "c2"], ["out"]>;
-  let babyJub: BabyJub;
+  let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
-    encryptionCircuit = await circomkitInstance.WitnessTester(
-      "ElGamalEncryption",
-      {
-        file: "elgamal/ElGamalEncryption",
-        template: "ElGamalEncryption",
-        params: [],
-      },
-    );
+    encryptionCircuit = await circomkitInstance.WitnessTester("ElGamalEncryption", {
+      file: "elgamal/ElGamalEncryption",
+      template: "ElGamalEncryption",
+      params: [],
+    });
 
-    decryptionCircuit = await circomkitInstance.WitnessTester(
-      "ElGamalDecryption",
-      {
-        file: "elgamal/ElGamalDecryption",
-        template: "ElGamalDecryption",
-        params: [],
-      },
-    );
+    decryptionCircuit = await circomkitInstance.WitnessTester("ElGamalDecryption", {
+      file: "elgamal/ElGamalDecryption",
+      template: "ElGamalDecryption",
+      params: [],
+    });
 
     babyJub = await buildBabyjub();
   });
@@ -43,15 +34,9 @@ describe("ElGamalEncryption", () => {
         fc.bigInt({ min: 1n, max: babyJub.subOrder - 1n }),
         fc.bigInt({ min: 1n, max: 1000n }),
         async (privateKey: bigint, random: bigint, message: bigint) => {
-          const publicKeyPoint = babyJub.mulPointEscalar(
-            babyJub.Base8,
-            privateKey,
-          );
+          const publicKeyPoint = babyJub.mulPointEscalar(babyJub.Base8, privateKey);
 
-          const publicKey = [
-            babyJub.F.toObject(publicKeyPoint[0]),
-            babyJub.F.toObject(publicKeyPoint[1]),
-          ];
+          const publicKey = [babyJub.F.toObject(publicKeyPoint[0]), babyJub.F.toObject(publicKeyPoint[1])];
 
           const encryptionWitness = await encryptionCircuit.calculateWitness({
             random,
@@ -83,10 +68,7 @@ describe("ElGamalEncryption", () => {
 
           const candidate = babyJub.mulPointEscalar(babyJub.Base8, message);
 
-          return (
-            babyJub.F.eq(candidate[0], babyJub.F.e(mx)) &&
-            babyJub.F.eq(candidate[1], babyJub.F.e(my))
-          );
+          return babyJub.F.eq(candidate[0], babyJub.F.e(mx)) && babyJub.F.eq(candidate[1], babyJub.F.e(my));
         },
       ),
     );
@@ -121,15 +103,9 @@ describe("ElGamalEncryption", () => {
         fc.bigInt({ min: 1n, max: babyJub.subOrder - 1n }),
         fc.bigInt({ min: 1n, max: 1000n }),
         async (privateKey: bigint, random: bigint, message: bigint) => {
-          const publicKeyPoint = babyJub.mulPointEscalar(
-            babyJub.Base8,
-            privateKey,
-          );
+          const publicKeyPoint = babyJub.mulPointEscalar(babyJub.Base8, privateKey);
 
-          const publicKey = [
-            babyJub.F.toObject(publicKeyPoint[0]),
-            babyJub.F.toObject(publicKeyPoint[1]),
-          ];
+          const publicKey = [babyJub.F.toObject(publicKeyPoint[0]), babyJub.F.toObject(publicKeyPoint[1])];
 
           const encryptionWitness = await encryptionCircuit.calculateWitness({
             random,
@@ -161,10 +137,7 @@ describe("ElGamalEncryption", () => {
 
           const candidate = babyJub.mulPointEscalar(babyJub.Base8, message);
 
-          return (
-            !babyJub.F.eq(candidate[0], babyJub.F.e(mx)) &&
-            !babyJub.F.eq(candidate[1], babyJub.F.e(my))
-          );
+          return !babyJub.F.eq(candidate[0], babyJub.F.e(mx)) && !babyJub.F.eq(candidate[1], babyJub.F.e(my));
         },
       ),
     );

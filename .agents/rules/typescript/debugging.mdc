@@ -1,0 +1,28 @@
+---
+description: Diagnose circuit TypeScript failures using repository commands and root-cause evidence.
+globs:
+  - "circuits/**/*.ts"
+  - "circuits/**/*.tsx"
+alwaysApply: false
+---
+
+# TypeScript Failure Diagnosis
+
+Observe, classify, reproduce, isolate, form a hypothesis, make one targeted
+change, and validate it. Start with the first meaningful compiler error,
+failing assertion, runtime exception, or property counterexample; distinguish
+root causes from cascading symptoms.
+
+Inspect the relevant input, fixture, setup, implementation, and repository
+configuration before changing expectations. Fix the underlying type, domain,
+API, async, or environment problem rather than adding broad catches,
+assertions, suppressions, retries, sleeps, or weaker tests.
+
+Use the repository's actual commands from `circuits/package.json`:
+
+- `cd circuits && pnpm build`
+- `cd circuits && pnpm test`
+
+For generated circuit or proof artifacts, change the source of truth and use
+the official generation workflow. Keep debugging changes focused and inspect
+the final diff.

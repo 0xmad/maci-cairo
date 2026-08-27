@@ -1,0 +1,227 @@
+---
+description: "Apply repository TypeScript coding conventions for type safety, imports, syntax, accessibility, and local implementation style."
+globs:
+  - "circuits/**/*.ts"
+  - "circuits/**/*.tsx"
+alwaysApply: false
+---
+
+# TypeScript Code Style
+
+Follow the repository's actual TypeScript conventions when editing TypeScript or TSX.
+
+## Repository Configuration
+
+Before making substantial changes, inspect the applicable:
+
+- ESLint configuration
+- Prettier configuration
+- tsconfig.json
+- package.json scripts
+- Package-specific configuration
+- Nearby source code
+
+Use this precedence:
+
+1. Task requirements
+2. Existing repository code
+3. Repository ESLint, Prettier, and TypeScript configuration
+4. Local package conventions
+5. General TypeScript guidance
+6. Agent preference
+
+The live repository configuration is authoritative.
+
+## Type Safety
+
+- Prefer the simplest precise type.
+- Never introduce explicit `any`.
+- Use `unknown` for genuinely unknown values and narrow it appropriately.
+- Do not weaken existing types to satisfy the compiler.
+- Avoid unnecessary type assertions.
+- Avoid unnecessary generics.
+- Preserve useful type relationships.
+- Do not redesign domain types for style reasons.
+
+## Module Boundary Types
+
+Follow the repository's configured requirements for explicit module-boundary types.
+
+When required:
+
+    export const parseMessage = (input: string): Message => {
+      return new Message(input);
+    };
+
+Do not mechanically annotate declarations where the repository does not require it.
+
+## Type Imports
+
+Follow the configured `@typescript-eslint/consistent-type-imports` rule.
+
+When `inline-type-imports` is configured:
+
+    import { type Message, MessageProcessor } from "./types";
+
+Do not mix incompatible type-import styles.
+
+## Imports
+
+Keep imports:
+
+- Correct
+- Minimal
+- Ordered according to repository configuration
+- Free of unused symbols
+- Consistent with package boundaries
+
+Do not:
+
+- Introduce circular imports
+- Import undeclared dependencies
+- Bypass public package APIs through unnecessary deep imports
+- Retain imports made unnecessary by the change
+- Reorder unrelated imports without reason
+
+## Local Patterns
+
+Before introducing a new TypeScript pattern:
+
+1. Search nearby code.
+2. Check whether the repository already uses an equivalent pattern.
+3. Prefer the established pattern when technically equivalent.
+
+Do not introduce advanced TypeScript syntax merely because it is generally considered preferable.
+
+Reuse existing:
+
+- Domain types
+- Utility types
+- Branded types
+- Error types
+- Generic abstractions
+- Helper functions
+
+when they already provide the required behavior.
+
+## Accessibility
+
+Follow the repository's configured member accessibility rules.
+
+When accessibility is configured as `no-public`:
+
+    class Processor {
+      private readonly queue: Queue;
+
+      protected process(): void {
+        // ...
+      }
+
+      execute(): void {
+        // ...
+      }
+    }
+
+Do not add redundant `public`.
+
+## Promise Usage
+
+Follow the repository's configured promise rules.
+
+Do not add artificial `await`, `.catch()`, or promise wrappers solely to satisfy generic style guidance.
+
+Do not use promise handling as a substitute for fixing incorrect asynchronous behavior.
+
+## Operators
+
+Do not mechanically replace:
+
+    value || fallback
+
+with:
+
+    value ?? fallback
+
+Choose based on runtime semantics.
+
+Consider:
+
+- `0`
+- `""`
+- `false`
+- `NaN`
+- `null`
+- `undefined`
+
+## Non-Null Assertions
+
+Non-null assertions are permitted when the invariant is established.
+
+    const poll = polls.get(pollId)!;
+
+Do not use them as generic compiler-error workarounds.
+
+Prefer explicit narrowing when absence is possible.
+
+## Template Expressions
+
+Follow the repository's configured template-expression rules.
+
+Numbers may be interpolated when permitted:
+
+    const message = `Processed ${count} messages`;
+
+Do not implicitly stringify arbitrary structured values.
+
+Use an intentional representation when necessary:
+
+    const message = `Processed ${JSON.stringify(value)}`;
+
+## Control Flow
+
+Follow the repository's configured control-flow rules.
+
+When `curly` requires braces:
+
+    if (enabled) {
+      run();
+    }
+
+## Comments
+
+Comments should explain information that the code does not communicate clearly.
+
+Useful comments explain:
+
+- Protocol constraints
+- Invariants
+- Compatibility requirements
+- Security assumptions
+- Non-obvious implementation decisions
+
+Do not add comments that merely restate the code.
+
+## Formatting
+
+Use the repository formatter.
+
+The live Prettier configuration is authoritative.
+
+Do not:
+
+- Manually fight formatter output
+- Reformat unrelated files
+- Perform repository-wide formatting for a local task
+- Introduce formatting churn unrelated to the task
+- Modify formatter configuration to make code pass
+
+## Scope
+
+Keep style changes local to the requested change.
+
+- Format changed files only.
+- Avoid unrelated import reordering.
+- Avoid line-ending churn.
+- Avoid unrelated cleanup.
+- Inspect the diff after formatting.
+- Revert unrelated formatting changes.

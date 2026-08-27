@@ -1,0 +1,514 @@
+---
+description: "Guidance for designing, reviewing, and debugging fast-check arbitraries for TypeScript property-based tests."
+globs:
+  - "circuits/**/*.{test,spec}.ts"
+  - "circuits/**/*.{test,spec}.tsx"
+alwaysApply: false
+---
+
+# fast-check Generators
+
+Use domain-driven arbitraries to generate meaningful property-based test inputs with useful shrinking.
+
+## Define the domain first
+
+Before creating or changing an arbitrary:
+
+1. Identify the exact valid domain.
+2. Identify the invalid domain when rejection behavior is under test.
+3. Identify important boundaries.
+4. Identify relationships between generated values.
+5. Identify categories that must be represented.
+6. Search for existing arbitraries, generators, builders, factories, and domain constructors.
+
+Construct the arbitrary from the domain rather than starting with a primitive generator and filtering toward the desired shape.
+
+## Reuse existing arbitraries
+
+Before creating a new arbitrary:
+
+1. Search for the domain type.
+2. Search for related arbitrary and generator names.
+3. Search for builders, factories, fixtures, and constructors.
+4. Determine whether an existing arbitrary already represents the required domain.
+5. Reuse it when the domain is equivalent.
+
+Do not duplicate canonical generators when multiple properties require the same domain.
+
+## Name arbitraries by domain
+
+Prefer names that communicate what the arbitrary generates:
+
+    const validMessageArbitrary = ...;
+
+    const invalidDurationArbitrary = ...;
+
+    const pollConfigArbitrary = ...;
+
+Avoid generic names such as:
+
+    const data = ...;
+
+    const value = ...;
+
+    const generator = ...;
+
+    const arb = ...;
+
+## Primitive generators
+
+Use primitive arbitraries when the domain genuinely consists of those primitives:
+
+    fc.integer()
+
+    fc.nat()
+
+    fc.boolean()
+
+    fc.string()
+
+    fc.uuid()
+
+Do not use unrestricted primitives when the production domain has richer constraints.
+
+## Bounded and unbounded values
+
+When the domain has a real numeric range, encode it directly:
+
+    fc.integer({
+      min: 1,
+      max: 100,
+    });
+
+Prefer bounded generation over filtering an unrestricted generator.
+
+Use unbounded arbitraries when the production domain genuinely supports unbounded values.
+
+Do not introduce artificial limits solely to simplify a property or hide performance problems.
+
+## Construct relationships directly
+
+When generated fields have relationships, construct those relationships directly.
+
+For:
+
+    start <= end
+
+prefer:
+
+    fc
+      .tuple(fc.integer(), fc.nat())
+      .map(([start, width]) => ({
+        start,
+        end: start + width,
+      }));
+
+Avoid generating unrelated fields and filtering the result when constructive generation is practical.
+
+## map and chain
+
+Use `map` when generated values can be transformed directly into the required domain.
+
+Use `chain` when one generated value determines the valid domain of another.
+
+Prefer transformations that preserve useful shrinking and produce semantically simple counterexamples.
+
+Do not use dependent generation when a simpler compositional arbitrary expresses the same domain.
+
+## Filtering
+
+Use `.filter()` only when:
+
+- the condition is simple;
+- rejection is inexpensive;
+- most generated values remain valid;
+- direct construction would add unnecessary complexity;
+- the repository already uses the pattern appropriately.
+
+Avoid high-rejection generators.
+
+Frequent filtering is a signal that the arbitrary may be modeling the domain poorly.
+
+## fc.pre
+
+Use `fc.pre` only for genuine property preconditions.
+
+Do not use `fc.pre` to exclude values that currently fail because of an implementation defect.
+
+Do not use `fc.pre` as a substitute for a valid-domain arbitrary when the valid domain can be generated directly.
+
+## Valid and invalid domains
+
+When a property assumes valid input, generate valid values directly.
+
+When testing rejection behavior, generate invalid values intentionally.
+
+Keep valid and invalid arbitraries separate when they represent different testing purposes.
+
+Do not randomly mix valid and invalid values when a property specifically targets one domain.
+
+## Boundary coverage
+
+Represent important boundaries intentionally.
+
+For a domain such as:
+
+    1 <= duration <= 100
+
+consider meaningful categories such as:
+
+    0
+    1
+    2
+    99
+    100
+    101
+
+Combine boundary values with broader generated values when both are important.
+
+Do not rely on uniform random generation to reliably exercise rare boundaries.
+
+## Combining categories
+
+When broad and boundary inputs are both important, compose them:
+
+    const durationArbitrary = fc.oneof(
+      fc.constantFrom(0, 1, 100, 101),
+      fc.integer({
+        min: -1000,
+        max: 1000,
+      }),
+    );
+
+Use composition when it improves meaningful exploration.
+
+Do not manipulate distributions merely to avoid failures.
+
+## Arrays and collections
+
+Use:
+
+    fc.array(elementArbitrary)
+
+when collection structure is part of the domain.
+
+Consider whether the domain requires:
+
+- empty collections;
+- non-empty collections;
+- singleton collections;
+- duplicates;
+- ordering;
+- bounded lengths;
+- large collections.
+
+When at least one element is required, use a repository-compatible fast-check approach that generates non-empty collections directly.
+
+When the production contract defines collection limits, encode them with the installed fast-check API.
+
+Do not narrow collection sizes solely to hide production performance problems.
+
+## Tuples and records
+
+Use tuples when generated values have a clear positional relationship:
+
+    fc.tuple(
+      fc.integer(),
+      fc.integer(),
+    );
+
+Use named records when positional meaning becomes difficult to understand.
+
+Use `fc.record` for domain objects and keep the generated structure aligned with the production type.
+
+## Domain constructors
+
+When a production constructor enforces important invariants, generate constructor inputs and map through the canonical constructor.
+
+Do not create test-only objects that production code would reject.
+
+Do not invoke constructors requiring infrastructure, network access, database state, or unrelated side effects merely to create test data.
+
+## Discriminated unions
+
+Generate each meaningful variant explicitly.
+
+Example:
+
+    const commandArbitrary = fc.oneof(
+      fc.record({
+        kind: fc.constant("create"),
+        value: valueArbitrary,
+      }),
+      fc.record({
+        kind: fc.constant("delete"),
+        id: entityIdArbitrary,
+      }),
+    );
+
+Keep alternative structures explicit and domain-specific.
+
+## Optional and nullable values
+
+Preserve production distinctions between:
+
+    property absent
+
+    property present with undefined
+
+    property present with null
+
+when those states have different semantics.
+
+Use optional-value combinators according to the installed fast-check API and repository conventions.
+
+Do not make required fields optional merely to simplify generation.
+
+## Strings
+
+Generate the actual domain represented by a string.
+
+If an identifier has a required format, construct that format directly rather than using unrestricted `fc.string()` and filtering most results.
+
+Do not generate mostly invalid strings when a property assumes valid domain values.
+
+## Numeric domains
+
+Consider explicitly whether the domain includes:
+
+- zero;
+- negative values;
+- positive values;
+- integer boundaries;
+- safe integer limits;
+- domain-specific maximums;
+- `NaN`;
+- `Infinity`;
+- `-Infinity`;
+- `-0`.
+
+Do not assume a generic numeric arbitrary matches production semantics.
+
+## Dates and times
+
+For time-dependent domains:
+
+- generate meaningful timestamps;
+- cover relevant temporal boundaries;
+- consider timezone semantics;
+- consider timestamp precision;
+- avoid accidental dependence on real current time;
+- use repository-controlled clocks when available.
+
+Generate the current time only when current-time behavior is specifically part of the generated domain.
+
+## Duplicates and ordering
+
+If duplicate values are meaningful to the behavior under test, ensure the arbitrary can generate duplicates.
+
+If uniqueness is a domain invariant, encode uniqueness intentionally.
+
+Do not impose ordering when the production contract does not require it.
+
+## Nested domain objects
+
+Compose canonical arbitraries:
+
+    const userArbitrary = ...;
+
+    const messageArbitrary = fc.record({
+      sender: userArbitrary,
+      payload: fc.string(),
+    });
+
+Do not independently reconstruct equivalent nested domain objects throughout the test suite.
+
+## Shrinking
+
+Prefer standard fast-check combinators with useful shrinking.
+
+Good generators should shrink toward:
+
+- smaller collections;
+- simpler numbers;
+- shorter strings;
+- simpler domain structures;
+- minimal counterexamples.
+
+When using `map`, verify that shrinking source values still produces meaningful domain counterexamples.
+
+Avoid opaque transformations that destroy useful shrinking.
+
+Avoid `noShrink` unless disabling shrinking is an explicit domain requirement.
+
+## Generator independence
+
+The arbitrary creates inputs; the property determines expected relationships.
+
+Do not generate expected outputs using the same implementation logic as the system under test.
+
+Do not embed production algorithms into generators merely to produce convenient expected values.
+
+Keep generated input construction independent from the oracle.
+
+## Stateful generation
+
+For stateful systems, model:
+
+    current state
+
+    ↓
+
+    valid command generator
+
+    ↓
+
+    next state
+
+Generate commands according to the operations valid for the current state.
+
+Do not generate mostly invalid commands and discard them.
+
+Use fast-check command/model facilities or dependent generation when command validity depends on evolving state.
+
+## Model independence
+
+Keep stateful models simpler than production implementations.
+
+Do not copy production algorithms into the model and compare the two.
+
+The model should capture the relevant invariant independently so that the same implementation mistake cannot make both sides agree.
+
+## Resource-bearing values
+
+If generated values represent resources:
+
+- prefer lightweight representations when possible;
+- construct resources inside the property when appropriate;
+- clean resources after each execution;
+- prevent resources from leaking between runs.
+
+Do not make arbitrary generation responsible for persistent external state.
+
+## No external side effects
+
+Arbitraries should normally describe data.
+
+Do not perform:
+
+- database writes;
+- filesystem operations;
+- network requests;
+- RPC calls;
+- process creation;
+- external service calls;
+- infrastructure setup.
+
+Move external setup outside the arbitrary when it is not intrinsically part of the generated input.
+
+## Determinism
+
+Do not use uncontrolled randomness inside arbitrary construction.
+
+Avoid:
+
+    Math.random()
+
+    Date.now()
+
+when those values affect property reproducibility.
+
+Use fast-check's generated randomness or controlled application randomness.
+
+Keep fast-check randomness separate from randomness used by the system under test.
+
+## Generator performance
+
+Keep arbitrary construction inexpensive enough for repeated property execution.
+
+Watch for:
+
+- expensive validation;
+- high rejection rates;
+- cryptographic work;
+- unnecessarily large structures;
+- repeated infrastructure setup;
+- resource allocation.
+
+Do not restrict valid input solely to compensate for a slow implementation.
+
+## Generator breadth
+
+Review whether the arbitrary reaches meaningful categories:
+
+    empty
+    singleton
+    typical
+    boundary
+    unusual
+    large
+    invalid
+
+Do not assume a high number of property runs guarantees coverage of rare categories.
+
+Use explicit composition when important categories need reliable representation.
+
+## Debugging arbitraries
+
+When an arbitrary behaves unexpectedly:
+
+1. Run a focused property using the arbitrary.
+2. Inspect representative generated values.
+3. Verify important categories are reachable.
+4. Inspect rejection behavior.
+5. Trigger a deliberate failure.
+6. Inspect the resulting shrink.
+7. Simplify the arbitrary if generation or shrinking is poor.
+
+Do not modify production behavior merely to accommodate a defective arbitrary.
+
+## Generator failures
+
+When generated input exposes a failure:
+
+1. Determine whether the input is valid according to the domain.
+2. If valid, investigate the implementation or property.
+3. If invalid, verify that the property intentionally targets invalid input.
+4. Do not hide the failure with `fc.pre`.
+5. Do not narrow the arbitrary merely because the current implementation cannot handle valid input.
+
+## Domain changes
+
+When a domain type, constructor, validation rule, or business constraint changes:
+
+1. Search for related arbitraries.
+2. Compare generated values with the updated domain.
+3. Review valid and invalid generators.
+4. Review boundary coverage.
+5. Review dependent-field relationships.
+6. Rerun affected properties.
+
+Do not assume TypeScript type changes automatically keep arbitrary behavior correct.
+
+## Completion
+
+Before declaring an arbitrary complete, verify:
+
+- exact generated domain is understood;
+- existing canonical arbitraries were searched for;
+- arbitrary name communicates its domain;
+- valid and invalid domains are explicit;
+- important relationships are constructed directly;
+- important boundaries are reachable;
+- typical and unusual values are represented;
+- excessive filtering is avoided;
+- `fc.pre` represents only genuine preconditions;
+- shrinking produces useful counterexamples;
+- unnecessary `noShrink` is avoided;
+- no external side effects occur during generation;
+- no uncontrolled randomness affects generated values;
+- generator performance is reasonable;
+- generated resources are cleaned up;
+- stateful generation reflects valid state transitions;
+- the generator remains independent from the oracle;
+- domain changes have been reflected in related arbitraries.

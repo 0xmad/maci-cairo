@@ -1,0 +1,32 @@
+---
+description: Project-wide engineering workflow for Cursor in the MACI Cairo repository.
+alwaysApply: true
+---
+
+# Project engineering workflow
+
+Read `AGENTS.md` and `CONTEXT.md` before non-trivial work. Inspect the current
+worktree and repository configuration before editing, and preserve unrelated
+pre-existing changes.
+
+Work in small, atomic vertical slices. For each behavior change:
+
+1. Understand the observable behavior and invariants.
+2. Choose the smallest useful test seam.
+3. Write one meaningful failing test and verify the failure is for the expected
+   reason.
+4. Implement the minimum production change.
+5. Refactor only while tests are green.
+6. Run the narrowest applicable build, test, and type checks.
+7. Review the full diff for correctness, compatibility, security, coupling,
+   unnecessary complexity, and accidental scope.
+
+Use existing repository patterns and commands. Do not add speculative
+abstractions, dependencies, linters, formatters, or architecture. Tests should
+verify public behavior, including negative and boundary cases. For bugs,
+reproduce and preserve the failure with a regression test before fixing it.
+
+Treat Cairo contracts and Circom circuits as security-critical: preserve
+storage, events, serialization, signal ordering, constraints, field semantics,
+and validation ordering; test invariants and invalid inputs rather than relying
+on compilation alone.

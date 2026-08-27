@@ -14,19 +14,19 @@ This project brings the MACI architecture to the **Starknet / Cairo** ecosystem.
 
 The repository currently includes:
 
-* MACI state management
-* User registration using BabyJubJub public keys
-* Poseidon hashing
-* Lean Incremental Merkle Trees (LeanIMT)
-* State-tree root history
-* Poll and poll-factory contracts
-* Policy checkers and enforcers
-* Ballot-related Circom circuits
-* ElGamal-related circuits
-* Vote-related circuits
-* TypeScript circuit tooling and tests
-* Starknet contract interfaces and events
-* Modular arithmetic utilities
+- MACI state management
+- User registration using BabyJubJub public keys
+- Poseidon hashing
+- Lean Incremental Merkle Trees (LeanIMT)
+- State-tree root history
+- Poll and poll-factory contracts
+- Policy checkers and enforcers
+- Ballot-related Circom circuits
+- ElGamal-related circuits
+- Vote-related circuits
+- TypeScript circuit tooling and tests
+- Starknet contract interfaces and events
+- Modular arithmetic utilities
 
 ---
 
@@ -126,17 +126,17 @@ pub mod MACI
 
 The MACI contract manages:
 
-* State-tree configuration
-* User signups
-* BabyJubJub public-key validation
-* Public-key hashing
-* State indices
-* State-tree roots
-* Historical state roots
-* Signup events
-* Policy enforcement
-* Poll identifiers
-* Empty ballot roots
+- State-tree configuration
+- User signups
+- BabyJubJub public-key validation
+- Public-key hashing
+- State indices
+- State-tree roots
+- Historical state roots
+- Signup events
+- Policy enforcement
+- Poll identifiers
+- Empty ballot roots
 
 The current constructor accepts:
 
@@ -388,15 +388,15 @@ circuits/
 
 The package uses:
 
-* CircomKit
-* Circom
-* `circomlib`
-* `snarkjs`
-* `@zk-kit/binary-merkle-root.circom`
-* LeanIMT utilities
-* Poseidon utilities
-* Vitest
-* fast-check
+- CircomKit
+- Circom
+- `circomlib`
+- `snarkjs`
+- `@zk-kit/binary-merkle-root.circom`
+- LeanIMT utilities
+- Poseidon utilities
+- Vitest
+- fast-check
 
 ### Circuit Commands
 
@@ -440,12 +440,12 @@ The repository also contains a Docker-based Garaga workflow for generating a ver
 
 The repository uses:
 
-* **Cairo / Scarb** for Starknet contracts
-* **Starknet Foundry (`snforge`)** for Cairo tests
-* **Node.js**
-* **pnpm**
-* **Circom / CircomKit**
-* Docker for the Garaga verifier workflow
+- **Cairo / Scarb** for Starknet contracts
+- **Starknet Foundry (`snforge`)** for Cairo tests
+- **Node.js**
+- **pnpm**
+- **Circom / CircomKit**
+- Docker for the Garaga verifier workflow
 
 The contract packages currently target Starknet `2.20.0` and use Starknet Foundry `0.63.0`.
 
@@ -493,9 +493,9 @@ make test
 
 This runs:
 
-* Cairo contract tests
-* Common-package tests
-* Circuit tests
+- Cairo contract tests
+- Common-package tests
+- Circuit tests
 
 You can also run individual Cairo tests:
 
@@ -658,20 +658,20 @@ This project contains cryptographic and zero-knowledge components and should be 
 
 Before using the contracts in production, review at minimum:
 
-* BabyJubJub implementation and validation
-* Poseidon hashing
-* LeanIMT correctness
-* State-tree capacity calculations
-* State-index conversions
-* Duplicate signup handling
-* Policy/enforcer behavior
-* Cross-contract calls
-* Poll state transitions
-* Ballot validation
-* ZK proof verification
-* Circuit correctness
-* Proving and verification-key generation
-* Coordinator and off-chain message-processing logic
+- BabyJubJub implementation and validation
+- Poseidon hashing
+- LeanIMT correctness
+- State-tree capacity calculations
+- State-index conversions
+- Duplicate signup handling
+- Policy/enforcer behavior
+- Cross-contract calls
+- Poll state transitions
+- Ballot validation
+- ZK proof verification
+- Circuit correctness
+- Proving and verification-key generation
+- Coordinator and off-chain message-processing logic
 
 In particular, the current `Poll` implementation should **not** be interpreted as a complete production ballot-verification layer: although `Ballot` contains a proof field, `vote` currently updates the chain hash and emits the ballot data without performing proof verification itself.
 

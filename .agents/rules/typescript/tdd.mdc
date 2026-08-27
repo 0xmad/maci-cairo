@@ -1,0 +1,327 @@
+---
+description: "Test-driven development workflow for TypeScript behavioral changes. Use when adding or changing behavior, fixing bugs, adding regression coverage, or refactoring behavior covered by tests."
+globs:
+  - "circuits/**/*.{test,spec}.ts"
+  - "circuits/**/*.{test,spec}.tsx"
+alwaysApply: false
+---
+
+# TypeScript TDD Workflow
+
+Use example-based TDD to specify and protect observable behavior.
+
+## TDD Exception: Prototype Logic
+
+TDD is not required for prototype, exploratory, spike, or experimental logic
+when the purpose is to validate an approach, API, architecture, or feasibility
+before production implementation.
+
+For prototype work:
+
+- Tests are optional unless explicitly requested.
+- Do not add tests solely to satisfy the TDD workflow.
+- Keep prototype code clearly scoped and avoid treating it as production-ready.
+- Once prototype logic is promoted to production code, normal TDD requirements
+  apply.
+
+## Start from behavior
+
+Before writing or changing a test:
+
+1. Identify the behavior that must hold.
+2. Search existing tests covering the behavior.
+3. Search related fixtures, factories, helpers, matchers, and assertions.
+4. Identify the smallest useful test.
+5. Determine whether the behavior is already covered.
+6. Follow existing repository test patterns and Vitest conventions.
+
+Prefer behavior and public contracts over implementation details.
+
+## RED → GREEN → REFACTOR
+
+For a new behavioral requirement:
+
+1. **RED** — write the smallest useful failing test.
+2. Run it and confirm the failure represents the missing behavior.
+3. **GREEN** — implement the minimum behavior required.
+4. Run the test and confirm it passes.
+5. **REFACTOR** — improve structure without changing behavior.
+6. Rerun the relevant tests after refactoring.
+
+Do not skip RED when a meaningful behavioral test can be written first.
+
+A valid RED failure demonstrates the missing behavior. Failures caused by broken imports, invalid fixtures, missing helpers, or test-environment setup are not meaningful RED states.
+
+## Existing failing coverage can be RED
+
+A new test is unnecessary when an existing test already demonstrates the requested failure.
+
+For a bug fix:
+
+existing regression test
+→ confirm it fails because of the bug
+→ fix implementation
+→ confirm GREEN
+
+Do not create duplicate tests merely to satisfy a formal RED step.
+
+## Regression tests
+
+For behavioral bugs:
+
+1. Reproduce the actual defect.
+2. Fail against the buggy implementation when practical.
+3. Fix the implementation.
+4. Confirm the test passes.
+5. Keep the test meaningful if the implementation is later refactored.
+
+Do not replace a specific regression with a weaker generic assertion.
+
+## Characterization tests
+
+For poorly tested legacy behavior, migrations, exploratory work, infrastructure changes, or generated-code workflows:
+
+capture important current behavior
+→ confirm characterization tests pass
+→ make the change
+→ preserve behavior unless intentionally changed
+
+When behavior intentionally changes, update only the affected contract and add tests for the new behavior.
+
+## Test through realistic boundaries
+
+When behavior is exposed through a public API, test that API as a consumer would.
+
+Prefer:
+
+    processor.process(message);
+
+over invoking private implementation details.
+
+Test:
+
+- meaningful inputs;
+- observable outputs;
+- error behavior;
+- relevant side effects;
+- meaningful state transitions.
+
+A reasonable internal refactor should not require rewriting a behavioral test.
+
+## Focus tests on behavior
+
+Avoid coupling tests to:
+
+- private implementation details;
+- local variable names;
+- incidental helper structure;
+- internal caches;
+- exact internal call order;
+- implementation-specific library behavior.
+
+Prefer assertions about observable contracts.
+
+## Keep each test focused
+
+A test should have one primary behavioral reason to fail.
+
+Multiple assertions are appropriate when they describe the same behavior.
+
+Avoid combining unrelated concerns such as:
+
+creation
++
+validation
++
+persistence
++
+cache behavior
++
+unrelated events
+
+unless they intentionally form one public contract.
+
+Use Arrange → Act → Assert as a mental model, but do not add boilerplate comments when they do not improve readability.
+
+## Error semantics
+
+Use the repository's established style.
+
+Use broad error assertions when only rejection matters:
+
+    expect(() => operation()).toThrow();
+
+Use an error type when it is contractual:
+
+    expect(() => operation()).toThrow(InvalidMessageError);
+
+Assert exact error text only when callers depend on that text.
+
+## Side effects
+
+When side effects are part of the contract, test externally meaningful results:
+
+- persistence;
+- state mutation;
+- event emission;
+- external calls;
+- resource cleanup;
+- absence of mutation on failure;
+- absence of persistence or events after validation failure.
+
+Do not assert incidental internal calls merely because a mock makes them easy to inspect.
+
+## Mocks
+
+Mock boundaries, not the behavior under test.
+
+Appropriate mock targets include:
+
+- external services;
+- network clients;
+- expensive infrastructure;
+- nondeterministic dependencies;
+- filesystem/database boundaries when appropriate.
+
+Do not mock the core algorithm or function whose behavior is being tested.
+
+The test should exercise enough real behavior to prove the requirement.
+
+## Repository test infrastructure
+
+Before creating a fixture, factory, matcher, helper, or setup pattern:
+
+1. Search for an existing equivalent.
+2. Reuse established repository infrastructure where possible.
+3. Follow the repository's Vitest configuration and conventions.
+
+Do not introduce test frameworks, fixture systems, matchers, or broad test infrastructure for a focused behavior change unless required.
+
+## Test data
+
+Prefer readable domain data:
+
+    const poll = createPoll({
+      duration: 60,
+    });
+
+over unexplained positional values:
+
+    const poll = createPoll(17, 823, 91, false, "foo");
+
+Use named constants when special values have semantic meaning.
+
+Do not over-abstract tests. A helper is justified when it removes meaningful repetition, captures a stable convention, or makes scenarios easier to understand.
+
+Readable duplication is preferable to opaque test infrastructure.
+
+## Boundaries and negative behavior
+
+When relevant, consider:
+
+empty input
+minimum valid value
+maximum valid value
+just below/above a boundary
+invalid input
+missing values
+duplicate values
+important state transitions
+repeated operations
+relevant side effects
+
+Do not mechanically enumerate every possible value. Test domain-significant cases.
+
+## Public APIs
+
+When an exported API changes:
+
+- test through the public boundary;
+- verify relevant input/output semantics;
+- verify meaningful errors and absence behavior;
+- inspect downstream consumers when appropriate;
+- preserve compatibility unless the task intentionally changes it.
+
+## Async behavior
+
+Await the actual operation:
+
+    await processor.process(message);
+
+Do not synchronize tests with arbitrary sleeps:
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+Prefer repository-provided synchronization helpers, explicit completion conditions, or fake timers when appropriate.
+
+## TDD and property-based testing
+
+Example-based tests and property-based tests are complementary.
+
+Use example-based tests for:
+
+- concrete business scenarios;
+- known regressions;
+- exact outputs;
+- explicit error cases;
+- readable boundary documentation.
+
+Use property-based testing for:
+
+- broad input spaces;
+- invariants;
+- mathematical relationships;
+- serialization round trips;
+- state-space exploration.
+
+Do not replace a valuable concrete regression with a property merely because the property can generate the same example.
+
+## TDD and design
+
+Difficult tests can expose API design problems.
+
+Warning signs include:
+
+- excessive setup;
+- hidden dependencies;
+- impossible-to-construct valid states;
+- widespread mocking;
+- inaccessible boundaries;
+- repeated test-specific workarounds.
+
+Treat these as design feedback, but do not redesign production code solely to make one test shorter.
+
+## Test failures
+
+When a test unexpectedly fails:
+
+1. Read the complete failure.
+2. Compare expected and actual behavior.
+3. Inspect the fixture/input.
+4. Determine whether the implementation or test is wrong.
+5. Check whether the expected behavior intentionally changed.
+6. Fix the root cause.
+
+Do not immediately change the expected value.
+
+Do not delete tests, weaken assertions, skip failures, change fixtures solely to hide bugs, or add retries/sleeps to suppress flakiness.
+
+## Completion
+
+Before declaring a TDD change complete, verify:
+
+- intended behavior is explicitly represented by tests;
+- relevant regression behavior is protected;
+- meaningful negative/boundary cases are covered;
+- tests exercise observable behavior;
+- RED was confirmed when practical;
+- GREEN was achieved through the intended implementation;
+- refactoring preserved behavior;
+- deterministic tests pass;
+- meaningful assertions remain intact;
+- unnecessary mocks and abstractions were avoided;
+- existing repository conventions are followed;
+- relevant validation actually ran.
+
+For scope, dependencies, diff review, worktree safety, and commits, use the repository's atomic-change guidance.
+For repository workflow, validation escalation, and completion reporting, use the repository's TypeScript agent workflow guidance.

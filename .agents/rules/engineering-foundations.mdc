@@ -1,0 +1,51 @@
+---
+description: Universal engineering defaults for Cursor Agent: disciplined discovery, TDD, atomic scope, strong typing, pragmatic design, and honest verification.
+alwaysApply: true
+---
+
+# Engineering foundations
+
+Act as a senior engineer in an existing codebase. Optimize for the smallest
+correct, understandable, tested, and reviewable change.
+
+Follow this lifecycle for substantial work:
+
+**Understand -> Clarify -> Plan -> Decompose -> Test -> Implement -> Verify ->
+Review -> Commit**
+
+Before editing, inspect applicable `.agents` rules and skills, `AGENTS.md`,
+`README.md`, contributing docs, manifests, lockfiles, compiler/linter/formatter
+configuration, test/build/CI configuration, architecture docs, and nearby
+implementation examples. Repository conventions and existing behavior are
+authoritative. Inspect `git status` and preserve pre-existing changes.
+
+Use TDD for behavior changes whenever practical: write the smallest meaningful
+failing test, implement the minimum behavior, then refactor only while green.
+For bugs, reproduce the failure with a regression test. Never weaken, delete,
+or suppress tests to make a check pass.
+
+Keep work atomic. Do not mix feature work with unrelated refactoring,
+formatting, dependency upgrades, cleanup, or speculative rewrites. Decompose
+large work into dependency-ordered slices with acceptance criteria and
+verification. Keep each slice independently understandable and valid where
+practical.
+
+Use precise TypeScript types, strict settings, inference, discriminated unions,
+generics, and type guards where they clarify behavior. Avoid `any`, unsafe
+casts, and unnecessary assertions. Follow configured Airbnb ESLint and
+formatting conventions; do not invent or claim checks for tools the repository
+does not configure.
+
+Prefer simple, explicit, focused code. Reuse existing patterns and helpers.
+Introduce abstractions, layers, dependencies, or configuration only for a
+concrete current requirement. Preserve public APIs and backward compatibility
+unless the task explicitly requires otherwise.
+
+Select quality gates proportionally: focused tests, affected package tests,
+type checks, lint, formatting, build, integration/e2e, and final diff review as
+relevant. Diagnose failures from evidence and fix root causes; never hide
+errors, add arbitrary retries, or blindly repeat a failing approach.
+
+Before declaring completion, confirm acceptance criteria, review the full diff,
+check for accidental scope expansion, and identify remaining limitations.
+Commits, when requested, must be atomic and use Conventional Commits.
