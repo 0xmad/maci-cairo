@@ -34,7 +34,7 @@ The BabyJubJub public key bound to a Signup.
 _Avoid_: Public key (bare), coordinator key
 
 **Evidence**:
-The payload passed into the Policy at Signup.
+The payload passed at Signup into the Policy and the vote-balance assigner.
 _Avoid_: Signup data, calldata (as this concept)
 
 ### Policy
@@ -53,6 +53,14 @@ _Avoid_: Validator, policy (as a synonym for Checker alone)
 The stateful half of a Policy: whether this Subject has already been
 enforced, and the call to the Checker.
 _Avoid_: Policy (as a synonym for Enforcer alone)
+
+**Vote-balance assigner**:
+The configured contract MACI calls at Signup to obtain the vote balance
+bound into the leaf. It is read-only. MACI uses one, set when MACI is
+constructed. New assignment rules are new implementations of this role
+(and a new MACI), not a change to Policy, Checker, or Enforcer.
+_Avoid_: Voice credit proxy, Policy
+(as this role)
 
 ### Polls and voting
 
@@ -73,9 +81,9 @@ _Avoid_: Ballot, voice credits (unless you adopt that name)
 
 **Vote balance**:
 The budget of vote-amount a Signup may put on **one Ballot**. It is assigned
-at Signup or by a later update, not invented inside the Ballot. It is **not
-consumed across Polls**: spending the full balance in Poll 1 does not reduce
-Poll 2.
+at Signup, bound into the state-tree leaf, and never updated. It is **not
+invented inside the Ballot** and **not consumed across Polls**: spending the
+full budget on Poll 1 does not reduce Poll 2.
 _Avoid_: Voice credits, tokens
 
 **Ballot**:

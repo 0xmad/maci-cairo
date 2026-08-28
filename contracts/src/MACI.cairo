@@ -25,12 +25,15 @@ pub struct ConstructorParams {
     pub empty_ballot_roots: (u256, u256, u256, u256, u256),
     /// Address of the enforcer contract used to enforce policy restrict
     pub enforcer: ContractAddress,
+    /// Address of the vote-balance assigner used at Signup.
+    pub vote_balance_assigner: ContractAddress,
 }
 
 /// Interface for the MACI contract.
 ///
 /// Provides access to the state tree and allows users to register a
-/// BabyJubJub public key together with arbitrary signup data.
+/// Signup leaf (user public key and vote balance) together with
+/// arbitrary signup data.
 #[starknet::interface]
 pub trait IMACI<TContractState> {
     /// Returns the configured state tree depth.
@@ -39,22 +42,24 @@ pub trait IMACI<TContractState> {
     /// Returns the current root of the MACI state tree.
     fn get_state_tree_root(self: @TContractState) -> u256;
 
-    /// Returns the zero-based state index associated with a public key hash.
+    /// Returns the zero-based state index associated with a state-tree leaf.
     ///
     /// The underlying LeanIMT stores leaf indices as one-based values, so
     /// this function subtracts one before returning the index.
     ///
     /// Arguments:
-    /// - `public_key_hash`: Poseidon hash of a registered public key.
+    /// - `leaf`: Poseidon hash of a registered user public key and vote
+    ///   balance, or the padding leaf.
     ///
     /// Returns:
-    /// - The zero-based state index of the corresponding signup.
-    fn get_state_index(self: @TContractState, public_key_hash: u256) -> u256;
+    /// - The zero-based state index of the corresponding leaf.
+    fn get_state_index(self: @TContractState, leaf: u256) -> u256;
 
-    /// Registers a new public key in the MACI state tree.
+    /// Registers a Signup in the MACI state tree.
     ///
     /// The public key must represent a valid BabyJubJub curve point and the
-    /// state tree must have available capacity.
+    /// state tree must have available capacity. Vote balance is obtained from
+    /// the vote-balance assigner and bound into the state-tree leaf at Signup.
     ///
     /// The supplied signup data is accepted as part of the signup interface.
     fn sign_up(ref self: TContractState, public_key: PublicKey, sign_up_data: ByteArray);
@@ -89,21 +94,29 @@ pub mod Errors {
 
     /// The supplied public key is not a valid BabyJubJub curve point.
     pub const INVALID_PUBLIC_KEY: felt252 = 'Invalid public key';
+
+    /// The vote-balance assigner returned zero.
+    pub const ZERO_VOTE_BALANCE: felt252 = 'Zero vote balance';
+
+    /// The vote-balance assigner returned a value that does not fit the Ballot circuit.
+    pub const VOTE_BALANCE_TOO_LARGE: felt252 = 'Vote balance too large';
 }
 
 #[starknet::contract]
 pub mod MACI {
     use core::hash::{HashStateExTrait, HashStateTrait};
     use core::num::traits::Pow;
-    use core::poseidon;
+    use core::poseidon::PoseidonTrait;
     use maci_common::crypto::BabyJubJub::BabyJubJub;
-    use poseidon::PoseidonTrait;
     use starknet::event::EventEmitter;
     use starknet::storage::{
         MutableVecTrait, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
     };
     use crate::policies::interfaces::IEnforcer::{IEnforcerDispatcher, IEnforcerDispatcherTrait};
     use crate::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait};
+    use crate::vote_balance::interfaces::IVoteBalanceAssigner::{
+        IVoteBalanceAssignerDispatcher, IVoteBalanceAssignerDispatcherTrait,
+    };
     use super::{Constants, ConstructorParams, Errors, PublicKey};
 
     /// Persistent storage for the MACI contract.
@@ -111,6 +124,8 @@ pub mod MACI {
     struct Storage {
         /// Dispatcher for the external enforcer contract used to enforce policy restrictions.
         enforcer: IEnforcerDispatcher,
+        /// Dispatcher for the vote-balance assigner used at Signup.
+        vote_balance_assigner: IVoteBalanceAssignerDispatcher,
         /// Configured depth of the state tree.
         state_tree_depth: u8,
         /// Maximum number of leaves that can be stored in the state tree.
@@ -149,6 +164,8 @@ pub mod MACI {
         /// Y-coordinate of the registered BabyJubJub public key.
         #[key]
         pub public_key_y: u256,
+        /// Vote balance bound into this Signup leaf.
+        pub vote_balance: u256,
         /// Block timestamp at which the signup was registered.
         pub timestamp: u64,
     }
@@ -162,15 +179,21 @@ pub mod MACI {
     /// - Stores the initial state-tree root.
     /// - Persists the tree configuration and empty ballot roots.
     /// - Creates a dispatcher for the supplied enforcer.
+    /// - Creates a dispatcher for the supplied vote-balance assigner.
     #[constructor]
     fn constructor(ref self: ContractState, params: ConstructorParams) {
         let arity: u256 = Constants::STATE_TREE_ARITY.into();
         let max_signups: u256 = arity.pow(params.state_tree_depth.into());
         let state_tree = ILeanIMTDispatcher { contract_address: params.state_tree_address };
+        let enforcer = IEnforcerDispatcher { contract_address: params.enforcer };
+        let vote_balance_assigner = IVoteBalanceAssignerDispatcher {
+            contract_address: params.vote_balance_assigner,
+        };
 
         state_tree.insert(Constants::PAD_KEY_HASH);
 
-        self.enforcer.write(IEnforcerDispatcher { contract_address: params.enforcer });
+        self.enforcer.write(enforcer);
+        self.vote_balance_assigner.write(vote_balance_assigner);
         self.state_roots_on_signup.push(Constants::PAD_KEY_HASH);
         self.state_tree_depth.write(params.state_tree_depth);
         self.max_signups.write(max_signups);
@@ -191,12 +214,12 @@ pub mod MACI {
             self.state_tree.read().get_root()
         }
 
-        /// Returns the zero-based state index for a public key hash.
+        /// Returns the zero-based state index for a state-tree leaf.
         ///
         /// The underlying LeanIMT uses one-based leaf indices, so the stored
         /// index is decremented before being returned.
-        fn get_state_index(self: @ContractState, public_key_hash: u256) -> u256 {
-            self.state_tree.read().get_leaf_index(public_key_hash) - 1
+        fn get_state_index(self: @ContractState, leaf: u256) -> u256 {
+            self.state_tree.read().get_leaf_index(leaf) - 1
         }
 
         /// Registers a new user in the MACI state tree.
@@ -206,10 +229,10 @@ pub mod MACI {
         /// curve, or if the configured enforcer rejects the caller.
         ///
         /// The configured enforcer is called with the caller's address and
-        /// the supplied signup data before the public key is inserted into
-        /// the LeanIMT state tree. The public key is then hashed with Poseidon
-        /// and inserted into the state tree. The resulting root is recorded
-        /// and a `Signup` event is emitted.
+        /// the supplied signup data, then the vote-balance assigner returns the
+        /// vote balance bound into the leaf. The leaf is Poseidon(user public
+        /// key, vote balance). The resulting root is recorded and a `Signup`
+        /// event is emitted.
         ///
         /// Arguments:
         /// - `public_key`: BabyJubJub public key to register.
@@ -223,9 +246,17 @@ pub mod MACI {
             assert(size < max_signups, Errors::TOO_MANY_SIGNUPS);
             assert(BabyJubJub::is_on_curve(public_key.x, public_key.y), Errors::INVALID_PUBLIC_KEY);
 
-            self.enforcer.read().enforce(starknet::get_caller_address(), sign_up_data);
+            self.enforcer.read().enforce(starknet::get_caller_address(), sign_up_data.clone());
 
-            let root = state_tree.insert(hash_public_key(public_key));
+            let vote_balance = self
+                .vote_balance_assigner
+                .read()
+                .get(starknet::get_caller_address(), sign_up_data);
+
+            assert(vote_balance != 0, Errors::ZERO_VOTE_BALANCE);
+            assert(vote_balance < 2_u256.pow(251), Errors::VOTE_BALANCE_TOO_LARGE);
+
+            let root = state_tree.insert(hash_state_leaf(public_key, vote_balance));
             self.state_roots_on_signup.push(root);
 
             self
@@ -236,6 +267,7 @@ pub mod MACI {
                             timestamp: starknet::get_block_timestamp(),
                             public_key_x: public_key.x,
                             public_key_y: public_key.y,
+                            vote_balance,
                         },
                     ),
                 )
@@ -257,16 +289,21 @@ pub mod MACI {
         }
     }
 
-    /// Computes the Poseidon hash of a BabyJubJub public key.
+    /// Computes the Poseidon hash of a state-tree leaf.
     ///
-    /// The public key is hashed as the ordered pair `(x, y)`.
+    /// The leaf preimage is the ordered triple `(public_key.x, public_key.y,
+    /// vote_balance)`, the same binding the Ballot circuit hashes.
     ///
     /// Arguments:
-    /// - `public_key`: BabyJubJub public key to hash.
+    /// - `public_key`: BabyJubJub public key bound in the Signup.
+    /// - `vote_balance`: Vote-amount budget bound in the Signup.
     ///
     /// Returns:
-    /// - Poseidon hash of the public key coordinates.
-    pub fn hash_public_key(public_key: PublicKey) -> u256 {
-        PoseidonTrait::new().update_with((public_key.x, public_key.y)).finalize().into()
+    /// - Poseidon hash of the state-tree leaf.
+    pub fn hash_state_leaf(public_key: PublicKey, vote_balance: u256) -> u256 {
+        PoseidonTrait::new()
+            .update_with((public_key.x, public_key.y, vote_balance))
+            .finalize()
+            .into()
     }
 }
