@@ -260,7 +260,9 @@ MACI
  │
  ├── Policy enforcement
  │
- ├── Poseidon(public key)
+ ├── Vote-balance assigner
+ │
+ ├── Poseidon(public key, vote balance)
  │
  ▼
 LeanIMT State Tree

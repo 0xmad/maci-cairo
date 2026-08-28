@@ -27,3 +27,9 @@ pub mod policies;
 /// Provides implementations and utilities for cryptographic tree structures, including
 /// Merkle-tree-based primitives.
 pub mod trees;
+
+/// Vote-balance assignment used at Signup.
+///
+/// Provides the vote-balance assigner MACI calls to obtain the vote
+/// balance bound into a state-tree leaf.
+pub mod vote_balance;
