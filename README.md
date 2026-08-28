@@ -113,407 +113,91 @@ The Cairo contracts are responsible for the on-chain state and interfaces, while
 
 ---
 
-# Contracts
+# Installation
 
-## MACI
-
-The main contract is:
-
-```cairo
-#[starknet::contract]
-pub mod MACI
-```
-
-The MACI contract manages:
-
-- State-tree configuration
-- User signups
-- BabyJubJub public-key validation
-- Public-key hashing
-- State indices
-- State-tree roots
-- Historical state roots
-- Signup events
-- Policy enforcement
-- Poll identifiers
-- Empty ballot roots
-
-The current constructor accepts:
-
-```cairo
-pub struct ConstructorParams {
-    pub state_tree_depth: u8,
-    pub state_tree_address: ContractAddress,
-    pub empty_ballot_roots: (u256, u256, u256, u256, u256),
-    pub enforcer: ContractAddress,
-}
-```
-
-The MACI contract uses an external LeanIMT contract as its state tree and an external enforcer contract for signup policy enforcement.
-
-### User Registration
-
-Users register through:
-
-```cairo
-fn sign_up(
-    ref self: TContractState,
-    public_key: PublicKey,
-    sign_up_data: ByteArray
-)
-```
-
-A public key is represented as:
-
-```cairo
-#[derive(Drop, Copy, Serde)]
-pub struct PublicKey {
-    pub x: u256,
-    pub y: u256,
-}
-```
-
-The signup flow is:
-
-1. Check state-tree capacity.
-2. Validate the BabyJubJub public key.
-3. Pass the caller and signup data to the configured enforcer.
-4. Hash the public key using Poseidon.
-5. Insert the resulting hash into the LeanIMT state tree.
-6. Record the resulting state-tree root.
-7. Emit a `Signup` event.
-
-### State Tree
-
-The state tree is binary:
-
-```cairo
-pub const STATE_TREE_ARITY: u8 = 2;
-```
-
-Its maximum capacity is calculated as:
-
-```text
-max_signups = 2 ^ state_tree_depth
-```
-
-A reserved padding leaf is inserted when the MACI contract is initialized.
-
-The public signup count excludes this padding leaf.
-
-### State Root History
-
-The contract keeps historical state-tree roots.
-
-The current root can be queried with:
-
-```cairo
-fn get_state_tree_root(self: @TContractState) -> u256;
-```
-
-A historical root can be queried with:
-
-```cairo
-fn get_state_tree_root_indexed_signup(
-    self: @TContractState,
-    index: u64
-) -> u256;
-```
-
-Index `0` represents the initial padded state before any user signup.
-
-### State Indices
-
-A public-key hash can be resolved to its zero-based state index:
-
-```cairo
-fn get_state_index(
-    self: @TContractState,
-    public_key_hash: u256
-) -> u256;
-```
-
-The underlying LeanIMT uses one-based leaf indices; the MACI interface converts these to zero-based state indices.
-
----
-
-# Polls
-
-The repository contains a dedicated `Poll` contract for ballot submission.
-
-A ballot currently contains:
-
-```cairo
-pub struct Ballot {
-    pub hash: u256,
-    pub user_commitment: u256,
-    pub encrypted_votes_c1: Span<Span<u256>>,
-    pub encrypted_votes_c2: Span<Span<u256>>,
-    pub proof: Span<u256>,
-}
-```
-
-The poll maintains a cryptographic chain hash.
-
-When a ballot is submitted, the current implementation computes:
-
-```text
-new_chain_hash =
-    Poseidon(current_chain_hash, ballot_hash)
-```
-
-and emits a `Voted` event containing the ballot information and resulting chain hash.
-
-# PollFactory
-
-`PollFactory` deploys new poll contracts from a configured class hash.
-
-The factory accepts:
-
-```cairo
-pub struct CreatePollArgs {
-    pub start_date: u64,
-    pub end_date: u64,
-    pub poll_public_key: (u256, u256),
-    pub maci: ContractAddress,
-    pub state_tree_depth: u8,
-    pub vote_options: u256,
-}
-```
-
-A poll is deployed with the configured poll class hash and a `PollCreated` event is emitted containing the newly deployed contract address.
-
----
-
-# Policies
-
-MACI signup can be restricted through an external **enforcer** contract.
-
-The policy system is organized into:
-
-```text
-contracts/src/policies/
-├── checkers/
-└── enforcers/
-```
-
-The current repository includes a `FreeForAll` checker/enforcer implementation.
-
-The MACI constructor receives an enforcer address:
-
-```cairo
-pub enforcer: ContractAddress
-```
-
-During signup, the configured enforcer receives the caller address and supplied `sign_up_data` before the public key is inserted into the state tree.
-
-This architecture allows signup eligibility rules to be implemented separately from the core MACI state-management contract.
-
----
-
-# Cryptography
-
-## BabyJubJub
-
-MACI users are represented by BabyJubJub public keys.
-
-Keys are supplied as `(x, y)` coordinates and validated before registration.
-
-The common package contains the BabyJubJub implementation used by the contracts.
-
-## Poseidon
-
-Public keys are hashed using the Starknet Poseidon implementation:
-
-```cairo
-pub fn hash_public_key(public_key: PublicKey) -> u256 {
-    PoseidonTrait::new()
-        .update_with((public_key.x, public_key.y))
-        .finalize()
-        .into()
-}
-```
-
-The hash is computed over the ordered pair:
-
-```text
-(x, y)
-```
-
-The resulting value is inserted into the MACI state tree.
-
-## LeanIMT
-
-The MACI state tree is backed by a separate Lean Incremental Merkle Tree contract.
-
-The contract interface includes:
-
-```cairo
-fn get_root(self: @TContractState) -> u256;
-
-fn get_size(self: @TContractState) -> u256;
-
-fn get_leaf_index(
-    self: @TContractState,
-    leaf: u256
-) -> u256;
-
-fn insert(
-    ref self: TContractState,
-    leaf: u256
-) -> u256;
-```
-
-State-tree leaves must be non-zero, fit within the configured field constraints, and not already exist in the tree.
-
----
-
-# Circuits
-
-The `circuits` package contains the zero-knowledge circuit implementation and associated TypeScript tooling.
-
-The current circuit tree contains:
-
-```text
-circuits/
-├── circom/
-│   ├── ballot/
-│   ├── elgamal/
-│   ├── utils/
-│   └── vote/
-├── ptau/
-├── test/
-└── ts/
-```
-
-The package uses:
-
-- CircomKit
-- Circom
-- `circomlib`
-- `snarkjs`
-- `@zk-kit/binary-merkle-root.circom`
-- LeanIMT utilities
-- Poseidon utilities
-- Vitest
-- fast-check
-
-### Circuit Commands
-
-From the `circuits` directory:
-
-```bash
-pnpm install
-```
-
-Run circuit tests:
-
-```bash
-pnpm test
-```
-
-Compile the ballot circuit:
-
-```bash
-pnpm compile:ballot
-```
-
-Generate the ballot proving setup:
-
-```bash
-pnpm setup:ballot
-```
-
-Build the TypeScript circuit package:
-
-```bash
-pnpm build
-```
-
-The repository also contains a Docker-based Garaga workflow for generating a verifier from a Groth16 verification key.
-
----
-
-# Development
+Clone the repository, then install the toolchains below before building.
 
 ## Prerequisites
 
-The repository uses:
+| Tool                                                                                                            | Version                     | Notes                                                |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------- |
+| [Scarb](https://docs.swmansion.com/scarb/download.html)                                                         | Cairo / Starknet **2.20.0** | Workspace `edition = "2024_07"`                      |
+| [Starknet Foundry](https://foundry-rs.github.io/starknet-foundry/getting-started/installation.html) (`snforge`) | **0.63.0**                  | Cairo tests (`scarb test`)                           |
+| [Node.js](https://nodejs.org/)                                                                                  | **24** or **26**            | Root `package.json` `engines`                        |
+| [pnpm](https://pnpm.io/installation)                                                                            | **11**                      | `corepack enable` is enough on a matching Node       |
+| [Circom](https://docs.circom.io/getting-started/installation/)                                                  | **2.2.3**                   | Must be on `PATH`; matches `circuits/circomkit.json` |
+| [lcov](https://github.com/linux-test-project/lcov)                                                              | any recent                  | `make test` runs coverage (`lcov` / `genhtml`)       |
+| Docker                                                                                                          | optional                    | Garaga Groth16 verifier from a verification key      |
 
-- **Cairo / Scarb** for Starknet contracts
-- **Starknet Foundry (`snforge`)** for Cairo tests
-- **Node.js**
-- **pnpm**
-- **Circom / CircomKit**
-- Docker for the Garaga verifier workflow
+Install Scarb (Cairo 2.20 line):
 
-The contract packages currently target Starknet `2.20.0` and use Starknet Foundry `0.63.0`.
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh
+```
 
-The root JavaScript workspace declares Node `24` or `26` and pnpm `11`.
+Install Starknet Foundry 0.63.0:
 
-## Install JavaScript Dependencies
+```bash
+curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh
+snfoundryup -v 0.63.0
+```
 
-At the repository root:
+Install Circom 2.2.3 (requires a Rust toolchain):
+
+```bash
+git clone https://github.com/iden3/circom.git
+cd circom
+git checkout v2.2.3
+cargo install --path circom
+```
+
+Install `lcov` (and `genhtml`) so `make test` can write coverage reports.
+
+## JavaScript dependencies
+
+From the repository root:
 
 ```bash
 pnpm install
 ```
 
-The root workspace is configured to run package scripts recursively.
+The root workspace installs `circuits` recursively.
 
-## Build Cairo Packages
-
-Build the shared package:
-
-```bash
-scarb build --package maci_common
-```
-
-Build the contracts:
-
-```bash
-scarb build --package maci_contracts
-```
-
-Or use the Makefile:
+## Build
 
 ```bash
 make build
 ```
 
-The current Makefile defines separate build targets for the common and contract packages.
+Equivalent package builds:
 
-## Run Tests
+```bash
+scarb build --package maci_common
+scarb build --package maci_contracts
+```
 
-Run the complete test workflow:
+## Test
 
 ```bash
 make test
 ```
 
-This runs:
+This runs `maci_common` and `maci_contracts` tests with coverage, then circuit tests (`cd circuits && pnpm test`).
 
-- Cairo contract tests
-- Common-package tests
-- Circuit tests
-
-You can also run individual Cairo tests:
+Narrower commands (see also `AGENTS.md`):
 
 ```bash
-cd common
-scarb test
+scarb test --package maci_common
+scarb test --package maci_contracts
+cd circuits && pnpm test
 ```
 
-```bash
-cd contracts
-scarb test
-```
-
-Circuit tests:
+Ballot circuit compile and Groth16 setup (needs Circom 2.2.3 and a powers-of-tau file under `circuits/ptau`):
 
 ```bash
 cd circuits
-pnpm test
+pnpm compile:ballot
+pnpm setup:ballot
 ```
 
 ---
@@ -535,120 +219,6 @@ Generated coverage directories can be removed with:
 ```bash
 make clean
 ```
-
----
-
-# Useful Contract Interfaces
-
-## MACI
-
-```cairo
-fn state_tree_depth(self: @TContractState) -> u8;
-
-fn get_state_tree_root(self: @TContractState) -> u256;
-
-fn get_state_index(
-    self: @TContractState,
-    public_key_hash: u256
-) -> u256;
-
-fn sign_up(
-    ref self: TContractState,
-    public_key: PublicKey,
-    sign_up_data: ByteArray
-);
-
-fn get_state_tree_root_indexed_signup(
-    self: @TContractState,
-    index: u64
-) -> u256;
-
-fn total_signups(self: @TContractState) -> u256;
-```
-
-## Poll
-
-```cairo
-fn vote(
-    ref self: TContractState,
-    ballot: Ballot
-);
-
-fn get_chain_hash(
-    self: @TContractState
-) -> u256;
-```
-
-## PollFactory
-
-```cairo
-fn create_poll(
-    ref self: TContractState,
-    args: CreatePollArgs
-) -> ContractAddress;
-
-fn get_poll_class_hash(
-    self: @TContractState
-) -> ClassHash;
-```
-
----
-
-# Events
-
-## MACI
-
-Successful signups emit:
-
-```cairo
-Signup {
-    state_index,
-    public_key_x,
-    public_key_y,
-    timestamp,
-}
-```
-
-The event allows off-chain applications to track user registration and state-tree updates.
-
-## Poll
-
-Successful ballot submissions emit:
-
-```cairo
-Voted {
-    hash,
-    user_commitment,
-    encrypted_votes_c1,
-    encrypted_votes_c2,
-    chain_hash,
-}
-```
-
-The chain hash provides an ordered cryptographic commitment to submitted ballots.
-
-## PollFactory
-
-New polls emit:
-
-```cairo
-PollCreated {
-    contract_address,
-}
-```
-
----
-
-# Error Handling
-
-The MACI contract currently defines:
-
-| Error                | Description                                              |
-| -------------------- | -------------------------------------------------------- |
-| `TOO_MANY_SIGNUPS`   | The state tree has reached its configured capacity.      |
-| `INVALID_PUBLIC_KEY` | The supplied public key is not a valid BabyJubJub point. |
-
-The LeanIMT implementation additionally handles invalid and duplicate leaves.
 
 ---
 
