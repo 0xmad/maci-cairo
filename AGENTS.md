@@ -62,3 +62,17 @@ Use repository commands as the source of truth:
 - `cd circuits && pnpm test`
 - `cd circuits && pnpm compile:ballot`
 - `cd circuits && pnpm setup:ballot`
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `0xmad/maci-cairo`, via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical roles map 1:1 to tracker labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` plus `docs/adr/`. See `docs/agents/domain.md`.
