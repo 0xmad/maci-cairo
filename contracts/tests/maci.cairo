@@ -185,17 +185,17 @@ fn test_signup() {
     assert_eq!(maci.total_signups(), 2);
     assert_eq!(
         maci.get_state_tree_root(),
-        2733690249170393328342678854874796288937122268445951915858397652968886526000,
+        18641568663061805515935921339670908659069483970050100085681843188073007624893,
     );
     assert_eq!(maci.get_state_tree_root(), imt_contract.get_root());
     assert_eq!(maci.get_state_tree_root_indexed_signup(0), Constants::PAD_KEY_HASH);
     assert_eq!(
         maci.get_state_tree_root_indexed_signup(1),
-        640363641296375460809719516352163455719949987866342593579367400151342769153,
+        9744670572396782122315160530155514271043932556846579787669152829052089049996,
     );
     assert_eq!(
         maci.get_state_tree_root_indexed_signup(2),
-        2733690249170393328342678854874796288937122268445951915858397652968886526000,
+        18641568663061805515935921339670908659069483970050100085681843188073007624893,
     );
     assert_eq!(maci.get_state_index(Constants::PAD_KEY_HASH), 0);
     assert_eq!(maci.get_state_index(leaf_hash1), imt_contract.get_leaf_index(leaf_hash1) - 1);

@@ -1,6 +1,4 @@
-/// BabyJubJub elliptic curve utilities and primitives.
-///
-/// This module contains the types, constants, and operations required to
-/// work with the BabyJubJub elliptic curve, including curve arithmetic and related cryptographic
-/// operations.
+/// Cryptographic primitives shared by MACI contracts.
 pub mod BabyJubJub;
+pub mod poseidon_bn254;
+mod poseidon_bn254_constants;

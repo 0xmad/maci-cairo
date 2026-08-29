@@ -104,10 +104,9 @@ pub mod Errors {
 
 #[starknet::contract]
 pub mod MACI {
-    use core::hash::{HashStateExTrait, HashStateTrait};
     use core::num::traits::Pow;
-    use core::poseidon::PoseidonTrait;
     use maci_common::crypto::BabyJubJub::BabyJubJub;
+    use maci_common::crypto::poseidon_bn254::poseidon3;
     use starknet::event::EventEmitter;
     use starknet::storage::{
         MutableVecTrait, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
@@ -301,9 +300,6 @@ pub mod MACI {
     /// Returns:
     /// - Poseidon hash of the state-tree leaf.
     pub fn hash_state_leaf(public_key: PublicKey, vote_balance: u256) -> u256 {
-        PoseidonTrait::new()
-            .update_with((public_key.x, public_key.y, vote_balance))
-            .finalize()
-            .into()
+        poseidon3(public_key.x, public_key.y, vote_balance)
     }
 }

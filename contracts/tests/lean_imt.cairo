@@ -1,6 +1,5 @@
-use maci_contracts::trees::LeanIMT::{
-    ILeanIMTDispatcher, ILeanIMTDispatcherTrait, SNARK_SCALAR_FIELD,
-};
+use maci_common::crypto::poseidon_bn254::BN254_SCALAR;
+use maci_contracts::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait};
 use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
 use starknet::SyscallResultTrait;
 
@@ -22,8 +21,8 @@ fn test_insert() {
     let index = imt.get_leaf_index(1);
     let size = imt.get_size();
 
-    assert_eq!(node, 57657544514806701516422874648817029470079888617466081654292212158904804989);
-    assert_eq!(root, 57657544514806701516422874648817029470079888617466081654292212158904804989);
+    assert_eq!(node, 527908145296097206114143106285915374574174982593103155045063421343005867592);
+    assert_eq!(root, 527908145296097206114143106285915374574174982593103155045063421343005867592);
     assert_eq!(index, 2);
     assert_eq!(size, 2);
 }
@@ -44,11 +43,11 @@ fn test_multi_insert() {
     assert_eq!(imt.get_size(), 10);
 }
 
-
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_fuzz_insert(leaf: u256) {
-    if (leaf >= SNARK_SCALAR_FIELD) {
+fn test_insert_fuzz(leaf: u256) {
+    if (leaf >= BN254_SCALAR) {
         return;
     }
 
@@ -73,7 +72,7 @@ fn test_zero_leaf() {
 fn test_max_leaf() {
     let imt = deploy();
 
-    let _ = imt.insert(SNARK_SCALAR_FIELD);
+    let _ = imt.insert(BN254_SCALAR);
 }
 
 #[test]

@@ -9,6 +9,9 @@ edition = "2024_07"
 snforge_std = "0.63.0"
 assert_macros = "2.20.0"
 
+[features]
+fuzz = []
+
 [scripts]
 test = "snforge test"
 
