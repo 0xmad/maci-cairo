@@ -59,7 +59,6 @@ fn test_add_identity_fuzz(s: u256) {
     assert_eq!(result.1, y);
 }
 
-#[cfg(feature: 'fuzz')]
 #[test]
 #[should_panic]
 fn test_zero_inverse() {

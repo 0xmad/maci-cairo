@@ -67,3 +67,13 @@ fn test_poseidon_rejects_wrong_arity() {
 fn test_poseidon_rejects_arity_six() {
     let _ = poseidon(array![1, 2, 3, 4, 5, 6].span());
 }
+
+#[test]
+fn test_poseidon_dispatches_to_poseidon2() {
+    assert_eq!(poseidon(array![1, 2].span()), poseidon2(1, 2));
+}
+
+#[test]
+fn test_poseidon_dispatches_to_poseidon3() {
+    assert_eq!(poseidon(array![1, 2, 3].span()), poseidon3(1, 2, 3));
+}
