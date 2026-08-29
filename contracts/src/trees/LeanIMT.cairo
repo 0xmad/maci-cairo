@@ -58,27 +58,22 @@ mod Errors {
     /// The leaf is invalid.
     ///
     /// A leaf is invalid when it is zero or greater than or equal to
-    /// `SNARK_SCALAR_FIELD`.
+    /// `BN254_SCALAR`.
     pub const INVALID_LEAF: felt252 = 'Invalid leaf';
 }
 
 /// Scalar field modulus used to validate tree leaves.
 ///
-/// This is the scalar field modulus of the BN254 curve and is used to ensure
-/// that leaves are valid field elements for SNARK-related applications.
-pub const SNARK_SCALAR_FIELD: u256 =
-    21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
 #[starknet::contract]
 pub mod LeanIMT {
-    use core::hash::{HashStateExTrait, HashStateTrait};
     use core::num::traits::Pow;
-    use core::poseidon::PoseidonTrait;
+    use maci_common::crypto::poseidon_bn254::{BN254_SCALAR, poseidon2};
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use super::{Errors, SNARK_SCALAR_FIELD};
+    use super::Errors;
 
     /// Persistent storage for the Lean Incremental Merkle Tree.
     #[storage]
@@ -134,7 +129,7 @@ pub mod LeanIMT {
         /// Inserts a leaf into the LeanIMT and returns the resulting root.
         ///
         /// The insertion performs the following validation:
-        /// 1. The leaf must be smaller than `SNARK_SCALAR_FIELD`.
+        /// 1. The leaf must be smaller than `BN254_SCALAR`.
         /// 2. The leaf must be non-zero.
         /// 3. The leaf must not already exist in the tree.
         ///
@@ -146,7 +141,7 @@ pub mod LeanIMT {
         /// The leaf is stored with a one-based index so that `0` can
         /// represent an absent leaf.
         fn insert(ref self: ContractState, leaf: u256) -> u256 {
-            assert(leaf < SNARK_SCALAR_FIELD, Errors::INVALID_LEAF);
+            assert(leaf < BN254_SCALAR, Errors::INVALID_LEAF);
             assert(leaf != 0, Errors::INVALID_LEAF);
             assert(!self._has(leaf), Errors::ALREADY_EXISTS);
 
@@ -165,7 +160,7 @@ pub mod LeanIMT {
                 if (index / 2.pow(level)) % 2 == 1 {
                     let left = self.side_nodes.read(level);
 
-                    node = PoseidonTrait::new().update_with((left, node)).finalize().into();
+                    node = poseidon2(left, node);
                 } else {
                     self.side_nodes.write(level, node);
                 }

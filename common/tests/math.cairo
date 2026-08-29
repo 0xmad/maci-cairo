@@ -22,9 +22,10 @@ fn test_add_mod_overflow_branch() {
     assert_eq!(result, 10);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_mod_commutative(x: u256, y: u256, m: u256) {
+fn test_add_mod_commutative_fuzz(x: u256, y: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -35,9 +36,10 @@ fn test_add_mod_commutative(x: u256, y: u256, m: u256) {
     assert_eq!(result1, result2);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_mod_range(x: u256, y: u256, m: u256) {
+fn test_add_mod_range_fuzz(x: u256, y: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -47,9 +49,10 @@ fn test_add_mod_range(x: u256, y: u256, m: u256) {
     assert!(result < m);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_mod_associative(a: u256, b: u256, c: u256, m: u256) {
+fn test_add_mod_associative_fuzz(a: u256, b: u256, c: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -60,9 +63,10 @@ fn test_add_mod_associative(a: u256, b: u256, c: u256, m: u256) {
     assert_eq!(lhs, rhs);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_mod_inverse(a: u256, m: u256) {
+fn test_add_mod_inverse_fuzz(a: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -78,9 +82,10 @@ fn test_add_mod_inverse(a: u256, m: u256) {
     assert_eq!(math::add_mod(a, neg_a, m), 0);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_mod_identity(x: u256, m: u256) {
+fn test_add_mod_identity_fuzz(x: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -109,9 +114,10 @@ fn test_sub_mod_overflow_branch() {
     assert_eq!(result, 90);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_sub_mod_identity(a: u256, m: u256) {
+fn test_sub_mod_identity_fuzz(a: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -119,9 +125,10 @@ fn test_sub_mod_identity(a: u256, m: u256) {
     assert_eq!(math::sub_mod(a, 0, m), a % m);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_sub_mod_self(a: u256, m: u256) {
+fn test_sub_mod_self_fuzz(a: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -129,9 +136,10 @@ fn test_sub_mod_self(a: u256, m: u256) {
     assert_eq!(math::sub_mod(a, a, m), 0);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_sub_mod_as_add_inverse(a: u256, b: u256, m: u256) {
+fn test_sub_mod_as_add_inverse_fuzz(a: u256, b: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -147,9 +155,10 @@ fn test_sub_mod_as_add_inverse(a: u256, b: u256, m: u256) {
     assert_eq!(math::sub_mod(a, b, m), math::add_mod(a, neg_b, m));
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_sub_mod_range(a: u256, b: u256, m: u256) {
+fn test_sub_mod_range_fuzz(a: u256, b: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -159,9 +168,10 @@ fn test_sub_mod_range(a: u256, b: u256, m: u256) {
     assert!(result < m);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_sub_mod_antisymmetric(a: u256, b: u256, m: u256) {
+fn test_sub_mod_antisymmetric_fuzz(a: u256, b: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -185,9 +195,10 @@ fn test_mul_mod() {
     assert_eq!(math::mul_mod(Q, Q, Q), 0);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_mod_identity(a: u256, m: u256) {
+fn test_mul_mod_identity_fuzz(a: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -196,9 +207,10 @@ fn test_mul_mod_identity(a: u256, m: u256) {
     assert_eq!(math::mul_mod(1, a, m), a % m);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_mod_zero(a: u256, m: u256) {
+fn test_mul_mod_zero_fuzz(a: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -207,9 +219,10 @@ fn test_mul_mod_zero(a: u256, m: u256) {
     assert_eq!(math::mul_mod(0, a, m), 0);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_mod_commutative(a: u256, b: u256, m: u256) {
+fn test_mul_mod_commutative_fuzz(a: u256, b: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -217,9 +230,10 @@ fn test_mul_mod_commutative(a: u256, b: u256, m: u256) {
     assert_eq!(math::mul_mod(a, b, m), math::mul_mod(b, a, m));
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_mod_associative(a: u256, b: u256, c: u256, m: u256) {
+fn test_mul_mod_associative_fuzz(a: u256, b: u256, c: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -230,9 +244,10 @@ fn test_mul_mod_associative(a: u256, b: u256, c: u256, m: u256) {
     assert_eq!(lhs, rhs);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_mod_distributive(a: u256, b: u256, c: u256, m: u256) {
+fn test_mul_mod_distributive_fuzz(a: u256, b: u256, c: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -243,9 +258,10 @@ fn test_mul_mod_distributive(a: u256, b: u256, c: u256, m: u256) {
     assert_eq!(lhs, rhs);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_mod_range(a: u256, b: u256, m: u256) {
+fn test_mul_mod_range_fuzz(a: u256, b: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -253,9 +269,10 @@ fn test_mul_mod_range(a: u256, b: u256, m: u256) {
     assert!(math::mul_mod(a, b, m) < m);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_mod_inverse(x: u256) {
+fn test_mul_mod_inverse_fuzz(x: u256) {
     let x = x % Q;
 
     if x == 0 {
@@ -281,9 +298,10 @@ fn test_pow_mod() {
     assert_eq!(math::pow_mod(Q, Q, Q), 0);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_pow_mod_zero(a: u256, m: u256) {
+fn test_pow_mod_zero_fuzz(a: u256, m: u256) {
     if m <= 1 {
         return;
     }
@@ -291,9 +309,10 @@ fn test_pow_mod_zero(a: u256, m: u256) {
     assert_eq!(math::pow_mod(a, 0, m), 1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_pow_mod_one(a: u256, m: u256) {
+fn test_pow_mod_one_fuzz(a: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -301,9 +320,10 @@ fn test_pow_mod_one(a: u256, m: u256) {
     assert_eq!(math::pow_mod(a, 1, m), a % m);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_pow_mod_zero_base(n: u256, m: u256) {
+fn test_pow_mod_zero_base_fuzz(n: u256, m: u256) {
     if m == 0 || m == 1 || n == 0 {
         return;
     }
@@ -311,9 +331,10 @@ fn test_pow_mod_zero_base(n: u256, m: u256) {
     assert_eq!(math::pow_mod(0, n, m), 0);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_pow_mod_add_exponents(a: u256, x: u128, y: u128, m: u256) {
+fn test_pow_mod_add_exponents_fuzz(a: u256, x: u128, y: u128, m: u256) {
     if m == 0 {
         return;
     }
@@ -327,9 +348,10 @@ fn test_pow_mod_add_exponents(a: u256, x: u128, y: u128, m: u256) {
     assert_eq!(lhs, rhs);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_pow_mod_power(a: u256, x: u128, y: u128, m: u256) {
+fn test_pow_mod_power_fuzz(a: u256, x: u128, y: u128, m: u256) {
     if m == 0 {
         return;
     }
@@ -343,9 +365,10 @@ fn test_pow_mod_power(a: u256, x: u128, y: u128, m: u256) {
     assert_eq!(lhs, rhs);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_then_sub(a: u256, b: u256, m: u256) {
+fn test_add_then_sub_fuzz(a: u256, b: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -355,9 +378,10 @@ fn test_add_then_sub(a: u256, b: u256, m: u256) {
     assert_eq!(result, a % m);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_sub_then_add(a: u256, b: u256, m: u256) {
+fn test_sub_then_add_fuzz(a: u256, b: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -367,9 +391,10 @@ fn test_sub_then_add(a: u256, b: u256, m: u256) {
     assert_eq!(result, a % m);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_mod_distributive_sub(a: u256, b: u256, c: u256, m: u256) {
+fn test_mul_mod_distributive_sub_fuzz(a: u256, b: u256, c: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -380,9 +405,10 @@ fn test_mul_mod_distributive_sub(a: u256, b: u256, c: u256, m: u256) {
     assert_eq!(lhs, rhs);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_mod_reduction(a: u256, b: u256, m: u256) {
+fn test_add_mod_reduction_fuzz(a: u256, b: u256, m: u256) {
     if m == 0 {
         return;
     }
@@ -392,7 +418,7 @@ fn test_add_mod_reduction(a: u256, b: u256, m: u256) {
 
 #[test]
 #[fuzzer]
-fn test_mul_mod_reduction(a: u256, b: u256, m: u256) {
+fn test_mul_mod_reduction_fuzz(a: u256, b: u256, m: u256) {
     if m == 0 {
         return;
     }

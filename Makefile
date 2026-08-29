@@ -1,4 +1,4 @@
-.PHONY: test test-contracts test-circuits build coverage clean
+.PHONY: test test-contracts test-circuits test-fuzz test-fuzz-common test-fuzz-contracts build coverage clean
 
 build: build-common build-contracts
 
@@ -11,7 +11,7 @@ build-contracts:
 test: test-common test-contracts test-circuits
 
 test-contracts:
-	cd common && rm -rf coverage
+	cd contracts && rm -rf coverage
 	scarb test --package maci_contracts --coverage
 	cd contracts && lcov --remove coverage/coverage.lcov \
 		'*/tests/*' \
@@ -30,6 +30,14 @@ test-common:
 
 test-circuits:
 	cd circuits && pnpm run test
+
+test-fuzz: test-fuzz-common test-fuzz-contracts
+
+test-fuzz-common:
+	scarb test --package maci_common --features fuzz
+
+test-fuzz-contracts:
+	scarb test --package maci_contracts --features fuzz
 
 clean:
 	rm -rf contracts/coverage

@@ -44,8 +44,7 @@ pub trait IPoll<TContractState> {
 /// history.
 #[starknet::contract]
 pub mod Poll {
-    use core::hash::{HashStateExTrait, HashStateTrait};
-    use core::poseidon::PoseidonTrait;
+    use maci_common::crypto::poseidon_bn254::poseidon2;
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use crate::MACI::IMACIDispatcher;
     use crate::PollFactory::CreatePollArgs;
@@ -104,10 +103,7 @@ pub mod Poll {
         /// The resulting chain hash is stored and a [`Voted`] event is emitted.
         fn vote(ref self: ContractState, ballot: super::Ballot) {
             // verify ballot
-            let new_chain_hash: u256 = PoseidonTrait::new()
-                .update_with((self.chain_hash.read(), ballot.hash))
-                .finalize()
-                .into();
+            let new_chain_hash: u256 = poseidon2(self.chain_hash.read(), ballot.hash);
             self.chain_hash.write(new_chain_hash);
 
             self

@@ -14,6 +14,9 @@ maci_common = { path = "../common" }
 snforge_std = "0.63.0"
 assert_macros = "2.20.0"
 
+[features]
+fuzz = []
+
 [[target.starknet-contract]]
 sierra = true
 

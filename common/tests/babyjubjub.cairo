@@ -1,4 +1,5 @@
 use maci_common::crypto::BabyJubJub::BabyJubJub;
+#[cfg(feature: 'fuzz')]
 use maci_common::utils::math::math;
 
 fn generate_point(s: u256) -> (u256, u256) {
@@ -29,9 +30,10 @@ fn test_not_on_curve() {
     assert_eq!(BabyJubJub::is_on_curve(x, y), false);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_closure(s1: u256, s2: u256) {
+fn test_add_closure_fuzz(s1: u256, s2: u256) {
     let (x1, y1) = generate_point(s1);
     let (x2, y2) = generate_point(s2);
 
@@ -43,9 +45,10 @@ fn test_add_closure(s1: u256, s2: u256) {
     assert_eq!(BabyJubJub::is_on_curve(x, y), true);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_identity(s: u256) {
+fn test_add_identity_fuzz(s: u256) {
     let (x, y) = generate_point(s);
 
     assert_eq!(BabyJubJub::is_on_curve(x, y), true);
@@ -56,15 +59,17 @@ fn test_add_identity(s: u256) {
     assert_eq!(result.1, y);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[should_panic]
 fn test_zero_inverse() {
     let _ = BabyJubJub::inverse(0);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_inverse(s: u256) {
+fn test_add_inverse_fuzz(s: u256) {
     let (x, y) = generate_point(s);
     let inv_x = math::sub_mod(BabyJubJub::Q, x, BabyJubJub::Q);
 
@@ -77,9 +82,10 @@ fn test_add_inverse(s: u256) {
     assert_eq!(result.1, 1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_associativity(s1: u256, s2: u256, s3: u256) {
+fn test_add_associativity_fuzz(s1: u256, s2: u256, s3: u256) {
     let p = generate_point(s1 % 16);
     let q = generate_point(s2 % 16);
     let r = generate_point(s3 % 16);
@@ -97,9 +103,10 @@ fn test_add_associativity(s1: u256, s2: u256, s3: u256) {
     assert_eq!(res1.1, res2.1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_commutativity(s1: u256, s2: u256) {
+fn test_add_commutativity_fuzz(s1: u256, s2: u256) {
     let p = generate_point(s1);
     let q = generate_point(s2);
 
@@ -113,9 +120,10 @@ fn test_add_commutativity(s1: u256, s2: u256) {
     assert_eq!(pq.1, qp.1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_add_n_times(n: u8, s: u256) {
+fn test_add_n_times_fuzz(n: u8, s: u256) {
     let n = n % 8;
     let p = generate_point(s);
     let mut add_result = (0, 1);
@@ -130,9 +138,10 @@ fn test_add_n_times(n: u8, s: u256) {
     assert_eq!(add_result.1, mul_result.1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_closure(s: u256) {
+fn test_mul_closure_fuzz(s: u256) {
     let p = generate_point(s);
 
     let result = BabyJubJub::mul(p.0, p.1, s);
@@ -140,9 +149,10 @@ fn test_mul_closure(s: u256) {
     assert_eq!(BabyJubJub::is_on_curve(result.0, result.1), true);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_zero(s: u256) {
+fn test_mul_zero_fuzz(s: u256) {
     let p = generate_point(s);
 
     let result = BabyJubJub::mul(p.0, p.1, 0);
@@ -151,9 +161,10 @@ fn test_mul_zero(s: u256) {
     assert_eq!(result.1, 1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_identity(s: u256) {
+fn test_mul_identity_fuzz(s: u256) {
     let p = generate_point(s);
 
     let result = BabyJubJub::mul(p.0, p.1, 1);
@@ -167,6 +178,7 @@ fn test_mul_identity(s: u256) {
     assert_eq!(result.1, 1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 fn test_mul_n_times_in_subgroup() {
     let p = generate_point(1);
@@ -177,9 +189,10 @@ fn test_mul_n_times_in_subgroup() {
     assert_eq!(result.1, 1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_additive_scalar(a: u256, b: u256) {
+fn test_mul_additive_scalar_fuzz(a: u256, b: u256) {
     let p = (0, 1);
 
     let pa = BabyJubJub::mul(p.0, p.1, a);
@@ -191,9 +204,10 @@ fn test_mul_additive_scalar(a: u256, b: u256) {
     assert_eq!(add_result.1, mul_result.1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_multiplicative_scalar(a: u256, b: u256) {
+fn test_mul_multiplicative_scalar_fuzz(a: u256, b: u256) {
     let p = (0, 1);
 
     let pa = BabyJubJub::mul(p.0, p.1, a);
@@ -205,9 +219,10 @@ fn test_mul_multiplicative_scalar(a: u256, b: u256) {
     assert_eq!(add_result.1, mul_result.1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_distribution(a: u32) {
+fn test_mul_distribution_fuzz(a: u32) {
     let p = generate_point(1);
     let q = generate_point(2);
 
@@ -221,9 +236,10 @@ fn test_mul_distribution(a: u32) {
     assert_eq!(add_result.1, mul_result.1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_mul_negative_scalar(s: u256) {
+fn test_mul_negative_scalar_fuzz(s: u256) {
     let p = generate_point(s);
 
     let sp = BabyJubJub::mul(p.0, p.1, s);
@@ -250,9 +266,10 @@ fn test_negate() {
     assert_eq!(result.1, 1);
 }
 
+#[cfg(feature: 'fuzz')]
 #[test]
 #[fuzzer]
-fn test_double_negate(s: u256) {
+fn test_double_negate_fuzz(s: u256) {
     let p = generate_point(s);
 
     let neg_p = BabyJubJub::negate(p.0, p.1);
