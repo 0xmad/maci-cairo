@@ -114,7 +114,6 @@ fn permute_t4(mut s0: u384, mut s1: u384, mut s2: u384, mut s3: u384) -> u256 {
     s0.try_into().unwrap()
 }
 
-#[inline(never)]
 fn full_round_t3(
     s0: u384,
     s1: u384,
@@ -185,7 +184,6 @@ fn full_round_t3(
     (outputs.get_output(n0_2), outputs.get_output(n1_2), outputs.get_output(n2_2))
 }
 
-#[inline(never)]
 fn partial_round_t3(
     s0: u384,
     s1: u384,
@@ -250,7 +248,6 @@ fn partial_round_t3(
     (outputs.get_output(n0_2), outputs.get_output(n1_2), outputs.get_output(n2_2))
 }
 
-#[inline(never)]
 fn full_round_t4(
     s0: u384,
     s1: u384,
@@ -356,7 +353,6 @@ fn full_round_t4(
     )
 }
 
-#[inline(never)]
 fn partial_round_t4(
     s0: u384,
     s1: u384,
