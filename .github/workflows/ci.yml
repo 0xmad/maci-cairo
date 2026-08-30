@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  format-lint:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: format
+            target: fmt
+          - name: lint
+            target: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: asdf-vm/actions/setup@v4
+
+      - uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-lock: ./Scarb.lock
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: make ${{ matrix.target }}
+
+  cairo:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cairo-build
+            target: build
+          - name: cairo-test-common
+            target: test-common
+          - name: cairo-test-contracts
+            target: test-contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/setup-snfoundry@v6
+        if: matrix.target != 'build'
+
+      - uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-lock: ./Scarb.lock
+
+      - uses: asdf-vm/actions/setup@v4
+        if: matrix.target != 'build'
+
+      - name: Install cairo-coverage
+        if: matrix.target != 'build'
+        run: |
+          asdf plugin add cairo-coverage https://github.com/software-mansion/asdf-cairo-coverage.git
+          asdf install cairo-coverage "$(awk '/^cairo-coverage / { print $2 }' .tool-versions)"
+          asdf reshim cairo-coverage
+          cairo-coverage --version
+
+      - name: Install lcov
+        if: matrix.target != 'build'
+        run: sudo apt-get update && sudo apt-get install -y lcov
+
+      - run: make ${{ matrix.target }}
+
+  circuits:
+    name: circuits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Witness tests need the Circom compiler on PATH. Groth16
+      # `compile:ballot` / `setup:ballot` are still not part of this workflow.
+      - name: Install Circom
+        run: |
+          circom_version="$(awk '/^circom / { print $2 }' .tool-versions)"
+          mkdir -p "${HOME}/.local/bin"
+          curl -sSfL -o "${HOME}/.local/bin/circom" \
+            "https://github.com/iden3/circom/releases/download/v${circom_version}/circom-linux-amd64"
+          chmod +x "${HOME}/.local/bin/circom"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
+      - name: Install C++ witness dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential libgmp-dev nlohmann-json3-dev nasm
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: circom --version
+
+      - run: make test-circuits

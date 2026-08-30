@@ -119,15 +119,16 @@ Clone the repository, then install the toolchains below before building.
 
 ## Prerequisites
 
-| Tool                                                                                                            | Version                     | Notes                                                |
-| --------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------- |
-| [Scarb](https://docs.swmansion.com/scarb/download.html)                                                         | Cairo / Starknet **2.20.0** | Workspace `edition = "2024_07"`                      |
-| [Starknet Foundry](https://foundry-rs.github.io/starknet-foundry/getting-started/installation.html) (`snforge`) | **0.63.0**                  | Cairo tests (`scarb test`)                           |
-| [Node.js](https://nodejs.org/)                                                                                  | **24** or **26**            | Root `package.json` `engines`                        |
-| [pnpm](https://pnpm.io/installation)                                                                            | **11**                      | `corepack enable` is enough on a matching Node       |
-| [Circom](https://docs.circom.io/getting-started/installation/)                                                  | **2.2.3**                   | Must be on `PATH`; matches `circuits/circomkit.json` |
-| [lcov](https://github.com/linux-test-project/lcov)                                                              | any recent                  | `make test` runs coverage (`lcov` / `genhtml`)       |
-| Docker                                                                                                          | optional                    | Garaga Groth16 verifier from a verification key      |
+| Tool                                                                                                            | Version                     | Notes                                                        |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------ |
+| [Scarb](https://docs.swmansion.com/scarb/download.html)                                                         | Cairo / Starknet **2.20.0** | Workspace `edition = "2024_07"`; pinned in `.tool-versions`  |
+| [Starknet Foundry](https://foundry-rs.github.io/starknet-foundry/getting-started/installation.html) (`snforge`) | **0.63.0**                  | Cairo tests (`scarb test`); pinned in `.tool-versions`       |
+| [Node.js](https://nodejs.org/)                                                                                  | **24** or **26**            | Root `package.json` `engines`                                |
+| [pnpm](https://pnpm.io/installation)                                                                            | **11**                      | `corepack enable` is enough on a matching Node               |
+| [Circom](https://docs.circom.io/getting-started/installation/)                                                  | **2.2.3**                   | Must be on `PATH`; matches `circuits/circomkit.json`         |
+| [cairo-coverage](https://github.com/software-mansion/cairo-coverage)                                            | **0.6.1**                   | `asdf plugin add cairo-coverage`; pinned in `.tool-versions` |
+| [lcov](https://github.com/linux-test-project/lcov)                                                              | any recent                  | `make test` HTML reports (`lcov` / `genhtml`)                |
+| Docker                                                                                                          | optional                    | Garaga Groth16 verifier from a verification key              |
 
 Install Scarb (Cairo 2.20 line):
 
@@ -151,7 +152,14 @@ git checkout v2.2.3
 cargo install --path circom
 ```
 
-Install `lcov` (and `genhtml`) so `make test` can write coverage reports.
+Install `cairo-coverage` with [asdf](https://asdf-vm.com/) ([plugin](https://github.com/software-mansion/asdf-cairo-coverage)):
+
+```bash
+asdf plugin add cairo-coverage
+asdf install cairo-coverage
+```
+
+The version comes from `.tool-versions`. `make test` also needs `lcov` (and `genhtml`) for HTML reports.
 
 ## JavaScript dependencies
 
@@ -184,6 +192,21 @@ make test
 
 This runs `maci_common` and `maci_contracts` tests with coverage, then circuit tests (`cd circuits && pnpm test`).
 
+Format and lint (CI uses check-only):
+
+```bash
+make fmt          # scarb fmt --check + Prettier check
+make fmt:fix      # write: scarb fmt + Prettier
+make lint         # scarb lint + ESLint + TypeScript
+make lint:fix     # scarb lint --fix + ESLint --fix
+```
+
+Cairo fuzz tests (feature `fuzz`; not part of `make test`):
+
+```bash
+make test-fuzz
+```
+
 Narrower commands (see also `AGENTS.md`):
 
 ```bash
@@ -199,6 +222,10 @@ cd circuits
 pnpm compile:ballot
 pnpm setup:ballot
 ```
+
+CI (`.github/workflows/ci.yml`) runs on pull requests to `main`, pushes to `main`, and `workflow_dispatch`. It gates format, lint, Cairo build and coverage tests, and circuit Vitest (with Circom 2.2.3 on PATH). It does not run Cairo fuzz or Circom `compile:ballot` / `setup:ballot`.
+
+Cairo fuzz (`.github/workflows/fuzz.yml`) runs weekly (Sunday 04:00 UTC) and on `workflow_dispatch`.
 
 ---
 

@@ -54,8 +54,10 @@ compilation proves circuit correctness.
 
 Use repository commands as the source of truth:
 
+- `make fmt` / `make fmt:fix` / `make lint` / `make lint:fix`
 - `make build`
 - `make test`
+- `make test-fuzz`
 - `scarb test --package maci_common`
 - `scarb test --package maci_contracts`
 - `cd circuits && pnpm build`

@@ -1,4 +1,21 @@
-.PHONY: test test-contracts test-circuits test-fuzz test-fuzz-common test-fuzz-contracts build coverage clean
+.PHONY: test test-contracts test-circuits test-fuzz test-fuzz-common test-fuzz-contracts build coverage clean fmt fmt\:fix lint lint\:fix
+
+fmt:
+	scarb fmt --check
+	pnpm run prettier
+
+fmt\:fix:
+	scarb fmt
+	pnpm run prettier:fix
+
+lint:
+	scarb lint
+	pnpm run lint:ts
+	pnpm run types
+
+lint\:fix:
+	scarb lint --fix
+	pnpm run lint:ts:fix
 
 build: build-common build-contracts
 
@@ -34,10 +51,10 @@ test-circuits:
 test-fuzz: test-fuzz-common test-fuzz-contracts
 
 test-fuzz-common:
-	scarb test --package maci_common --features fuzz
+	scarb test --package maci_common --features fuzz -- $(SNFORGE_ARGS)
 
 test-fuzz-contracts:
-	scarb test --package maci_contracts --features fuzz
+	scarb test --package maci_contracts --features fuzz -- $(SNFORGE_ARGS)
 
 clean:
 	rm -rf contracts/coverage

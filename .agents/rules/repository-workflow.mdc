@@ -15,6 +15,8 @@ Use the repository's actual manifests and scripts as the source of truth:
 - Cairo tests: `scarb test --package maci_common` and
   `scarb test --package maci_contracts`
 - Full workflow: `make build` and `make test`
+- Format/lint: `make fmt`, `make fmt:fix`, `make lint`, `make lint:fix`
+- Cairo fuzz: `make test-fuzz`
 - Circuit build: `cd circuits && pnpm build`
 - Circuit tests: `cd circuits && pnpm test`
 - Circuit compilation/setup: `cd circuits && pnpm compile:ballot` and

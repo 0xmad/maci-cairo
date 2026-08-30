@@ -149,7 +149,7 @@ describe("Ballot", () => {
         },
       ),
     );
-  }, 60_000);
+  });
 
   test("should fail when votes exceed max votes", async () => {
     const userPrivateKey = 0n;
