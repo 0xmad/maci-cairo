@@ -257,7 +257,7 @@ describe("CalculateTotalPoints circuit", () => {
       ),
       { numRuns: 100 },
     );
-  }, 60_000);
+  });
 
   test("should fail if length is less than two", async () => {
     const result1 = await circomkitInstance

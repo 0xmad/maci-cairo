@@ -80,5 +80,5 @@ describe("CalculateTotal circuit", () => {
       ),
       { numRuns: 1000 },
     );
-  }, 60_000);
+  });
 });

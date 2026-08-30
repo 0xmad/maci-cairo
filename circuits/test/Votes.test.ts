@@ -116,7 +116,7 @@ describe("Votes", () => {
         },
       ),
     );
-  }, 60_000);
+  });
 
   test("should fail if trying to encrypt votes with invalid parameters", async () => {
     await fc.assert(
@@ -144,7 +144,7 @@ describe("Votes", () => {
         },
       ),
     );
-  }, 30_000);
+  });
 
   test("should fail if trying to decrypt votes with invalid parameters", async () => {
     await fc.assert(
@@ -200,5 +200,5 @@ describe("Votes", () => {
         },
       ),
     );
-  }, 30_000);
+  });
 });

@@ -72,7 +72,7 @@ describe("ElGamalEncryption", () => {
         },
       ),
     );
-  }, 30_000);
+  });
 
   test("should fail if trying to encrypt with invalid parameters", async () => {
     await fc.assert(
@@ -94,7 +94,7 @@ describe("ElGamalEncryption", () => {
         },
       ),
     );
-  }, 30_000);
+  });
 
   test("should fail if trying to decrypt with invalid parameters", async () => {
     await fc.assert(
@@ -141,5 +141,5 @@ describe("ElGamalEncryption", () => {
         },
       ),
     );
-  }, 30_000);
+  });
 });

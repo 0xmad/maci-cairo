@@ -1,0 +1,53 @@
+name: Fuzz
+
+on:
+  schedule:
+    - cron: "0 4 * * 0" # Weekly scheduled run (Sunday 04:00 UTC).
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fuzz-common (1/4)
+            target: test-fuzz-common
+            snforge_args: "--partition 1/4"
+          - name: fuzz-common (2/4)
+            target: test-fuzz-common
+            snforge_args: "--partition 2/4"
+          - name: fuzz-common (3/4)
+            target: test-fuzz-common
+            snforge_args: "--partition 3/4"
+          - name: fuzz-common (4/4)
+            target: test-fuzz-common
+            snforge_args: "--partition 4/4"
+          - name: fuzz-contracts
+            target: test-fuzz-contracts
+            snforge_args: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/setup-snfoundry@v6
+
+      - uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-lock: ./Scarb.lock
+          cache-targets: false
+
+      - run: make ${{ matrix.target }} SNFORGE_ARGS='${{ matrix.snforge_args }}'

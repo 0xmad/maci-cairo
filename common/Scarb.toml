@@ -17,6 +17,3 @@ test = "snforge test"
 
 [tool.scarb]
 allow-prebuilt-plugins = ["snforge_std"]
-
-[tool.snforge]
-coverage = true
