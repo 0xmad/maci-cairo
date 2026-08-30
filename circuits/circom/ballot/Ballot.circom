@@ -1,9 +1,9 @@
 pragma circom 2.2.3;
 
-include "./babyjub.circom";
-include "./binary-merkle-root.circom";
-include "./comparators.circom";
-include "./poseidon.circom";
+include "babyjub.circom";
+include "binary-merkle-root.circom";
+include "comparators.circom";
+include "poseidon.circom";
 
 include "../utils/CalculateTotal.circom";
 include "../utils/CalculateTotalPoints.circom";

@@ -1,8 +1,8 @@
 pragma circom 2.2.3;
 
-include "./babyjub.circom";
-include "./bitify.circom";
-include "./escalarmulany.circom";
+include "babyjub.circom";
+include "bitify.circom";
+include "escalarmulany.circom";
 
 /*
  * Decrypts an ElGamal ciphertext on the BabyJubJub curve.

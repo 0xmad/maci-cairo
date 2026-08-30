@@ -1,6 +1,6 @@
 pragma circom 2.2.3;
 
-include "./babyjub.circom";
+include "babyjub.circom";
 
 /**
  * @title CalculateTotalPoints
