@@ -1,9 +1,9 @@
 pragma circom 2.2.3;
 
-include "./babyjub.circom";
-include "./bitify.circom";
-include "./escalarmulany.circom";
-include "./escalarmulfix.circom";
+include "babyjub.circom";
+include "bitify.circom";
+include "escalarmulany.circom";
+include "escalarmulfix.circom";
 
 /*
  * Encrypts a message using ElGamal encryption on the BabyJubJub curve.

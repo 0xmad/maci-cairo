@@ -1,8 +1,8 @@
 pragma circom 2.2.3;
 
-include "./bitify.circom";
-include "./comparators.circom";
-include "./escalarmulfix.circom";
+include "bitify.circom";
+include "comparators.circom";
+include "escalarmulfix.circom";
 
 /**
  * Converts a private key to a public key on the BabyJubJub curve.
