@@ -4,7 +4,7 @@ import { beforeAll, describe, test } from "vitest";
 
 import type { WitnessTester } from "circomkit";
 
-import { circomkitInstance, getSignal } from "./utils.js";
+import { circomkitInstance, getSignal } from "./utils/index.js";
 
 describe("ElGamalEncryption", () => {
   let encryptionCircuit: WitnessTester<["random", "message", "publicKey"], ["c1", "c2"]>;

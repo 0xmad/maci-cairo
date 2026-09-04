@@ -109,9 +109,36 @@ _Avoid_: Message tree, ballot tree, skip
 
 **Tally**:
 The process that consumes a Poll's accepted Ballots in chain-hash order and
-produces totals per vote option. For a given user commitment, only the last
-Ballot in that sequence is the vote; earlier ones are **superseded**.
+produces a tally total per vote option. For a given user commitment, only the
+last Ballot in that sequence is the vote; earlier ones are **superseded**.
 _Avoid_: Skip, drop, coordinator (until this repo has one)
+
+**Tally total**:
+The public integer amount for one vote option after Tally. It is the discrete
+log of the decrypted aggregate point for that option (`T * G`).
+_Avoid_: Result, score, tally (as this amount)
+
+**Tally batch**:
+A fixed-size chunk of the accepted Ballot sequence consumed by one Tally
+proof. Unused slots in the last batch are not Ballots and are not absorbed
+into the chain hash.
+_Avoid_: Message batch, vote batch
+
+**Tally accumulator**:
+The running ElGamal ciphertext per vote option equal to the homomorphic sum
+of live Ballots so far.
+_Avoid_: Tally (as this ciphertext), result
+
+**Live-ballot tree**:
+The Merkle tree, while Tally runs, keyed by user commitment, whose leaf is
+that commitment's current live encrypted Votes. It is not the chain hash and
+not the state tree.
+_Avoid_: Ballot tree, message tree, state tree
+
+**Tally finalize**:
+The proof that opens a tally accumulator to tally totals under the poll
+private key. It does not consume Ballots.
+_Avoid_: Decrypt circuit, tally (as this proof)
 
 ### State tree
 

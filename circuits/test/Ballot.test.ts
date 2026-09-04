@@ -8,7 +8,7 @@ import type { WitnessTester } from "circomkit";
 
 import { encryptVotes } from "../ts/votes.js";
 
-import { circomkitInstance, generateBinaryMerkleRoot } from "./utils.js";
+import { circomkitInstance, generateBinaryMerkleRoot } from "./utils/index.js";
 
 const VOTE_OPTIONS = 5;
 const STATE_TREE_DEPTH = 5;

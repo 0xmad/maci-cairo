@@ -7,7 +7,7 @@ import path from "node:path";
 
 import type { CircomkitConfig, WitnessTester } from "circomkit";
 
-const configFilePath = path.resolve(__dirname, "..", "circomkit.json");
+const configFilePath = path.resolve(__dirname, "../..", "circomkit.json");
 const config = JSON.parse(fs.readFileSync(configFilePath, "utf-8")) as CircomkitConfig;
 
 export const circomkitInstance = new Circomkit({

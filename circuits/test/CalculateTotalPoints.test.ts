@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import type { WitnessTester } from "circomkit";
 import type { Point } from "circomlibjs";
 
-import { circomkitInstance } from "./utils.js";
+import { circomkitInstance } from "./utils/index.js";
 
 const LENGTH = 6;
 

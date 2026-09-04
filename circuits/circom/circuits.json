@@ -4,5 +4,28 @@
     "template": "Ballot",
     "params": [5, 5],
     "pubs": ["ballotHash", "userTreeRoot", "pollId", "userCommitment", "pollPublicKey"]
+  },
+  "TallyBatch": {
+    "file": "tally/TallyBatch",
+    "template": "TallyBatch",
+    "params": [4, 5, 4],
+    "pubs": [
+      "pollId",
+      "realBallotCount",
+      "currentChainHash",
+      "newChainHash",
+      "currentLiveRoot",
+      "newLiveRoot",
+      "currentAccumulatorC1",
+      "currentAccumulatorC2",
+      "newAccumulatorC1",
+      "newAccumulatorC2"
+    ]
+  },
+  "TallyFinalize": {
+    "file": "tally/TallyFinalize",
+    "template": "TallyFinalize",
+    "params": [5],
+    "pubs": ["pollPublicKey", "accumulatorC1", "accumulatorC2", "tallyTotals"]
   }
 }

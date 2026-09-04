@@ -4,7 +4,7 @@ import { beforeAll, describe, test } from "vitest";
 
 import type { WitnessTester } from "circomkit";
 
-import { circomkitInstance, getSignal } from "./utils.js";
+import { circomkitInstance, getSignal } from "./utils/index.js";
 
 describe("PrivateToPublicKey", () => {
   let circuit: WitnessTester<["privateKey"], ["publicKey"]>;
