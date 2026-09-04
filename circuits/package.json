@@ -11,6 +11,8 @@
     "test": "vitest --run",
     "compile:ballot": "circomkit compile Ballot",
     "setup:ballot": "circomkit setup Ballot",
+    "compile:tally": "circomkit compile TallyBatch && circomkit compile TallyFinalize",
+    "setup:tally": "circomkit setup TallyBatch && circomkit setup TallyFinalize",
     "verifier:ballot": "docker run --rm -it -v \"$(pwd)/..:/workspace\" garaga gen --system groth16 --vk ./circuits/build/Ballot/groth16_vkey.json --project-name ballot_verifier"
   },
   "keywords": [],

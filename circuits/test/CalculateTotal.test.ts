@@ -5,7 +5,7 @@ import { beforeAll, describe, test } from "vitest";
 import type { WitnessTester } from "circomkit";
 import type { BabyJub } from "circomlibjs";
 
-import { circomkitInstance, getSignal } from "./utils.js";
+import { circomkitInstance, getSignal } from "./utils/index.js";
 
 describe("CalculateTotal circuit", () => {
   let circuit: WitnessTester<["nums"], ["sum"]>;

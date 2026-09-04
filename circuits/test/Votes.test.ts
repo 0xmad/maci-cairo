@@ -7,7 +7,7 @@ import type { WitnessTester } from "circomkit";
 
 import { encryptVotes } from "../ts/votes.js";
 
-import { circomkitInstance, getSignalArray } from "./utils.js";
+import { circomkitInstance, getSignalArray } from "./utils/index.js";
 
 describe("Votes", () => {
   const VOTE_OPTIONS = 5;

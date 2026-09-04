@@ -136,3 +136,50 @@ export const encryptVotes = async <T1 extends bigint[], T2 extends bigint[]>({
 
   return { c1, c2, ballotHash };
 };
+
+/**
+ * Arguments used to decrypt a set of ElGamal vote ciphertexts.
+ *
+ * `c1` and `c2` must have the same length.
+ *
+ * @property privateKey - BabyJub private key matching the encryption public key.
+ * @property c1 - Ephemeral public-key points, one per vote option.
+ * @property c2 - Encrypted vote points, one per vote option.
+ */
+export interface IDecryptVotesArgs {
+  privateKey: bigint;
+  c1: [bigint, bigint][];
+  c2: [bigint, bigint][];
+}
+
+/**
+ * Decrypts ElGamal vote ciphertexts to message points `mG`.
+ *
+ * For each option, recovers `mG = c2 - x * c1` where `x` is the private key.
+ * The integer vote (or tally total) is the discrete log of that point.
+ *
+ * @param args - Private key and per-option ciphertext points.
+ * @returns The decrypted message point `[x, y]` for each vote option.
+ *
+ * @throws If `c1` and `c2` differ in length, or BabyJubJub initialization fails.
+ */
+export const decryptVotes = async ({ privateKey, c1, c2 }: IDecryptVotesArgs): Promise<[bigint, bigint][]> => {
+  if (c1.length !== c2.length) {
+    throw new Error("encrypted Votes C1 and C2 must have the same length");
+  }
+
+  const babyJub = await buildBabyjub();
+  const messagePoints: [bigint, bigint][] = [];
+
+  for (let index = 0; index < c1.length; index += 1) {
+    const xC1 = babyJub.mulPointEscalar([babyJub.F.e(c1[index][0]), babyJub.F.e(c1[index][1])], privateKey);
+    const messagePoint = babyJub.addPoint(
+      [babyJub.F.e(c2[index][0]), babyJub.F.e(c2[index][1])],
+      [babyJub.F.neg(xC1[0]), xC1[1]],
+    );
+
+    messagePoints.push([babyJub.F.toObject(messagePoint[0]), babyJub.F.toObject(messagePoint[1])]);
+  }
+
+  return messagePoints;
+};
