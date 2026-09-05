@@ -14,13 +14,14 @@ describe("TallyFinalize", () => {
   let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
-    circuit = await circomkitInstance.WitnessTester("TallyFinalize", {
-      file: "tally/TallyFinalize",
-      template: "TallyFinalize",
-      params: [VOTE_OPTIONS],
-    });
-
-    babyJub = await buildBabyjub();
+    [circuit, babyJub] = await Promise.all([
+      circomkitInstance.WitnessTester("TallyFinalize", {
+        file: "tally/TallyFinalize",
+        template: "TallyFinalize",
+        params: [VOTE_OPTIONS],
+      }),
+      buildBabyjub(),
+    ]);
   });
 
   test("should open an accumulator to the tally totals", async () => {

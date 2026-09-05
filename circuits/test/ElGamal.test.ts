@@ -12,19 +12,19 @@ describe("ElGamalEncryption", () => {
   let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
-    encryptionCircuit = await circomkitInstance.WitnessTester("ElGamalEncryption", {
-      file: "elgamal/ElGamalEncryption",
-      template: "ElGamalEncryption",
-      params: [],
-    });
-
-    decryptionCircuit = await circomkitInstance.WitnessTester("ElGamalDecryption", {
-      file: "elgamal/ElGamalDecryption",
-      template: "ElGamalDecryption",
-      params: [],
-    });
-
-    babyJub = await buildBabyjub();
+    [encryptionCircuit, decryptionCircuit, babyJub] = await Promise.all([
+      circomkitInstance.WitnessTester("ElGamalEncryption", {
+        file: "elgamal/ElGamalEncryption",
+        template: "ElGamalEncryption",
+        params: [],
+      }),
+      circomkitInstance.WitnessTester("ElGamalDecryption", {
+        file: "elgamal/ElGamalDecryption",
+        template: "ElGamalDecryption",
+        params: [],
+      }),
+      buildBabyjub(),
+    ]);
   });
 
   test("should encrypt and decrypt one vote correctly", async () => {

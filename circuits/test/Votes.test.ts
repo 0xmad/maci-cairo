@@ -1,11 +1,11 @@
 import { buildBabyjub } from "circomlibjs";
 import fc from "fast-check";
 import { poseidon2 } from "poseidon-lite/poseidon2";
-import { beforeAll, describe, test } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 
 import type { WitnessTester } from "circomkit";
 
-import { encryptVotes } from "../ts/votes.js";
+import { decryptVotes, encryptVotes } from "../ts/votes.js";
 
 import { circomkitInstance, getSignalArray } from "./utils/index.js";
 
@@ -17,19 +17,19 @@ describe("Votes", () => {
   let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
-    encryptionCircuit = await circomkitInstance.WitnessTester("VotesEncryption", {
-      file: "vote/VotesEncryption",
-      template: "VotesEncryption",
-      params: [VOTE_OPTIONS],
-    });
-
-    decryptionCircuit = await circomkitInstance.WitnessTester("VotesDecryption", {
-      file: "vote/VotesDecryption",
-      template: "VotesDecryption",
-      params: [VOTE_OPTIONS],
-    });
-
-    babyJub = await buildBabyjub();
+    [encryptionCircuit, decryptionCircuit, babyJub] = await Promise.all([
+      circomkitInstance.WitnessTester("VotesEncryption", {
+        file: "vote/VotesEncryption",
+        template: "VotesEncryption",
+        params: [VOTE_OPTIONS],
+      }),
+      circomkitInstance.WitnessTester("VotesDecryption", {
+        file: "vote/VotesDecryption",
+        template: "VotesDecryption",
+        params: [VOTE_OPTIONS],
+      }),
+      buildBabyjub(),
+    ]);
   });
 
   test("should encrypt votes correctly", async () => {
@@ -55,24 +55,25 @@ describe("Votes", () => {
 
           const userCommitment = poseidon2([privateKey, pollId]);
 
-          const encryptionWitness = await encryptionCircuit.calculateWitness({
-            votes,
-            random,
-            publicKey,
-          });
+          const [encryptionWitness, encryptedVotes] = await Promise.all([
+            encryptionCircuit.calculateWitness({
+              votes,
+              random,
+              publicKey,
+            }),
+            encryptVotes({
+              votes,
+              random,
+              publicKey,
+              pollId,
+              userCommitment,
+            }),
+          ]);
 
           const [c1, c2] = await Promise.all([
             getSignalArray(encryptionCircuit, encryptionWitness, "c1", VOTE_OPTIONS, 2),
             getSignalArray(encryptionCircuit, encryptionWitness, "c2", VOTE_OPTIONS, 2),
           ]);
-
-          const encryptedVotes = await encryptVotes({
-            votes,
-            random,
-            publicKey,
-            pollId,
-            userCommitment,
-          });
 
           const isValidC1 = c1.every((point, index) => {
             const encryptedPoint = encryptedVotes.c1[index];
@@ -200,5 +201,15 @@ describe("Votes", () => {
         },
       ),
     );
+  });
+
+  test("should reject decrypting ciphertexts of different lengths", async () => {
+    await expect(
+      decryptVotes({
+        privateKey: 7n,
+        c1: [[0n, 1n]],
+        c2: [],
+      }),
+    ).rejects.toThrow("encrypted Votes C1 and C2 must have the same length");
   });
 });

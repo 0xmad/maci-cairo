@@ -1,4 +1,5 @@
-use starknet::ContractAddress;
+use starknet::{ClassHash, ContractAddress};
+use crate::PollFactory::CreatePollArgs;
 
 /// A BabyJubJub public key represented by its affine coordinates.
 ///
@@ -27,6 +28,12 @@ pub struct ConstructorParams {
     pub enforcer: ContractAddress,
     /// Address of the vote-balance assigner used at Signup.
     pub vote_balance_assigner: ContractAddress,
+    /// Starknet account that may create Polls.
+    pub coordinator: ContractAddress,
+    /// Class hash of the Poll factory MACI deploys in its constructor.
+    pub poll_factory_class_hash: ClassHash,
+    /// Class hash of the Poll contract the factory deploys.
+    pub poll_class_hash: ClassHash,
 }
 
 /// Interface for the MACI contract.
@@ -74,6 +81,36 @@ pub trait IMACI<TContractState> {
     ///
     /// The initial padding leaf is excluded from this count.
     fn total_signups(self: @TContractState) -> u256;
+
+    /// Returns the Coordinator account that may create Polls.
+    fn coordinator(self: @TContractState) -> ContractAddress;
+
+    /// Returns the Poll factory deployed by this MACI.
+    fn get_poll_factory(self: @TContractState) -> ContractAddress;
+
+    /// Returns the Poll address recorded for a MACI-assigned poll id.
+    ///
+    /// Arguments:
+    /// - `poll_id`: Identifier allocated by [`create_poll`].
+    ///
+    /// Returns:
+    /// - The Poll contract address, or the zero address if no Poll exists for
+    ///   that id.
+    fn get_poll(self: @TContractState, poll_id: u256) -> ContractAddress;
+
+    /// Creates a Poll. The caller must be the Coordinator.
+    ///
+    /// MACI assigns the next poll id, injects its own address, deploys the
+    /// Poll through the factory, records `poll_id → Poll`, and emits
+    /// `PollCreated`.
+    ///
+    /// Arguments:
+    /// - `args`: Schedule, poll public key, state-tree depth, vote options,
+    ///   and empty live-ballot root.
+    ///
+    /// Returns:
+    /// - The deployed Poll contract address.
+    fn create_poll(ref self: TContractState, args: CreatePollArgs) -> ContractAddress;
 }
 
 /// Constants used by the MACI state tree.
@@ -100,6 +137,9 @@ pub mod Errors {
 
     /// The vote-balance assigner returned a value that does not fit the Ballot circuit.
     pub const VOTE_BALANCE_TOO_LARGE: felt252 = 'Vote balance too large';
+
+    /// Caller is not the Coordinator.
+    pub const NOT_COORDINATOR: felt252 = 'Caller is not coordinator';
 }
 
 #[starknet::contract]
@@ -109,7 +149,14 @@ pub mod MACI {
     use maci_common::crypto::poseidon_bn254::poseidon3;
     use starknet::event::EventEmitter;
     use starknet::storage::{
-        MutableVecTrait, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
+        Map, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess, Vec, VecTrait,
+    };
+    use starknet::syscalls::deploy_syscall;
+    use starknet::{ContractAddress, SyscallResultTrait, get_caller_address, get_contract_address};
+    use crate::PollFactory::{
+        CreatePollArgs, IPollFactoryDispatcher, IPollFactoryDispatcherTrait, PollConstructorArgs,
+        assert_poll_config,
     };
     use crate::policies::interfaces::IEnforcer::{IEnforcerDispatcher, IEnforcerDispatcherTrait};
     use crate::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait};
@@ -135,6 +182,12 @@ pub mod MACI {
         empty_ballot_roots: (u256, u256, u256, u256, u256),
         /// Identifier for the next poll.
         next_poll_id: u256,
+        /// Coordinator account that may create Polls.
+        coordinator: ContractAddress,
+        /// Dispatcher for the Poll factory deployed by this MACI.
+        poll_factory: IPollFactoryDispatcher,
+        /// Poll contract addresses keyed by poll id.
+        polls: Map<u256, ContractAddress>,
         /// Dispatcher for the external LeanIMT state tree.
         state_tree: ILeanIMTDispatcher,
         /// Historical state tree roots recorded after each signup.
@@ -149,6 +202,8 @@ pub mod MACI {
     pub enum Event {
         /// Emitted when a new user signs up to MACI.
         Signup: Signup,
+        /// Emitted when the Coordinator creates a Poll.
+        PollCreated: PollCreated,
     }
 
     /// Signup event containing the registered public key and state index.
@@ -169,6 +224,16 @@ pub mod MACI {
         pub timestamp: u64,
     }
 
+    /// Event emitted when a Poll is created.
+    #[derive(Drop, starknet::Event)]
+    pub struct PollCreated {
+        /// MACI-assigned poll id.
+        #[key]
+        pub poll_id: u256,
+        /// Address of the deployed Poll.
+        pub poll: ContractAddress,
+    }
+
     /// Initializes the MACI contract.
     ///
     /// The constructor:
@@ -179,6 +244,8 @@ pub mod MACI {
     /// - Persists the tree configuration and empty ballot roots.
     /// - Creates a dispatcher for the supplied enforcer.
     /// - Creates a dispatcher for the supplied vote-balance assigner.
+    /// - Stores the Coordinator account.
+    /// - Deploys the Poll factory with this MACI as its deployer.
     #[constructor]
     fn constructor(ref self: ContractState, params: ConstructorParams) {
         let arity: u256 = Constants::STATE_TREE_ARITY.into();
@@ -198,6 +265,16 @@ pub mod MACI {
         self.max_signups.write(max_signups);
         self.empty_ballot_roots.write(params.empty_ballot_roots);
         self.state_tree.write(state_tree);
+        self.coordinator.write(params.coordinator);
+
+        let mut factory_calldata = array![];
+        params.poll_class_hash.serialize(ref factory_calldata);
+
+        let (poll_factory_address, _) = deploy_syscall(
+            params.poll_factory_class_hash, 0, factory_calldata.span(), false,
+        )
+            .unwrap_syscall();
+        self.poll_factory.write(IPollFactoryDispatcher { contract_address: poll_factory_address });
     }
 
     /// Public implementation of the MACI interface.
@@ -285,6 +362,71 @@ pub mod MACI {
         /// The initial padding leaf is excluded from the count.
         fn total_signups(self: @ContractState) -> u256 {
             self.state_tree.read().get_size() - 1
+        }
+
+        /// Returns the Coordinator account that may create Polls.
+        fn coordinator(self: @ContractState) -> ContractAddress {
+            self.coordinator.read()
+        }
+
+        /// Returns the address of the Poll factory deployed in the constructor.
+        fn get_poll_factory(self: @ContractState) -> ContractAddress {
+            self.poll_factory.read().contract_address
+        }
+
+        /// Returns the Poll address recorded for a MACI-assigned poll id.
+        ///
+        /// Arguments:
+        /// - `poll_id`: Identifier allocated by `create_poll`.
+        ///
+        /// Returns:
+        /// - The Poll contract address, or the zero address if no Poll exists
+        ///   for that id.
+        fn get_poll(self: @ContractState, poll_id: u256) -> ContractAddress {
+            self.polls.read(poll_id)
+        }
+
+        /// Creates a Poll. The caller must be the Coordinator.
+        ///
+        /// The schedule end must be after the start and vote options must be
+        /// nonzero. MACI assigns the next poll id, injects its own address,
+        /// asks the factory to deploy, records the Poll, and emits
+        /// `PollCreated`.
+        ///
+        /// Arguments:
+        /// - `args`: Schedule, poll public key, state-tree depth, vote options,
+        ///   tally batch size, and empty live-ballot root.
+        ///
+        /// Returns:
+        /// - The deployed Poll contract address.
+        fn create_poll(ref self: ContractState, args: CreatePollArgs) -> ContractAddress {
+            assert(get_caller_address() == self.coordinator.read(), Errors::NOT_COORDINATOR);
+            assert_poll_config(args.start_date, args.end_date, args.vote_options, args.batch_size);
+
+            let poll_id = self.next_poll_id.read();
+            self.next_poll_id.write(poll_id + 1);
+
+            let poll = self
+                .poll_factory
+                .read()
+                .create_poll(
+                    PollConstructorArgs {
+                        start_date: args.start_date,
+                        end_date: args.end_date,
+                        poll_public_key: args.poll_public_key,
+                        maci: get_contract_address(),
+                        state_tree_depth: args.state_tree_depth,
+                        vote_options: args.vote_options,
+                        poll_id,
+                        batch_size: args.batch_size,
+                        empty_live_ballot_root: args.empty_live_ballot_root,
+                    },
+                );
+
+            self.polls.write(poll_id, poll);
+            self.emit(Event::PollCreated(PollCreated { poll_id, poll }));
+
+            poll
         }
     }
 

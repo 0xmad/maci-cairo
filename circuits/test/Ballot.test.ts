@@ -35,13 +35,14 @@ describe("Ballot", () => {
   let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
-    ballotCircuit = await circomkitInstance.WitnessTester("Ballot", {
-      file: "ballot/Ballot",
-      template: "Ballot",
-      params: [STATE_TREE_DEPTH, VOTE_OPTIONS],
-    });
-
-    babyJub = await buildBabyjub();
+    [ballotCircuit, babyJub] = await Promise.all([
+      circomkitInstance.WitnessTester("Ballot", {
+        file: "ballot/Ballot",
+        template: "Ballot",
+        params: [STATE_TREE_DEPTH, VOTE_OPTIONS],
+      }),
+      buildBabyjub(),
+    ]);
   });
 
   test("should validate ballot votes correctly", async () => {

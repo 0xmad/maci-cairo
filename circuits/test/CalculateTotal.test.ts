@@ -12,13 +12,14 @@ describe("CalculateTotal circuit", () => {
   let babyJub: BabyJub;
 
   beforeAll(async () => {
-    circuit = await circomkitInstance.WitnessTester("calculateTotal", {
-      file: "./utils/CalculateTotal",
-      template: "CalculateTotal",
-      params: [6],
-    });
-
-    babyJub = await buildBabyjub();
+    [circuit, babyJub] = await Promise.all([
+      circomkitInstance.WitnessTester("calculateTotal", {
+        file: "./utils/CalculateTotal",
+        template: "CalculateTotal",
+        params: [6],
+      }),
+      buildBabyjub(),
+    ]);
   });
 
   test("should correctly sum a list of values", async () => {
