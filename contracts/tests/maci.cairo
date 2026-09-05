@@ -3,6 +3,7 @@ use maci_common::crypto::BabyJubJub::BabyJubJub;
 use maci_contracts::MACI::{
     Constants, ConstructorParams, IMACIDispatcher, IMACIDispatcherTrait, MACI, PublicKey,
 };
+use maci_contracts::PollFactory::CreatePollArgs;
 use maci_contracts::policies::interfaces::IEnforcer::{
     IEnforcerDispatcher, IEnforcerDispatcherTrait,
 };
@@ -75,6 +76,22 @@ fn deploy_constant_vote_balance_assigner() -> ContractAddress {
     vote_balance_assigner
 }
 
+pub fn coordinator() -> ContractAddress {
+    0x123.try_into().unwrap()
+}
+
+pub fn default_create_poll_args() -> CreatePollArgs {
+    CreatePollArgs {
+        start_date: 0,
+        end_date: 1_000,
+        poll_public_key: (0, 1),
+        state_tree_depth: 5,
+        vote_options: 2,
+        batch_size: 2,
+        empty_live_ballot_root: 0xabc,
+    }
+}
+
 fn deploy_maci(
     vote_balance_assigner: ContractAddress, state_tree_depth: u8,
 ) -> (IMACIDispatcher, ILeanIMTDispatcher) {
@@ -87,6 +104,8 @@ fn deploy_maci(
     let (enforcer_address, _) = enforcer_contract
         .deploy(@array![checker_address.into()])
         .unwrap_syscall();
+    let poll_contract = declare("Poll").unwrap_syscall().contract_class();
+    let poll_factory_contract = declare("PollFactory").unwrap_syscall().contract_class();
 
     let params = ConstructorParams {
         state_tree_depth,
@@ -94,6 +113,9 @@ fn deploy_maci(
         empty_ballot_roots: TEST_EMPTY_BALLOT_ROOTS,
         enforcer: enforcer_address,
         vote_balance_assigner,
+        coordinator: coordinator(),
+        poll_factory_class_hash: *poll_factory_contract.class_hash,
+        poll_class_hash: *poll_contract.class_hash,
     };
     let mut calldata = array![];
     params.serialize(ref calldata);
@@ -123,6 +145,8 @@ fn test_constructor() {
     assert_eq!(maci.get_state_tree_root(), Constants::PAD_KEY_HASH);
     assert_eq!(maci.get_state_tree_root_indexed_signup(0), Constants::PAD_KEY_HASH);
     assert_eq!(maci.get_state_index(Constants::PAD_KEY_HASH), 0);
+    assert_eq!(maci.coordinator(), coordinator());
+    assert!(maci.get_poll_factory().into() != 0);
 }
 
 #[test]
@@ -261,4 +285,50 @@ fn test_signup_rejects_vote_balance_too_large() {
     let (assigner, _) = stub.deploy(@array![]).unwrap_syscall();
     let (maci, _) = deploy_maci(assigner, 5);
     maci.sign_up(generate_public_key(9000), "");
+}
+
+#[test]
+fn test_coordinator_creates_poll() {
+    let mut spy = spy_events();
+    let (maci, _) = deploy();
+    let args = default_create_poll_args();
+
+    start_cheat_caller_address(maci.contract_address, coordinator());
+    let poll = maci.create_poll(args);
+    stop_cheat_caller_address(maci.contract_address);
+
+    assert!(poll.into() != 0);
+    assert_eq!(maci.get_poll(0), poll);
+
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    maci.contract_address,
+                    MACI::Event::PollCreated(MACI::PollCreated { poll_id: 0, poll }),
+                ),
+            ],
+        );
+}
+
+#[test]
+fn test_create_poll_assigns_sequential_ids() {
+    let (maci, _) = deploy();
+    let args = default_create_poll_args();
+
+    start_cheat_caller_address(maci.contract_address, coordinator());
+    let poll0 = maci.create_poll(args);
+    let poll1 = maci.create_poll(args);
+    stop_cheat_caller_address(maci.contract_address);
+
+    assert!(poll0 != poll1);
+    assert_eq!(maci.get_poll(0), poll0);
+    assert_eq!(maci.get_poll(1), poll1);
+}
+
+#[test]
+#[should_panic(expected: 'Caller is not coordinator')]
+fn test_create_poll_rejects_non_coordinator() {
+    let (maci, _) = deploy();
+    maci.create_poll(default_create_poll_args());
 }

@@ -11,12 +11,13 @@ describe("PrivateToPublicKey", () => {
   let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
-    circuit = await circomkitInstance.WitnessTester("privateToPublicKey", {
-      file: "./utils/PrivateToPublicKey",
-      template: "PrivateToPublicKey",
-    });
-
-    babyJub = await buildBabyjub();
+    [circuit, babyJub] = await Promise.all([
+      circomkitInstance.WitnessTester("privateToPublicKey", {
+        file: "./utils/PrivateToPublicKey",
+        template: "PrivateToPublicKey",
+      }),
+      buildBabyjub(),
+    ]);
   });
 
   test("should correctly compute a public key", async () => {
@@ -27,8 +28,10 @@ describe("PrivateToPublicKey", () => {
         const witness = await circuit.calculateWitness({ privateKey });
         await circuit.expectConstraintPass(witness);
 
-        const x = await getSignal(circuit, witness, "publicKey[0]");
-        const y = await getSignal(circuit, witness, "publicKey[1]");
+        const [x, y] = await Promise.all([
+          getSignal(circuit, witness, "publicKey[0]"),
+          getSignal(circuit, witness, "publicKey[1]"),
+        ]);
 
         return (
           babyJub.inCurve([babyJub.F.e(x), babyJub.F.e(y)]) &&

@@ -13,10 +13,25 @@ A protocol instance that registers Signups in one state tree and is the parent
 of its Polls.
 _Avoid_: User registry, voting contract (as the name of this concept)
 
+**Coordinator**:
+The Starknet account stored on a MACI that may create Polls. It is not the
+Poll public key, not the poll private key, and not required to submit Tally.
+_Avoid_: Owner, admin, operator, poll creator (as this role); coordinator key
+
 **Poll**:
-A voting instance under one MACI, with a Poll public key, a number of vote
-options, a schedule, and a chain hash of accepted Ballots.
+A voting instance under one MACI, identified by a poll id, with a Poll public
+key, a number of vote options, a schedule, and a chain hash of accepted
+Ballots.
 _Avoid_: Election, round (unless you later mean something else)
+
+**Poll id**:
+The MACI-assigned identifier of one Poll, bound into Ballot and Tally proofs.
+_Avoid_: Election id, poll address (as this identifier)
+
+**Poll schedule**:
+The start and end bounds of a Poll. Ballots may be accepted from the start
+up to, but not including, the end; Tally runs only at or after the end.
+_Avoid_: Voting period, round
 
 ### Identity and signup
 
@@ -111,12 +126,17 @@ _Avoid_: Message tree, ballot tree, skip
 The process that consumes a Poll's accepted Ballots in chain-hash order and
 produces a tally total per vote option. For a given user commitment, only the
 last Ballot in that sequence is the vote; earlier ones are **superseded**.
-_Avoid_: Skip, drop, coordinator (until this repo has one)
+_Avoid_: Skip, drop, coordinator (as this process)
 
 **Tally total**:
 The public integer amount for one vote option after Tally. It is the discrete
 log of the decrypted aggregate point for that option (`T * G`).
 _Avoid_: Result, score, tally (as this amount)
+
+**Chain-hash checkpoint**:
+The chain hash after each tally batch of accepted Ballots, including a shorter
+last batch. Tally must consume these prefixes in order.
+_Avoid_: Batch hash, snapshot
 
 **Tally batch**:
 A fixed-size chunk of the accepted Ballot sequence consumed by one Tally

@@ -14,13 +14,14 @@ describe("CalculateTotalPoints circuit", () => {
   let babyJub: Awaited<ReturnType<typeof buildBabyjub>>;
 
   beforeAll(async () => {
-    circuit = await circomkitInstance.WitnessTester("CalculateTotalPoints", {
-      file: "./utils/CalculateTotalPoints",
-      template: "CalculateTotalPoints",
-      params: [LENGTH],
-    });
-
-    babyJub = await buildBabyjub();
+    [circuit, babyJub] = await Promise.all([
+      circomkitInstance.WitnessTester("CalculateTotalPoints", {
+        file: "./utils/CalculateTotalPoints",
+        template: "CalculateTotalPoints",
+        params: [LENGTH],
+      }),
+      buildBabyjub(),
+    ]);
   });
 
   test("should correctly sum a list of points", async () => {
@@ -260,23 +261,24 @@ describe("CalculateTotalPoints circuit", () => {
   });
 
   test("should fail if length is less than two", async () => {
-    const result1 = await circomkitInstance
-      .WitnessTester("CalculateTotalPoints", {
-        file: "./utils/CalculateTotalPoints",
-        template: "CalculateTotalPoints",
-        params: [0],
-      })
-      .then(() => false)
-      .catch(() => true);
-
-    const result2 = await circomkitInstance
-      .WitnessTester("CalculateTotalPoints", {
-        file: "./utils/CalculateTotalPoints",
-        template: "CalculateTotalPoints",
-        params: [1],
-      })
-      .then(() => false)
-      .catch(() => true);
+    const [result1, result2] = await Promise.all([
+      circomkitInstance
+        .WitnessTester("CalculateTotalPoints", {
+          file: "./utils/CalculateTotalPoints",
+          template: "CalculateTotalPoints",
+          params: [0],
+        })
+        .then(() => false)
+        .catch(() => true),
+      circomkitInstance
+        .WitnessTester("CalculateTotalPoints", {
+          file: "./utils/CalculateTotalPoints",
+          template: "CalculateTotalPoints",
+          params: [1],
+        })
+        .then(() => false)
+        .catch(() => true),
+    ]);
 
     expect(result1).toBe(true);
     expect(result2).toBe(true);

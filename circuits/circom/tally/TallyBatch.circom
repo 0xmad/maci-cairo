@@ -7,7 +7,9 @@ include "./ProcessTallyBallot.circom";
 /// Proves one tally batch: the accepted Ballots in this chunk extend the
 /// chain hash, update the live-ballot tree (last-wins by user commitment),
 /// and homomorphically update the tally accumulator. The poll private key
-/// is not used; tally totals are opened by TallyFinalize.
+/// is not used; tally totals are opened by TallyFinalize. On-chain, Poll
+/// `batch_size` must match `BATCH_SIZE`, and `newChainHash` is bound to the
+/// next chain-hash checkpoint.
 ///
 /// The circuit verifies:
 /// - `realBallotCount` is at most `BATCH_SIZE` (8-bit compare; `BATCH_SIZE`

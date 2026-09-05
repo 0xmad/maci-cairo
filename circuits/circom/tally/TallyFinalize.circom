@@ -5,8 +5,9 @@ include "../vote/VotesDecryption.circom";
 
 /// Opens a tally accumulator to tally totals under the poll private key.
 /// This circuit does not consume Ballots, the chain hash, or the live-ballot
-/// tree; the verifier binds it to a Poll by checking that the accumulator
-/// matches the last TallyBatch.
+/// tree. The verifier binds it to a Poll by checking that the accumulator
+/// matches the last TallyBatch. Poll also requires every chain-hash
+/// checkpoint to have been processed before this proof is accepted.
 ///
 /// The circuit verifies:
 /// - The poll public key is derived from the poll private key.

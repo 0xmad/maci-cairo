@@ -117,26 +117,27 @@ template ProcessTallyBallot(VOTE_OPTIONS, LIVE_TREE_DEPTH) {
     component newIdentityC2[VOTE_OPTIONS][2];
 
     for (var option = 0; option < VOTE_OPTIONS; option += 1) {
-        for (var coord = 0; coord < 2; coord += 1) {
-            oldIdentityC1[option][coord] = ForceEqualIfEnabled();
-            oldIdentityC1[option][coord].enabled <== oldMustBeIdentity;
-            oldIdentityC1[option][coord].in[0] <== oldEncryptedVotesC1[option][coord];
-            oldIdentityC1[option][coord].in[1] <== coord;
+        // Identity is (0, 1); the axis index is that coordinate.
+        for (var axis = 0; axis < 2; axis += 1) {
+            oldIdentityC1[option][axis] = ForceEqualIfEnabled();
+            oldIdentityC1[option][axis].enabled <== oldMustBeIdentity;
+            oldIdentityC1[option][axis].in[0] <== oldEncryptedVotesC1[option][axis];
+            oldIdentityC1[option][axis].in[1] <== axis;
 
-            oldIdentityC2[option][coord] = ForceEqualIfEnabled();
-            oldIdentityC2[option][coord].enabled <== oldMustBeIdentity;
-            oldIdentityC2[option][coord].in[0] <== oldEncryptedVotesC2[option][coord];
-            oldIdentityC2[option][coord].in[1] <== coord;
+            oldIdentityC2[option][axis] = ForceEqualIfEnabled();
+            oldIdentityC2[option][axis].enabled <== oldMustBeIdentity;
+            oldIdentityC2[option][axis].in[0] <== oldEncryptedVotesC2[option][axis];
+            oldIdentityC2[option][axis].in[1] <== axis;
 
-            newIdentityC1[option][coord] = ForceEqualIfEnabled();
-            newIdentityC1[option][coord].enabled <== 1 - isReal;
-            newIdentityC1[option][coord].in[0] <== encryptedVotesC1[option][coord];
-            newIdentityC1[option][coord].in[1] <== coord;
+            newIdentityC1[option][axis] = ForceEqualIfEnabled();
+            newIdentityC1[option][axis].enabled <== 1 - isReal;
+            newIdentityC1[option][axis].in[0] <== encryptedVotesC1[option][axis];
+            newIdentityC1[option][axis].in[1] <== axis;
 
-            newIdentityC2[option][coord] = ForceEqualIfEnabled();
-            newIdentityC2[option][coord].enabled <== 1 - isReal;
-            newIdentityC2[option][coord].in[0] <== encryptedVotesC2[option][coord];
-            newIdentityC2[option][coord].in[1] <== coord;
+            newIdentityC2[option][axis] = ForceEqualIfEnabled();
+            newIdentityC2[option][axis].enabled <== 1 - isReal;
+            newIdentityC2[option][axis].in[0] <== encryptedVotesC2[option][axis];
+            newIdentityC2[option][axis].in[1] <== axis;
         }
     }
 
@@ -216,14 +217,14 @@ template ProcessTallyBallot(VOTE_OPTIONS, LIVE_TREE_DEPTH) {
     userUpdate.index <== leafIndex;
     userUpdate.siblings <== leafPath;
 
-    component liveMuxIU = Mux1();
-    liveMuxIU.c[0] <== userUpdate.newRoot;
-    liveMuxIU.c[1] <== slotInsert.newRoot;
-    liveMuxIU.s <== isNew;
+    component insertOrUpdateRoot = Mux1();
+    insertOrUpdateRoot.c[0] <== userUpdate.newRoot;
+    insertOrUpdateRoot.c[1] <== slotInsert.newRoot;
+    insertOrUpdateRoot.s <== isNew;
 
     component liveMux = Mux1();
     liveMux.c[0] <== currentLiveRoot;
-    liveMux.c[1] <== liveMuxIU.out;
+    liveMux.c[1] <== insertOrUpdateRoot.out;
     liveMux.s <== isReal;
     newLiveRoot <== liveMux.out;
 
