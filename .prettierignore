@@ -4,3 +4,4 @@ node_modules/
 .snfoundry_cache/
 snfoundry_trace/
 target/
+apps/web/dist/

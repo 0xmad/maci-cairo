@@ -4,6 +4,8 @@ snfoundry_trace/
 coverage/
 profile/
 node_modules/
+apps/web/dist/
+apps/web/.env
 circuits/circom/test/
 circuits/circom/main/
 build/

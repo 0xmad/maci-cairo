@@ -32,7 +32,7 @@ The repository currently includes:
 
 ## Repository Structure
 
-The repository is a Scarb workspace containing three packages:
+The repository is a Scarb workspace (`common`, `contracts`) plus pnpm packages (`circuits`, `apps/web`):
 
 ```text
 .
@@ -55,6 +55,10 @@ The repository is a Scarb workspace containing three packages:
 │           ├── utils/
 │           └── experiments/
 │
+├── apps/
+│   └── web/
+│       └── Ops console scaffold (Vite + React). See [apps/web/README.md](apps/web/README.md).
+│
 ├── circuits/
 │   ├── circom/
 │   │   ├── ballot/
@@ -75,7 +79,7 @@ The repository is a Scarb workspace containing three packages:
 └── pnpm-workspace.yaml
 ```
 
-The workspace configuration currently includes `common`, `contracts`, and `circuits`.
+The Scarb workspace includes `common` and `contracts`. The pnpm workspace includes `circuits` and `apps/web`.
 
 ---
 
@@ -169,7 +173,7 @@ From the repository root:
 pnpm install
 ```
 
-The root workspace installs `circuits` recursively.
+The root workspace installs `circuits` and `apps/web` recursively.
 
 ## Build
 
@@ -190,7 +194,7 @@ scarb build --package maci_contracts
 make test
 ```
 
-This runs `maci_common` and `maci_contracts` tests with coverage, then circuit tests (`cd circuits && pnpm test`).
+This runs `maci_common` and `maci_contracts` tests with coverage, circuit tests (`cd circuits && pnpm test`), then the ops console smoke tests (`cd apps/web && pnpm test`).
 
 Format and lint (CI uses check-only):
 
@@ -213,6 +217,10 @@ Narrower commands (see also `AGENTS.md`):
 scarb test --package maci_common
 scarb test --package maci_contracts
 cd circuits && pnpm test
+cd apps/web && pnpm test
+cd apps/web && pnpm test:coverage
+make types-web
+make test-web-coverage
 ```
 
 Ballot circuit compile and Groth16 setup (needs Circom 2.2.3 and a powers-of-tau file under `circuits/ptau`):
@@ -223,7 +231,7 @@ pnpm compile:ballot
 pnpm setup:ballot
 ```
 
-CI (`.github/workflows/ci.yml`) runs on pull requests to `main`, pushes to `main`, and `workflow_dispatch`. It gates format, lint, Cairo build and coverage tests, and circuit Vitest (with Circom 2.2.3 on PATH). It does not run Cairo fuzz or Circom `compile:ballot` / `setup:ballot`.
+CI (`.github/workflows/ci.yml`) runs on pull requests to `main`, pushes to `main`, and `workflow_dispatch`. It gates format, lint, Cairo build and coverage tests, circuit Vitest (with Circom 2.2.3 on PATH), and the ops console typecheck plus Vitest. It does not run Cairo fuzz or Circom `compile:ballot` / `setup:ballot`.
 
 Cairo fuzz (`.github/workflows/fuzz.yml`) runs weekly (Sunday 04:00 UTC) and on `workflow_dispatch`.
 
@@ -239,7 +247,7 @@ Run:
 make test
 ```
 
-The Makefile generates coverage reports for both `common` and `contracts` and uses `lcov` / `genhtml` to produce HTML reports.
+The Makefile generates coverage reports for both `common` and `contracts` and uses `lcov` / `genhtml` to produce HTML reports. Ops console coverage is `make test-web-coverage` (`apps/web` Vitest HTML/LCOV under `apps/web/coverage`).
 
 Generated coverage directories can be removed with:
 

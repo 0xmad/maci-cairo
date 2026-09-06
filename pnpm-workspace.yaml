@@ -1,5 +1,6 @@
 packages:
   - "circuits"
+  - "apps/*"
 allowBuilds:
   blake-hash: true
   unrs-resolver: true
