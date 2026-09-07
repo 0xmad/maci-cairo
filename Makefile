@@ -1,4 +1,4 @@
-.PHONY: test test-contracts test-circuits test-web test-web-coverage test-fuzz test-fuzz-common test-fuzz-contracts build coverage clean fmt fmt\:fix lint lint\:fix types-web
+.PHONY: test test-contracts test-circuits test-web test-web-coverage test-fuzz test-fuzz-common test-fuzz-contracts test-deploy test-deploy-coverage build coverage clean fmt fmt\:fix lint lint\:fix types-web deploy
 
 fmt:
 	scarb fmt --check
@@ -25,7 +25,10 @@ build-common:
 build-contracts:
 	scarb build --package maci_contracts
 
-test: test-common test-contracts test-circuits test-web
+deploy:
+	pnpm --filter maci-deploy run deploy
+
+test: test-common test-contracts test-circuits test-web test-deploy
 
 test-contracts:
 	cd contracts && rm -rf coverage
@@ -51,6 +54,12 @@ test-circuits:
 test-web:
 	cd apps/web && pnpm run test
 
+test-deploy:
+	pnpm --filter maci-deploy run test
+
+test-deploy-coverage:
+	pnpm --filter maci-deploy run test:coverage
+
 test-web-coverage:
 	cd apps/web && pnpm run test:coverage
 
@@ -69,3 +78,4 @@ clean:
 	rm -rf contracts/coverage
 	rm -rf common/coverage
 	rm -rf apps/web/coverage
+	rm -rf scripts/deploy_maci/coverage

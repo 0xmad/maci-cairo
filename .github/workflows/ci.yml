@@ -88,6 +88,57 @@ jobs:
 
       - run: make ${{ matrix.target }}
 
+  deploy:
+    name: deploy-devnet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/setup-snfoundry@v6
+
+      - uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-lock: ./Scarb.lock
+
+      - uses: asdf-vm/actions/setup@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install starknet-devnet
+        run: |
+          asdf plugin add starknet-devnet https://github.com/ptisserand/asdf-starknet-devnet.git
+          asdf install starknet-devnet "$(awk '/^starknet-devnet / { print $2 }' .tool-versions)"
+          asdf reshim starknet-devnet
+          starknet-devnet --version
+
+      - name: Start starknet-devnet
+        run: |
+          starknet-devnet --seed 0 --port 5050 > /tmp/starknet-devnet.log 2>&1 &
+          echo $! > /tmp/starknet-devnet.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:5050/is_alive >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "starknet-devnet did not become ready"
+          cat /tmp/starknet-devnet.log
+          exit 1
+
+      - run: make test-deploy
+
+      - name: Smoke local MACI stand-up
+        run: make deploy
+
   circuits:
     name: circuits
     runs-on: ubuntu-latest

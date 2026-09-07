@@ -1,0 +1,7 @@
+# Visit https://foundry-rs.github.io/starknet-foundry/appendix/snfoundry-toml.html
+
+[sncast.devnet]
+url = "http://127.0.0.1:5050/"
+account = "devnet-1"
+show-explorer-links = false
+wait-params = { timeout = 300, retry-interval = 2 }

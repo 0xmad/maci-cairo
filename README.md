@@ -59,6 +59,10 @@ The repository is a Scarb workspace (`common`, `contracts`) plus pnpm packages (
 │   └── web/
 │       └── Ops console scaffold (Vite + React). See [apps/web/README.md](apps/web/README.md).
 │
+├── scripts/
+│   └── deploy_maci/
+│       └── TypeScript sncast CLI stand-up of one MACI on local devnet
+│
 ├── circuits/
 │   ├── circom/
 │   │   ├── ballot/
@@ -79,7 +83,7 @@ The repository is a Scarb workspace (`common`, `contracts`) plus pnpm packages (
 └── pnpm-workspace.yaml
 ```
 
-The Scarb workspace includes `common` and `contracts`. The pnpm workspace includes `circuits` and `apps/web`.
+The Scarb workspace includes `common` and `contracts`. Local MACI stand-up is the pnpm package `scripts/deploy_maci`. The pnpm workspace includes `circuits`, `apps/web`, and `scripts/deploy_maci`.
 
 ---
 
@@ -123,16 +127,17 @@ Clone the repository, then install the toolchains below before building.
 
 ## Prerequisites
 
-| Tool                                                                                                            | Version                     | Notes                                                        |
-| --------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------ |
-| [Scarb](https://docs.swmansion.com/scarb/download.html)                                                         | Cairo / Starknet **2.20.0** | Workspace `edition = "2024_07"`; pinned in `.tool-versions`  |
-| [Starknet Foundry](https://foundry-rs.github.io/starknet-foundry/getting-started/installation.html) (`snforge`) | **0.63.0**                  | Cairo tests (`scarb test`); pinned in `.tool-versions`       |
-| [Node.js](https://nodejs.org/)                                                                                  | **24** or **26**            | Root `package.json` `engines`                                |
-| [pnpm](https://pnpm.io/installation)                                                                            | **11**                      | `corepack enable` is enough on a matching Node               |
-| [Circom](https://docs.circom.io/getting-started/installation/)                                                  | **2.2.3**                   | Must be on `PATH`; matches `circuits/circomkit.json`         |
-| [cairo-coverage](https://github.com/software-mansion/cairo-coverage)                                            | **0.6.1**                   | `asdf plugin add cairo-coverage`; pinned in `.tool-versions` |
-| [lcov](https://github.com/linux-test-project/lcov)                                                              | any recent                  | `make test` HTML reports (`lcov` / `genhtml`)                |
-| Docker                                                                                                          | optional                    | Garaga Groth16 verifier from a verification key              |
+| Tool                                                                                                                      | Version                     | Notes                                                         |
+| ------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------- |
+| [Scarb](https://docs.swmansion.com/scarb/download.html)                                                                   | Cairo / Starknet **2.20.0** | Workspace `edition = "2024_07"`; pinned in `.tool-versions`   |
+| [Starknet Foundry](https://foundry-rs.github.io/starknet-foundry/getting-started/installation.html) (`snforge`, `sncast`) | **0.63.0**                  | Cairo tests and `make deploy`; pinned in `.tool-versions`     |
+| [Starknet Devnet](https://github.com/0xSpaceShard/starknet-devnet)                                                        | **0.9.0**                   | `make deploy` (`--seed 0`); `asdf plugin add starknet-devnet` |
+| [Node.js](https://nodejs.org/)                                                                                            | **24** or **26**            | Root `package.json` `engines`                                 |
+| [pnpm](https://pnpm.io/installation)                                                                                      | **11**                      | `corepack enable` is enough on a matching Node                |
+| [Circom](https://docs.circom.io/getting-started/installation/)                                                            | **2.2.3**                   | Must be on `PATH`; matches `circuits/circomkit.json`          |
+| [cairo-coverage](https://github.com/software-mansion/cairo-coverage)                                                      | **0.6.1**                   | `asdf plugin add cairo-coverage`; pinned in `.tool-versions`  |
+| [lcov](https://github.com/linux-test-project/lcov)                                                                        | any recent                  | `make test` HTML reports (`lcov` / `genhtml`)                 |
+| Docker                                                                                                                    | optional                    | Garaga Groth16 verifier from a verification key               |
 
 Install Scarb (Cairo 2.20 line):
 
@@ -161,6 +166,13 @@ Install `cairo-coverage` with [asdf](https://asdf-vm.com/) ([plugin](https://git
 ```bash
 asdf plugin add cairo-coverage
 asdf install cairo-coverage
+```
+
+Install Starknet Devnet 0.9.0 with [asdf](https://asdf-vm.com/) ([plugin](https://github.com/ptisserand/asdf-starknet-devnet)):
+
+```bash
+asdf plugin add starknet-devnet https://github.com/ptisserand/asdf-starknet-devnet.git
+asdf install starknet-devnet
 ```
 
 The version comes from `.tool-versions`. `make test` also needs `lcov` (and `genhtml`) for HTML reports.
@@ -194,7 +206,7 @@ scarb build --package maci_contracts
 make test
 ```
 
-This runs `maci_common` and `maci_contracts` tests with coverage, circuit tests (`cd circuits && pnpm test`), then the ops console smoke tests (`cd apps/web && pnpm test`).
+This runs `maci_common` and `maci_contracts` tests with coverage, circuit tests (`cd circuits && pnpm test`), the ops console smoke tests (`cd apps/web && pnpm test`), then MACI stand-up unit tests (`pnpm --filter maci-deploy run test`).
 
 Format and lint (CI uses check-only):
 
@@ -204,6 +216,15 @@ make fmt:fix      # write: scarb fmt + Prettier
 make lint         # scarb lint + ESLint + TypeScript
 make lint:fix     # scarb lint --fix + ESLint --fix
 ```
+
+Stand up one MACI on local `starknet-devnet --seed 0` (FreeForAll Policy, constant vote-balance assigner; does not create a Poll):
+
+```bash
+starknet-devnet --seed 0
+make deploy
+```
+
+`make deploy` is not part of `make test`. CI runs it on an ephemeral seed-0 node.
 
 Cairo fuzz tests (feature `fuzz`; not part of `make test`):
 
@@ -219,6 +240,7 @@ scarb test --package maci_contracts
 cd circuits && pnpm test
 cd apps/web && pnpm test
 cd apps/web && pnpm test:coverage
+make test-deploy
 make types-web
 make test-web-coverage
 ```
@@ -231,7 +253,7 @@ pnpm compile:ballot
 pnpm setup:ballot
 ```
 
-CI (`.github/workflows/ci.yml`) runs on pull requests to `main`, pushes to `main`, and `workflow_dispatch`. It gates format, lint, Cairo build and coverage tests, circuit Vitest (with Circom 2.2.3 on PATH), and the ops console typecheck plus Vitest. It does not run Cairo fuzz or Circom `compile:ballot` / `setup:ballot`.
+CI (`.github/workflows/ci.yml`) runs on pull requests to `main`, pushes to `main`, and `workflow_dispatch`. It gates format, lint, Cairo build and coverage tests, a seed-0 `make deploy` smoke, circuit Vitest (with Circom 2.2.3 on PATH), and the ops console typecheck plus Vitest. It does not run Cairo fuzz or Circom `compile:ballot` / `setup:ballot`.
 
 Cairo fuzz (`.github/workflows/fuzz.yml`) runs weekly (Sunday 04:00 UTC) and on `workflow_dispatch`.
 

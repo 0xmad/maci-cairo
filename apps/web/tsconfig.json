@@ -17,8 +17,7 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": ["vite/client", "vitest/globals"]
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src", "vite.config.ts"]
 }
