@@ -30,6 +30,6 @@
     "types": ["node"]
   },
   // apps/web is a Vite/React package: JSX and bundler modules live in apps/web/tsconfig.json.
-  "exclude": ["node_modules", "build", "apps"],
+  "exclude": ["node_modules", "build", "apps", "scripts"],
   "include": ["./**/*.ts"]
 }

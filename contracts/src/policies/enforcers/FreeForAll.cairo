@@ -40,16 +40,22 @@ pub mod FreeForAllEnforcer {
         OwnableEvent: OwnableComponent::Event,
     }
 
-    /// Initializes the enforcer with a checker and the deploying account
-    /// as the initial owner.
+    /// Initializes the enforcer with a checker and an explicit owner.
+    ///
+    /// The owner must be passed in. A Universal Deployer Contract is the
+    /// constructor caller on Starknet, so `get_caller_address()` would make
+    /// the UDC the owner and block later `set_target`.
     ///
     /// Arguments:
     /// - `checker_address`: Address of the checker contract used to validate
     ///   subjects during enforcement.
+    /// - `owner`: Account that may `set_target` and, until then, `enforce`.
     #[constructor]
-    fn constructor(ref self: ContractState, checker_address: ContractAddress) {
+    fn constructor(
+        ref self: ContractState, checker_address: ContractAddress, owner: ContractAddress,
+    ) {
         self.checker.write(ICheckerDispatcher { contract_address: checker_address });
-        self.ownable.initializer(starknet::get_caller_address());
+        self.ownable.initializer(owner);
     }
 
     /// Public ownership implementation provided by OpenZeppelin.

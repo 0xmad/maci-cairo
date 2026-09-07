@@ -11,7 +11,7 @@ use maci_contracts::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, declare, spy_events,
     start_cheat_block_timestamp, start_cheat_caller_address, stop_cheat_block_timestamp,
-    stop_cheat_caller_address,
+    stop_cheat_caller_address, test_address,
 };
 use starknet::{ContractAddress, SyscallResultTrait};
 
@@ -102,7 +102,7 @@ fn deploy_maci(
     let enforcer_contract = declare("FreeForAllEnforcer").unwrap_syscall().contract_class();
     let (checker_address, _) = checker_contract.deploy(@array![]).unwrap_syscall();
     let (enforcer_address, _) = enforcer_contract
-        .deploy(@array![checker_address.into()])
+        .deploy(@array![checker_address.into(), test_address().into()])
         .unwrap_syscall();
     let poll_contract = declare("Poll").unwrap_syscall().contract_class();
     let poll_factory_contract = declare("PollFactory").unwrap_syscall().contract_class();
