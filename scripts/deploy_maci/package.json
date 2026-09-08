@@ -5,7 +5,9 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "deploy": "tsx src/deploy.ts",
+    "deploy:maci": "tsx src/deployMaci.ts",
+    "deploy:poll": "tsx src/deployPoll.ts",
+    "create-poll": "tsx src/deployPoll.ts",
     "test": "vitest --run",
     "test:coverage": "vitest --run --coverage",
     "types": "tsc -p tsconfig.json --noEmit"
@@ -16,5 +18,8 @@
     "tsx": "^4.20.5",
     "typescript": "^6.0.3",
     "vitest": "^5.0.0"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
   }
 }

@@ -61,7 +61,7 @@ The repository is a Scarb workspace (`common`, `contracts`) plus pnpm packages (
 │
 ├── scripts/
 │   └── deploy_maci/
-│       └── TypeScript sncast CLI stand-up of one MACI on local devnet
+│       └── TypeScript sncast CLI: stand up one MACI, then create a Poll, on local devnet
 │
 ├── circuits/
 │   ├── circom/
@@ -83,7 +83,7 @@ The repository is a Scarb workspace (`common`, `contracts`) plus pnpm packages (
 └── pnpm-workspace.yaml
 ```
 
-The Scarb workspace includes `common` and `contracts`. Local MACI stand-up is the pnpm package `scripts/deploy_maci`. The pnpm workspace includes `circuits`, `apps/web`, and `scripts/deploy_maci`.
+The Scarb workspace includes `common` and `contracts`. Local MACI stand-up and Poll create are the pnpm package `scripts/deploy_maci`. The pnpm workspace includes `circuits`, `apps/web`, and `scripts/deploy_maci`.
 
 ---
 
@@ -206,7 +206,7 @@ scarb build --package maci_contracts
 make test
 ```
 
-This runs `maci_common` and `maci_contracts` tests with coverage, circuit tests (`cd circuits && pnpm test`), the ops console smoke tests (`cd apps/web && pnpm test`), then MACI stand-up unit tests (`pnpm --filter maci-deploy run test`).
+This runs `maci_common` and `maci_contracts` tests with coverage, circuit tests (`cd circuits && pnpm test`), the ops console smoke tests (`cd apps/web && pnpm test`), then MACI stand-up and create-poll unit tests (`pnpm --filter maci-deploy run test`).
 
 Format and lint (CI uses check-only):
 
@@ -217,14 +217,15 @@ make lint         # scarb lint + ESLint + TypeScript
 make lint:fix     # scarb lint --fix + ESLint --fix
 ```
 
-Stand up one MACI on local `starknet-devnet --seed 0` (FreeForAll Policy, constant vote-balance assigner; does not create a Poll):
+Stand up one MACI on local `starknet-devnet --seed 0` (FreeForAll Policy, constant vote-balance assigner; does not create a Poll). Then create a Poll as seed-0 `devnet-1` from a JSON intent file (copy `scripts/deploy_maci/create-poll.example.json` and set `maci` to the `maci:` line from stand-up):
 
 ```bash
 starknet-devnet --seed 0
 make deploy
+pnpm --filter maci-deploy run deploy:poll -- --config ./poll.json
 ```
 
-`make deploy` is not part of `make test`. CI runs it on an ephemeral seed-0 node.
+GNU Make treats `--config` as its own option, so the Make wrapper still takes a variable: `make create-poll CONFIG=./poll.json` (that becomes `--config` for the CLI). `make deploy` and `make create-poll` are not part of `make test`. CI runs both on an ephemeral seed-0 node. Neither command defaults to the example file.
 
 Cairo fuzz tests (feature `fuzz`; not part of `make test`):
 
@@ -253,7 +254,7 @@ pnpm compile:ballot
 pnpm setup:ballot
 ```
 
-CI (`.github/workflows/ci.yml`) runs on pull requests to `main`, pushes to `main`, and `workflow_dispatch`. It gates format, lint, Cairo build and coverage tests, a seed-0 `make deploy` smoke, circuit Vitest (with Circom 2.2.3 on PATH), and the ops console typecheck plus Vitest. It does not run Cairo fuzz or Circom `compile:ballot` / `setup:ballot`.
+CI (`.github/workflows/ci.yml`) runs on pull requests to `main`, pushes to `main`, and `workflow_dispatch`. It gates format, lint, Cairo build and coverage tests, a seed-0 `make deploy` plus `make create-poll` smoke, circuit Vitest (with Circom 2.2.3 on PATH), and the ops console typecheck plus Vitest. It does not run Cairo fuzz or Circom `compile:ballot` / `setup:ballot`.
 
 Cairo fuzz (`.github/workflows/fuzz.yml`) runs weekly (Sunday 04:00 UTC) and on `workflow_dispatch`.
 

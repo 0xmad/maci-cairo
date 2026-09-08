@@ -84,7 +84,6 @@ export default defineConfig([
     "circuits/circom/test/",
     "circuits/circom/main/",
     "**/build/",
-    "**/vitest.config.ts",
   ]),
   {
     ignores: ["apps/web/**"],

@@ -20,6 +20,10 @@ const CALL_ADDRESS = `
 {"command":"call","response":"0x123","response_raw":["0x64b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691"],"type":"response"}
 `;
 
+const INVOKE_SUCCESS = `
+{"command":"invoke","transaction_hash":"0x0340abee4ccd74d90ba67b9c95cad3f5ca686356275f82bea4198ce4750e2d9d","type":"response"}
+`;
+
 describe("parseSncastField", () => {
   test("reads class_hash from a successful declare", () => {
     expect(parseSncastField(DECLARE_SUCCESS, "class_hash")).toBe(
@@ -43,6 +47,18 @@ describe("parseSncastField", () => {
     expect(parseSncastField(CALL_ADDRESS, "response")).toBe(
       "0x64b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691",
     );
+  });
+
+  test("reads transaction_hash from a successful invoke", () => {
+    expect(parseSncastField(INVOKE_SUCCESS, "transaction_hash")).toBe(
+      "0x0340abee4ccd74d90ba67b9c95cad3f5ca686356275f82bea4198ce4750e2d9d",
+    );
+  });
+
+  test("does not invent a response for invoke", () => {
+    expect(() => {
+      parseSncastField(INVOKE_SUCCESS, "response");
+    }).toThrow("missing JSON field response");
   });
 
   test("throws on other sncast errors", () => {

@@ -137,7 +137,22 @@ jobs:
       - run: make test-deploy
 
       - name: Smoke local MACI stand-up
-        run: make deploy
+        run: |
+          record="$(make deploy)"
+          printf '%s\n' "$record"
+          maci="$(printf '%s\n' "$record" | awk '/^maci:/{print $2}')"
+          test -n "$maci"
+          echo "MACI=$maci" >> "$GITHUB_ENV"
+
+      - name: Smoke local create poll
+        run: |
+          jq --arg maci "$MACI" '.maci = $maci' scripts/deploy_maci/create-poll.example.json > /tmp/create-poll.json
+          record="$(make create-poll CONFIG=/tmp/create-poll.json)"
+          printf '%s\n' "$record"
+          printf '%s\n' "$record" | grep -E '^poll_id: [0-9]+$'
+          poll="$(printf '%s\n' "$record" | awk '/^poll:/{print $2}')"
+          test -n "$poll"
+          test "$poll" != "0x0000000000000000000000000000000000000000000000000000000000000000"
 
   circuits:
     name: circuits

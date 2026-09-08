@@ -1,5 +1,5 @@
 /*
- * MACI stand-up graph: LeanIMT → FreeForAll Policy → vote-balance assigner →
+ * MACI deploy graph: LeanIMT → FreeForAll Policy → vote-balance assigner →
  * declare Poll/PollFactory → deploy MACI → Enforcer `set_target` → check coordinator.
  *
  * Depth, vote balance, and empty ballot roots match `contracts/tests/maci.cairo`.
@@ -21,15 +21,15 @@ export const EMPTY_BALLOT_ROOTS = [
   "18694062287284245784028624966421731916526814537891066525886866373016385890569",
 ] as const;
 
-/** sncast operations used by {@link standUp}; tests inject a recorder. */
+/** sncast operations used by {@link deployMaci}; tests inject a recorder. */
 export interface SncastOps {
   declareClass: (contractName: string) => string;
   deployUnique: (classHash: string, argumentsExpr?: string) => string;
   field: (key: string, args: string[]) => string;
 }
 
-/** Addresses and class hashes printed after a successful stand-up. */
-export interface StandUpResult {
+/** Addresses and class hashes printed after a successful MACI deploy. */
+export interface DeployMaciResult {
   leanImt: string;
   checker: string;
   enforcer: string;
@@ -41,13 +41,13 @@ export interface StandUpResult {
   coordinator: string;
 }
 
-export interface StandUpOptions {
+export interface DeployMaciOptions {
   /** Hex coordinator; empty or omitted uses seed-0 `devnet-1`. */
   coordinatorOverride?: string;
 }
 
-/** One `label: 0x…` line per {@link StandUpResult} field, for stdout. */
-export function formatStandUp(result: StandUpResult): string {
+/** One `label: 0x…` line per {@link DeployMaciResult} field, for stdout. */
+export function formatDeployMaci(result: DeployMaciResult): string {
   return [
     `lean_imt: ${result.leanImt}`,
     `checker: ${result.checker}`,
@@ -69,7 +69,7 @@ export function formatStandUp(result: StandUpResult): string {
  *
  * @throws If on-chain `coordinator()` does not match the intended coordinator.
  */
-export function standUp(ops: SncastOps, options: StandUpOptions = {}): StandUpResult {
+export function deployMaci(ops: SncastOps, options: DeployMaciOptions = {}): DeployMaciResult {
   const coordinator = intendedCoordinator(options.coordinatorOverride);
   const deployer = normalizeHex(DEVNET_SEED0_DEVNET_1);
 
