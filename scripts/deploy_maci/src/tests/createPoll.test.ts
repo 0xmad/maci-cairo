@@ -10,6 +10,7 @@ import {
   parseCreatePollConfig,
   type CreatePollOps,
   type CreatePollResult,
+  type CreatePollStep,
 } from "../createPoll.js";
 import { DEVNET_SEED0_DEVNET_1, normalizeHex } from "../hex.js";
 
@@ -178,20 +179,56 @@ describe("createPoll", () => {
     });
   });
 
+  test("reports preflight, invoke, and get_poll steps when onStep is set", () => {
+    const ops = recordingOps({ poll: "0xbb", pollId: "0x0" });
+    const steps: CreatePollStep[] = [];
+
+    createPoll(ops, parseCreatePollConfig(VALID_JSON), {
+      onStep: (step) => {
+        steps.push(step);
+      },
+    });
+
+    expect(steps).toEqual([
+      { kind: "call", name: "coordinator" },
+      { kind: "call", name: "state_tree_depth" },
+      { kind: "call", name: "next_poll_id" },
+      { kind: "invoke", name: "create_poll" },
+      { kind: "call", name: "get_poll" },
+    ]);
+  });
+
   test("fails when on-chain coordinator is not seed-0 devnet-1", () => {
     const ops = recordingOps({ coordinatorOnChain: "0x2" });
+    const steps: CreatePollStep[] = [];
 
     expect(() => {
-      createPoll(ops, parseCreatePollConfig(VALID_JSON));
+      createPoll(ops, parseCreatePollConfig(VALID_JSON), {
+        onStep: (step) => {
+          steps.push(step);
+        },
+      });
     }).toThrow(/coordinator mismatch/u);
+
+    expect(steps).toEqual([{ kind: "call", name: "coordinator" }]);
   });
 
   test("fails when on-chain state tree depth does not match the config", () => {
     const ops = recordingOps({ depthOnChain: "0x4" });
+    const steps: CreatePollStep[] = [];
 
     expect(() => {
-      createPoll(ops, parseCreatePollConfig(VALID_JSON));
+      createPoll(ops, parseCreatePollConfig(VALID_JSON), {
+        onStep: (step) => {
+          steps.push(step);
+        },
+      });
     }).toThrow(/state_tree_depth mismatch/u);
+
+    expect(steps).toEqual([
+      { kind: "call", name: "coordinator" },
+      { kind: "call", name: "state_tree_depth" },
+    ]);
   });
 
   test("reads decimal sncast felts for depth and poll_id", () => {
@@ -224,10 +261,23 @@ describe("createPoll", () => {
 
   test("fails when get_poll is still zero after create_poll", () => {
     const ops = recordingOps({ poll: "0x0" });
+    const steps: CreatePollStep[] = [];
 
     expect(() => {
-      createPoll(ops, parseCreatePollConfig(VALID_JSON));
+      createPoll(ops, parseCreatePollConfig(VALID_JSON), {
+        onStep: (step) => {
+          steps.push(step);
+        },
+      });
     }).toThrow(/did not record a Poll at id 0/u);
+
+    expect(steps).toEqual([
+      { kind: "call", name: "coordinator" },
+      { kind: "call", name: "state_tree_depth" },
+      { kind: "call", name: "next_poll_id" },
+      { kind: "invoke", name: "create_poll" },
+      { kind: "call", name: "get_poll" },
+    ]);
   });
 
   test("formatCreatePoll prints maci, poll, and poll_id", () => {

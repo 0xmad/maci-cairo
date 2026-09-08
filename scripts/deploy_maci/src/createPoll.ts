@@ -19,6 +19,15 @@ export interface CreatePollResult {
   pollId: string;
 }
 
+/** Reported Create Poll sncast steps (preflight, invoke, get_poll). The trailing poll_id call is not reported. */
+export type CreatePollStep =
+  | { kind: "call"; name: "coordinator" | "state_tree_depth" | "next_poll_id" | "get_poll" }
+  | { kind: "invoke"; name: "create_poll" };
+
+export interface CreatePollOptions {
+  onStep?: (step: CreatePollStep) => void;
+}
+
 const uintJson = union([
   number().refine((value) => Number.isSafeInteger(value) && value >= 0, { error: "invalid integer" }),
   string()
@@ -180,11 +189,17 @@ export function formatCreatePoll(result: CreatePollResult): string {
  *
  * @throws If on-chain `coordinator()` is not `devnet-1`, `state_tree_depth` does not match the config, or `get_poll` is still zero after `create_poll`.
  */
-export function createPoll(ops: CreatePollOps, config: CreatePollConfig): CreatePollResult {
+export function createPoll(
+  ops: CreatePollOps,
+  config: CreatePollConfig,
+  options: CreatePollOptions = {},
+): CreatePollResult {
+  const { onStep } = options;
   const intended = normalizeHex(DEVNET_SEED0_DEVNET_1);
   const actualCoordinator = normalizeHex(
     ops.field("response", ["call", "--contract-address", config.maci, "--function", "coordinator"]),
   );
+  onStep?.({ kind: "call", name: "coordinator" });
 
   if (actualCoordinator !== intended) {
     throw new Error(`coordinator mismatch: intended ${intended}, on-chain ${actualCoordinator}`);
@@ -193,6 +208,7 @@ export function createPoll(ops: CreatePollOps, config: CreatePollConfig): Create
   const actualDepth = integerFromFelt(
     ops.field("response", ["call", "--contract-address", config.maci, "--function", "state_tree_depth"]),
   );
+  onStep?.({ kind: "call", name: "state_tree_depth" });
 
   if (actualDepth !== config.stateTreeDepth) {
     throw new Error(`state_tree_depth mismatch: config ${config.stateTreeDepth}, on-chain ${actualDepth}`);
@@ -202,6 +218,7 @@ export function createPoll(ops: CreatePollOps, config: CreatePollConfig): Create
   const nextPollId = integerFromFelt(
     ops.field("response", ["call", "--contract-address", config.maci, "--function", "next_poll_id"]),
   );
+  onStep?.({ kind: "call", name: "next_poll_id" });
 
   ops.field("transaction_hash", [
     "invoke",
@@ -212,6 +229,7 @@ export function createPoll(ops: CreatePollOps, config: CreatePollConfig): Create
     "--arguments",
     createPollArgumentsExpr(config),
   ]);
+  onStep?.({ kind: "invoke", name: "create_poll" });
 
   const poll = normalizeHex(
     ops.field("response", [
@@ -224,6 +242,7 @@ export function createPoll(ops: CreatePollOps, config: CreatePollConfig): Create
       nextPollId.toString(),
     ]),
   );
+  onStep?.({ kind: "call", name: "get_poll" });
 
   if (poll === zero) {
     throw new Error(`create_poll did not record a Poll at id ${nextPollId}`);
