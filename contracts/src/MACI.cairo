@@ -98,6 +98,9 @@ pub trait IMACI<TContractState> {
     ///   that id.
     fn get_poll(self: @TContractState, poll_id: u256) -> ContractAddress;
 
+    /// Returns the poll id MACI will assign on the next [`create_poll`].
+    fn next_poll_id(self: @TContractState) -> u256;
+
     /// Creates a Poll. The caller must be the Coordinator.
     ///
     /// MACI assigns the next poll id, injects its own address, deploys the
@@ -384,6 +387,11 @@ pub mod MACI {
         ///   for that id.
         fn get_poll(self: @ContractState, poll_id: u256) -> ContractAddress {
             self.polls.read(poll_id)
+        }
+
+        /// Returns the poll id MACI will assign on the next `create_poll`.
+        fn next_poll_id(self: @ContractState) -> u256 {
+            self.next_poll_id.read()
         }
 
         /// Creates a Poll. The caller must be the Coordinator.

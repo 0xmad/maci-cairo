@@ -1,4 +1,4 @@
-.PHONY: test test-contracts test-circuits test-web test-web-coverage test-fuzz test-fuzz-common test-fuzz-contracts test-deploy test-deploy-coverage build coverage clean fmt fmt\:fix lint lint\:fix types-web deploy
+.PHONY: test test-contracts test-circuits test-web test-web-coverage test-fuzz test-fuzz-common test-fuzz-contracts test-deploy test-deploy-coverage build coverage clean fmt fmt\:fix lint lint\:fix types-web deploy create-poll
 
 fmt:
 	scarb fmt --check
@@ -26,7 +26,11 @@ build-contracts:
 	scarb build --package maci_contracts
 
 deploy:
-	pnpm --filter maci-deploy run deploy
+	pnpm --filter maci-deploy run deploy:maci
+
+create-poll:
+	@test -n "$(CONFIG)" || (echo "CONFIG=path is required (JSON intent file)" && exit 1)
+	pnpm --filter maci-deploy run deploy:poll -- --config "$(CONFIG)"
 
 test: test-common test-contracts test-circuits test-web test-deploy
 

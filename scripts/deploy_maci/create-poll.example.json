@@ -1,0 +1,10 @@
+{
+  "maci": "0x0",
+  "start_date": 0,
+  "end_date": 1000,
+  "poll_public_key": [0, 1],
+  "state_tree_depth": 5,
+  "vote_options": 2,
+  "batch_size": 2,
+  "empty_live_ballot_root": "0xabc"
+}

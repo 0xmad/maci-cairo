@@ -146,6 +146,7 @@ fn test_constructor() {
     assert_eq!(maci.get_state_tree_root_indexed_signup(0), Constants::PAD_KEY_HASH);
     assert_eq!(maci.get_state_index(Constants::PAD_KEY_HASH), 0);
     assert_eq!(maci.coordinator(), coordinator());
+    assert_eq!(maci.next_poll_id(), 0);
     assert!(maci.get_poll_factory().into() != 0);
 }
 
@@ -299,6 +300,7 @@ fn test_coordinator_creates_poll() {
 
     assert!(poll.into() != 0);
     assert_eq!(maci.get_poll(0), poll);
+    assert_eq!(maci.next_poll_id(), 1);
 
     spy
         .assert_emitted(
@@ -324,6 +326,7 @@ fn test_create_poll_assigns_sequential_ids() {
     assert!(poll0 != poll1);
     assert_eq!(maci.get_poll(0), poll0);
     assert_eq!(maci.get_poll(1), poll1);
+    assert_eq!(maci.next_poll_id(), 2);
 }
 
 #[test]

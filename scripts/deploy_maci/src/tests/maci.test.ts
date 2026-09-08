@@ -5,11 +5,11 @@ import {
   EMPTY_BALLOT_ROOTS,
   STATE_TREE_DEPTH,
   VOTE_BALANCE,
-  formatStandUp,
-  standUp,
+  deployMaci,
+  formatDeployMaci,
+  type DeployMaciResult,
   type SncastOps,
-  type StandUpResult,
-} from "../standUp.js";
+} from "../maci.js";
 
 function padIndex(index: number): string {
   return normalizeHex(`0x${index.toString(16)}`);
@@ -60,10 +60,10 @@ function recordingOps(options: { coordinatorOnChain?: string } = {}): SncastOps 
   return ops;
 }
 
-describe("standUp", () => {
-  test("declares and deploys in MACI stand-up order", () => {
+describe("deployMaci", () => {
+  test("declares and deploys in MACI deploy order", () => {
     const ops = recordingOps();
-    const result = standUp(ops);
+    const result = deployMaci(ops);
 
     expect(ops.declares).toEqual([
       "LeanIMT",
@@ -103,7 +103,7 @@ describe("standUp", () => {
     const ops = recordingOps({
       coordinatorOnChain: intendedCoordinator("0x1"),
     });
-    const result = standUp(ops, { coordinatorOverride: "0x1" });
+    const result = deployMaci(ops, { coordinatorOverride: "0x1" });
 
     expect(ops.deploys[4]?.argumentsExpr).toContain(`coordinator: ${intendedCoordinator("0x1")}`);
     expect(result.coordinator).toBe(intendedCoordinator("0x1"));
@@ -113,12 +113,12 @@ describe("standUp", () => {
     const ops = recordingOps({ coordinatorOnChain: "0x2" });
 
     expect(() => {
-      standUp(ops);
+      deployMaci(ops);
     }).toThrow(/coordinator mismatch/u);
   });
 
-  test("formatStandUp prints one labeled hex line per stand-up address", () => {
-    const result: StandUpResult = {
+  test("formatDeployMaci prints one labeled hex line per MACI address", () => {
+    const result: DeployMaciResult = {
       leanImt: "0x1",
       checker: "0x2",
       enforcer: "0x3",
@@ -130,7 +130,7 @@ describe("standUp", () => {
       coordinator: "0x9",
     };
 
-    expect(formatStandUp(result)).toBe(
+    expect(formatDeployMaci(result)).toBe(
       [
         "lean_imt: 0x1",
         "checker: 0x2",

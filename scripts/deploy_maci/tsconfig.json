@@ -1,13 +1,12 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src",
     "outDir": "build",
     "noEmit": true,
     "incremental": false,
     "composite": false,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src"],
+  "include": ["src", "vitest.config.ts"],
   "exclude": ["node_modules", "build"]
 }
