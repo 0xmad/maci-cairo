@@ -8,6 +8,7 @@ import {
   deployMaci,
   formatDeployMaci,
   type DeployMaciResult,
+  type DeployMaciStep,
   type SncastOps,
 } from "../maci.js";
 
@@ -107,6 +108,158 @@ describe("deployMaci", () => {
 
     expect(ops.deploys[4]?.argumentsExpr).toContain(`coordinator: ${intendedCoordinator("0x1")}`);
     expect(result.coordinator).toBe(intendedCoordinator("0x1"));
+  });
+
+  test("reports each declare, deploy, invoke, and check when onStep is set", () => {
+    const ops = recordingOps();
+    const steps: DeployMaciStep[] = [];
+
+    deployMaci(ops, {
+      onStep: (step) => {
+        steps.push(step);
+      },
+    });
+
+    expect(steps).toEqual([
+      { kind: "declare", name: "LeanIMT" },
+      { kind: "deploy", name: "leanImt" },
+      { kind: "declare", name: "FreeForAllChecker" },
+      { kind: "deploy", name: "checker" },
+      { kind: "declare", name: "FreeForAllEnforcer" },
+      { kind: "deploy", name: "enforcer" },
+      { kind: "declare", name: "ConstantInitialVoteBalance" },
+      { kind: "deploy", name: "assigner" },
+      { kind: "declare", name: "Poll" },
+      { kind: "declare", name: "PollFactory" },
+      { kind: "declare", name: "MACI" },
+      { kind: "deploy", name: "maci" },
+      { kind: "invoke", name: "set_target" },
+      { kind: "call", name: "coordinator" },
+      { kind: "call", name: "get_poll_factory" },
+    ]);
+  });
+
+  test("skips deployUnique for checkpointed instance addresses and still declares", () => {
+    const ops = recordingOps();
+    const checkpoint = {
+      leanImt: "0xaaa",
+      checker: "0xbbb",
+      enforcer: "0xccc",
+      assigner: "0xddd",
+      maci: "0xeee",
+    };
+
+    const result = deployMaci(ops, { checkpoint });
+
+    expect(ops.declares).toEqual([
+      "LeanIMT",
+      "FreeForAllChecker",
+      "FreeForAllEnforcer",
+      "ConstantInitialVoteBalance",
+      "Poll",
+      "PollFactory",
+      "MACI",
+    ]);
+    expect(ops.deploys).toEqual([]);
+    expect(result.leanImt).toBe("0xaaa");
+    expect(result.checker).toBe("0xbbb");
+    expect(result.enforcer).toBe("0xccc");
+    expect(result.assigner).toBe("0xddd");
+    expect(result.maci).toBe("0xeee");
+    expect(ops.fields[0]?.args).toEqual([
+      "invoke",
+      "--contract-address",
+      "0xccc",
+      "--function",
+      "set_target",
+      "--arguments",
+      "0xeee",
+    ]);
+  });
+
+  test("redeploys instances that are not in the checkpoint", () => {
+    const ops = recordingOps();
+    const result = deployMaci(ops, { checkpoint: { leanImt: "0xaaa" } });
+
+    expect(ops.deploys).toHaveLength(4);
+    expect(result.leanImt).toBe("0xaaa");
+    expect(result.checker).not.toBe("0xaaa");
+  });
+
+  test("skips declare when the checkpoint already has that class hash", () => {
+    const ops = recordingOps();
+    const result = deployMaci(ops, {
+      checkpoint: {
+        pollClassHash: "0x5",
+        pollFactoryClassHash: "0x6",
+        maciClassHash: "0x7",
+      },
+    });
+
+    expect(ops.declares).toEqual(["LeanIMT", "FreeForAllChecker", "FreeForAllEnforcer", "ConstantInitialVoteBalance"]);
+    expect(result.pollClassHash).toBe("0x5");
+    expect(result.pollFactoryClassHash).toBe("0x6");
+    expect(ops.deploys[4]?.argumentsExpr).toContain("poll_class_hash: 0x5");
+    expect(ops.deploys[4]?.argumentsExpr).toContain("poll_factory_class_hash: 0x6");
+  });
+
+  test("does not report skipped declare or deploy steps", () => {
+    const ops = recordingOps();
+    const steps: DeployMaciStep[] = [];
+
+    deployMaci(ops, {
+      checkpoint: {
+        leanImt: "0xaaa",
+        checker: "0xbbb",
+        enforcer: "0xccc",
+        assigner: "0xddd",
+        maci: "0xeee",
+        pollClassHash: "0x5",
+        pollFactoryClassHash: "0x6",
+        maciClassHash: "0x7",
+      },
+      onStep: (step) => {
+        steps.push(step);
+      },
+    });
+
+    expect(steps.filter((step) => step.kind === "deploy")).toEqual([]);
+    expect(steps.filter((step) => step.kind === "declare")).toEqual([
+      { kind: "declare", name: "LeanIMT" },
+      { kind: "declare", name: "FreeForAllChecker" },
+      { kind: "declare", name: "FreeForAllEnforcer" },
+      { kind: "declare", name: "ConstantInitialVoteBalance" },
+    ]);
+    expect(steps.filter((step) => step.kind === "invoke" || step.kind === "call")).toEqual([
+      { kind: "invoke", name: "set_target" },
+      { kind: "call", name: "coordinator" },
+      { kind: "call", name: "get_poll_factory" },
+    ]);
+  });
+
+  test("treats an empty checkpoint address as missing and still deploys", () => {
+    const ops = recordingOps();
+    const result = deployMaci(ops, { checkpoint: { leanImt: "" } });
+
+    expect(ops.deploys).toHaveLength(5);
+    expect(result.leanImt).not.toBe("");
+  });
+
+  test("reports steps completed before a coordinator mismatch", () => {
+    const ops = recordingOps({ coordinatorOnChain: "0x2" });
+    const steps: DeployMaciStep[] = [];
+
+    expect(() => {
+      deployMaci(ops, {
+        onStep: (step) => {
+          steps.push(step);
+        },
+      });
+    }).toThrow(/coordinator mismatch/u);
+
+    expect(steps.at(-1)).toEqual({ kind: "call", name: "coordinator" });
+    expect(steps.some((step) => step.kind === "invoke")).toBe(true);
+    expect(steps.some((step) => step.kind === "call" && step.name === "get_poll_factory")).toBe(false);
   });
 
   test("fails when on-chain coordinator does not match", () => {
