@@ -6,6 +6,7 @@ profile/
 node_modules/
 apps/web/dist/
 apps/web/.env
+apps/ops/.env
 circuits/circom/test/
 circuits/circom/main/
 build/

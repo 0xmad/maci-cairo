@@ -185,3 +185,11 @@ The ordered state-tree roots after the padding leaf and after each Signup, so
 a Ballot can prove against the tree as of a given Signup, not only the live
 root. Index `0` is the padded tree, not a Signup.
 _Avoid_: Snapshot (unless you mean something else)
+
+### Ops
+
+**Operator**:
+A human on the ops-console allowlist who may start MACI stand-up or Poll
+create. They prove that with a wallet signature; that wallet is not the
+Coordinator and does not sign protocol transactions.
+_Avoid_: Coordinator, admin, user (as this role)

@@ -6,9 +6,10 @@ import path from "path";
 import { defineConfig, globalIgnores } from "@eslint/config-helpers";
 import { FlatCompat } from "@eslint/eslintrc";
 import { fixupConfigRules } from "@eslint/compat";
+import drizzle from "eslint-plugin-drizzle";
 import prettier from "eslint-plugin-prettier";
-import unusedImports from "eslint-plugin-unused-imports";
 import reactHooks from "eslint-plugin-react-hooks";
+import unusedImports from "eslint-plugin-unused-imports";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -166,6 +167,16 @@ export default defineConfig([
           ],
         },
       ],
+    },
+  },
+  {
+    files: ["apps/ops/**/*.ts"],
+    plugins: {
+      drizzle,
+    },
+    rules: {
+      "drizzle/enforce-delete-with-where": "error",
+      "drizzle/enforce-update-with-where": "error",
     },
   },
   {
