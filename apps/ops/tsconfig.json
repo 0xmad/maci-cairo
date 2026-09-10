@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "build",
+    "noEmit": true,
+    "incremental": false,
+    "composite": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src", "vitest.config.ts", "drizzle.config.ts"],
+  "exclude": ["node_modules", "build"]
+}

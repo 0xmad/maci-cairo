@@ -1,0 +1,14 @@
+.git
+**/.env
+**/node_modules
+**/coverage
+**/build
+**/dist
+target
+.snfoundry_cache
+snfoundry_trace
+.pnpm-store
+*.md
+docs
+common
+contracts
