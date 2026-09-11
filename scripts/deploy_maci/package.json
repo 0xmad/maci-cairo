@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "license": "MIT",
+  "exports": {
+    "./maci": "./src/maci.ts",
+    "./sncast": "./src/sncast.ts",
+    "./hex": "./src/hex.ts"
+  },
   "scripts": {
     "deploy:maci": "tsx src/deployMaci.ts",
     "deploy:poll": "tsx src/deployPoll.ts",

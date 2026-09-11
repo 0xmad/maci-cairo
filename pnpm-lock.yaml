@@ -122,6 +122,9 @@ importers:
       jose:
         specifier: ^6.2.12
         version: 6.2.12
+      maci-deploy:
+        specifier: workspace:*
+        version: link:../../scripts/deploy_maci
       pg:
         specifier: ^8.16.3
         version: 8.23.0
