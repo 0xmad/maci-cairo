@@ -1,94 +1,114 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { connectInjectedWallet, findInjectedWallet, type InjectedWallet } from "..";
+import { Wallet } from "..";
+import { operatorNonceMessage } from "../../ops/nonceMessage";
 
-type WalletWindow = Window & {
-  starknet_argentX?: InjectedWallet;
-  starknet_braavos?: InjectedWallet;
-};
+const { connectMock, disconnectMock, walletAccountConnectMock } = vi.hoisted(() => ({
+  connectMock: vi.fn(),
+  disconnectMock: vi.fn(),
+  walletAccountConnectMock: vi.fn(),
+}));
 
-const walletWindow = (): WalletWindow => window;
+vi.mock("@starknet-io/get-starknet", () => ({
+  connect: connectMock,
+  disconnect: disconnectMock,
+}));
 
-afterEach(() => {
-  const w = walletWindow();
+vi.mock("starknet", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>("starknet");
 
-  delete w.starknet_argentX;
-  delete w.starknet_braavos;
+  return {
+    ...actual,
+    WalletAccount: {
+      connect: walletAccountConnectMock,
+    },
+  };
 });
 
-describe("findInjectedWallet", () => {
-  it("prefers Argent over Braavos", () => {
-    const argent: InjectedWallet = { selectedAddress: "0xargent" };
-    const braavos: InjectedWallet = { selectedAddress: "0xbraavos" };
+const RPC_URL = "http://rpc.test/";
+const selectedWallet = { id: "argentX" };
 
-    walletWindow().starknet_argentX = argent;
-    walletWindow().starknet_braavos = braavos;
-
-    expect(findInjectedWallet()).toBe(argent);
+describe("Wallet", () => {
+  beforeEach(() => {
+    connectMock.mockReset();
+    disconnectMock.mockReset();
+    walletAccountConnectMock.mockReset();
   });
 
-  it("uses Braavos when Argent is missing", () => {
-    const braavos: InjectedWallet = { selectedAddress: "0xbraavos" };
+  it("connects with get-starknet and returns the WalletAccount address", async () => {
+    connectMock.mockResolvedValue(selectedWallet);
+    walletAccountConnectMock.mockResolvedValue({ address: "0xabc" });
 
-    walletWindow().starknet_braavos = braavos;
-
-    expect(findInjectedWallet()).toBe(braavos);
+    await expect(new Wallet().connect(RPC_URL)).resolves.toBe("0xabc");
+    expect(connectMock).toHaveBeenCalledWith({ modalMode: "alwaysAsk", exclude: ["metamask"] });
+    expect(walletAccountConnectMock).toHaveBeenCalledWith({ nodeUrl: RPC_URL }, selectedWallet);
   });
 
-  it("returns undefined when no injected wallet is present", () => {
-    expect(findInjectedWallet()).toBeUndefined();
-  });
-});
+  it("throws when the user does not select a wallet", async () => {
+    connectMock.mockResolvedValue(null);
 
-describe("connectInjectedWallet", () => {
-  it("throws when no Argent or Braavos wallet is found", async () => {
-    await expect(connectInjectedWallet()).rejects.toThrow("No Argent or Braavos wallet found");
+    await expect(new Wallet().connect(RPC_URL)).rejects.toThrow("No wallet selected");
+    expect(walletAccountConnectMock).not.toHaveBeenCalled();
   });
 
-  it("returns the first enable() account when it is a non-empty string", async () => {
-    walletWindow().starknet_argentX = {
-      enable: vi.fn().mockResolvedValue(["0xfrom-enable"]),
-    };
+  it("throws when the connected account has no address", async () => {
+    connectMock.mockResolvedValue(selectedWallet);
+    walletAccountConnectMock.mockResolvedValue({ address: "" });
 
-    await expect(connectInjectedWallet()).resolves.toBe("0xfrom-enable");
+    await expect(new Wallet().connect(RPC_URL)).rejects.toThrow("Wallet connected without an address");
   });
 
-  it("returns a string enable() result", async () => {
-    walletWindow().starknet_argentX = {
-      enable: vi.fn().mockResolvedValue("0xsingle"),
-    };
+  it("signs SNIP-12 typed data with the last connected wallet", async () => {
+    const typedData = operatorNonceMessage("nonce-1", "0x534e5f5345504f4c4941");
+    const signMessage = vi.fn().mockResolvedValue(["0x1", "0x2"]);
 
-    await expect(connectInjectedWallet()).resolves.toBe("0xsingle");
+    connectMock.mockResolvedValue(selectedWallet);
+    walletAccountConnectMock.mockResolvedValue({ address: "0xabc", signMessage });
+
+    await expect(new Wallet().signMessage(RPC_URL, typedData)).resolves.toEqual(["0x1", "0x2"]);
+    expect(connectMock).toHaveBeenCalledWith({ modalMode: "neverAsk", exclude: ["metamask"] });
+    expect(signMessage).toHaveBeenCalledWith(typedData);
   });
 
-  it("requests accounts then uses selectedAddress when enable() has no address", async () => {
-    const request = vi.fn().mockResolvedValue(undefined);
+  it("throws when signing without a connected wallet", async () => {
+    connectMock.mockResolvedValue(null);
 
-    walletWindow().starknet_argentX = {
-      enable: vi.fn().mockResolvedValue([]),
-      request,
-      selectedAddress: "0xselected",
-    };
-
-    await expect(connectInjectedWallet()).resolves.toBe("0xselected");
-    expect(request).toHaveBeenCalledWith({ type: "wallet_requestAccounts" });
+    await expect(
+      new Wallet().signMessage(RPC_URL, operatorNonceMessage("nonce-1", "0x534e5f5345504f4c4941")),
+    ).rejects.toThrow("No wallet connected");
   });
 
-  it("uses account.address when selectedAddress is missing", async () => {
-    walletWindow().starknet_braavos = {
-      account: { address: "0xaccount" },
-    };
+  it("disconnects the last wallet", async () => {
+    disconnectMock.mockResolvedValue(undefined);
 
-    await expect(connectInjectedWallet()).resolves.toBe("0xaccount");
+    await expect(new Wallet().disconnect()).resolves.toBeUndefined();
+    expect(disconnectMock).toHaveBeenCalledWith({ clearLastWallet: true });
   });
 
-  it("throws when the wallet connects without an address", async () => {
-    walletWindow().starknet_argentX = {
-      enable: vi.fn().mockResolvedValue([""]),
-      request: vi.fn().mockResolvedValue(undefined),
-      selectedAddress: "",
-    };
+  it("asks the connected wallet to switch Starknet chain", async () => {
+    const request = vi.fn().mockResolvedValue(true);
 
-    await expect(connectInjectedWallet()).rejects.toThrow("Wallet connected without an address");
+    connectMock.mockResolvedValue({ ...selectedWallet, request });
+
+    await expect(new Wallet().switchChain("0x534e5f5345504f4c4941")).resolves.toBeUndefined();
+    expect(connectMock).toHaveBeenCalledWith({ modalMode: "neverAsk", exclude: ["metamask"] });
+    expect(request).toHaveBeenCalledWith({
+      type: "wallet_switchStarknetChain",
+      params: { chainId: "0x534e5f5345504f4c4941" },
+    });
+  });
+
+  it("does not request a chain switch when no wallet is connected", async () => {
+    connectMock.mockResolvedValue(null);
+
+    await expect(new Wallet().switchChain("0x534e5f5345504f4c4941")).resolves.toBeUndefined();
+  });
+
+  it("propagates a wallet_switchStarknetChain rejection", async () => {
+    const request = vi.fn().mockRejectedValue(new Error("unlisted network"));
+
+    connectMock.mockResolvedValue({ ...selectedWallet, request });
+
+    await expect(new Wallet().switchChain("0x534e5f5345504f4c4941")).rejects.toThrow("unlisted network");
   });
 });

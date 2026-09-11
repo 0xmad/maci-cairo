@@ -4,6 +4,7 @@ interface ImportMetaEnv {
   readonly VITE_RPC_URL?: string;
   readonly VITE_NETWORK_ID?: string;
   readonly VITE_SEPOLIA_RPC_URL?: string;
+  readonly VITE_BACKEND_OPS_URL?: string;
 }
 
 interface ImportMeta {

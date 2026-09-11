@@ -4,7 +4,6 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import { RpcProvider } from "starknet";
 
-import { randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,6 +12,7 @@ import { PostgresNonceRepository } from "./login/repositories/postgresNonce.repo
 import { LoginService } from "./login/services/login.service.js";
 import { SessionService } from "./login/services/session.service.js";
 import { WalletService } from "./login/services/wallet.service.js";
+import { randomFeltNonce } from "./login/utils/feltNonce.js";
 import { createServer } from "./server.js";
 import { readOpsEnv } from "./utils/env.js";
 
@@ -31,7 +31,7 @@ const loginService = new LoginService({
   nonceRepository: new PostgresNonceRepository(db),
   sessionService: new SessionService({ secret: env.jwtSecret, ttlMs: HOURS_MS }),
   nowMs: (): number => Date.now(),
-  randomNonce: (): string => randomBytes(32).toString("hex"),
+  randomNonce: randomFeltNonce,
   walletService: new WalletService({
     chainId: env.starknetChainId,
     verify: async (message, signature, address) => provider.verifyMessageInStarknet(message, signature, address),

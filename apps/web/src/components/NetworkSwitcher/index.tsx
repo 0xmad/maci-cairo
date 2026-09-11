@@ -8,9 +8,11 @@ import styles from "./index.module.css";
 export const NetworkSwitcher = (): JSX.Element => {
   const { network, setNetwork } = useNetwork();
 
-  const handleChange = (event: SyntheticEvent<HTMLSelectElement>): void => {
-    if (isAppNetwork(event.currentTarget.value)) {
-      setNetwork(event.currentTarget.value);
+  const handleChange = async (event: SyntheticEvent<HTMLSelectElement>): Promise<void> => {
+    const next = event.currentTarget.value;
+
+    if (next !== "sepolia" && isAppNetwork(next)) {
+      await setNetwork(next);
     }
   };
 
@@ -25,7 +27,9 @@ export const NetworkSwitcher = (): JSX.Element => {
       >
         <option value="local">Local</option>
 
-        <option value="sepolia">Sepolia</option>
+        <option disabled value="sepolia">
+          Sepolia
+        </option>
       </select>
     </label>
   );

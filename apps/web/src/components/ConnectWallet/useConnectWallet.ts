@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { connectInjectedWallet } from "../../services/wallet";
+import { rpcUrlFor } from "../../config/network";
+import { useNetwork } from "../../providers/Network";
+import { wallet } from "../../services/wallet";
 
 const CONNECT_ERROR_TOAST_MS = 4000;
 
@@ -8,9 +10,11 @@ interface UseConnectWalletResult {
   address?: string;
   error?: string;
   handleClick: () => Promise<void>;
+  disconnect: () => Promise<void>;
 }
 
 export function useConnectWallet(): UseConnectWalletResult {
+  const { network } = useNetwork();
   const [address, setAddress] = useState<string>();
   const [error, setError] = useState<string>();
 
@@ -32,12 +36,20 @@ export function useConnectWallet(): UseConnectWalletResult {
     setError(undefined);
 
     try {
-      const next = await connectInjectedWallet();
+      const next = await wallet.connect(rpcUrlFor(network));
       setAddress(next);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Connect failed");
     }
   };
 
-  return { address, error, handleClick };
+  const disconnectWallet = async (): Promise<void> => {
+    try {
+      await wallet.disconnect();
+    } finally {
+      setAddress(undefined);
+    }
+  };
+
+  return { address, error, handleClick, disconnect: disconnectWallet };
 }

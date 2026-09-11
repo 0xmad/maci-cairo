@@ -29,7 +29,7 @@ export const Shell = (): JSX.Element => {
         <div className="flex flex-wrap items-center gap-4">
           <NetworkSwitcher />
 
-          <ConnectWallet />
+          <ConnectWallet key={network} />
         </div>
       </header>
 

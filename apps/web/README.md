@@ -18,7 +18,7 @@ Connect uses injected Argent or Braavos. There is no paymaster. Deploy and Creat
 
 ## Networks
 
-`VITE_RPC_URL` and `VITE_NETWORK_ID` set the default (local `5050` or `sepolia`). The switcher also uses `VITE_SEPOLIA_RPC_URL`. Switching network keeps a MACI address in the URL and notes that addresses are network-specific.
+`VITE_RPC_URL` and `VITE_NETWORK_ID` set the default (local `5050` or `sepolia`). In `pnpm dev`, loopback `5050` is served as `/starknet-rpc` so the browser is not blocked by CORS. The switcher's Sepolia option is disabled for now. Switching network asks the connected wallet for `wallet_switchStarknetChain`, then disconnects and signs the Operator out (clears `maci.operator.jwt`). A MACI address in the URL is kept and noted as network-specific.
 
 ## Scaffold note
 

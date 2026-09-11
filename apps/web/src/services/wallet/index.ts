@@ -1,47 +1,53 @@
-export interface InjectedWallet {
-  enable?: () => Promise<string[] | string>;
-  request?: (args: { type: string }) => Promise<unknown>;
-  selectedAddress?: string;
-  account?: { address?: string };
-}
+import { connect, disconnect } from "@starknet-io/get-starknet";
+import { stark, WalletAccount, type TypedData } from "starknet";
 
-function asWindow(): Window & {
-  starknet_argentX?: InjectedWallet;
-  starknet_braavos?: InjectedWallet;
-} {
-  return window;
-}
+type ConnectModalMode = "alwaysAsk" | "neverAsk";
 
-export function findInjectedWallet(): InjectedWallet | undefined {
-  const w = asWindow();
-  return w.starknet_argentX ?? w.starknet_braavos;
-}
+/** Browser wallet via get-starknet and starknet.js `WalletAccount`. */
+export class Wallet {
+  async connect(rpcUrl: string): Promise<string> {
+    const account = await this.#account(rpcUrl, "alwaysAsk");
 
-export async function connectInjectedWallet(): Promise<string> {
-  const wallet = findInjectedWallet();
-
-  if (wallet === undefined) {
-    throw new Error("No Argent or Braavos wallet found");
-  }
-
-  if (typeof wallet.enable === "function") {
-    const accounts = await wallet.enable();
-    const first = Array.isArray(accounts) ? accounts[0] : accounts;
-
-    if (typeof first === "string" && first.length > 0) {
-      return first;
+    if (account.address.length === 0) {
+      throw new Error("Wallet connected without an address");
     }
+
+    return account.address;
   }
 
-  if (typeof wallet.request === "function") {
-    await wallet.request({ type: "wallet_requestAccounts" });
+  async signMessage(rpcUrl: string, typedData: TypedData): Promise<string[]> {
+    const account = await this.#account(rpcUrl, "neverAsk");
+    const signed = await account.signMessage(typedData);
+
+    return stark.signatureToHexArray(signed);
   }
 
-  const address = wallet.selectedAddress ?? wallet.account?.address;
-
-  if (address === undefined || address.length === 0) {
-    throw new Error("Wallet connected without an address");
+  async disconnect(): Promise<void> {
+    await disconnect({ clearLastWallet: true });
   }
 
-  return address;
+  async switchChain(chainId: string): Promise<void> {
+    const selected = await connect({ modalMode: "neverAsk", exclude: ["metamask"] });
+
+    if (selected === null) {
+      return;
+    }
+
+    await selected.request({
+      type: "wallet_switchStarknetChain",
+      params: { chainId },
+    });
+  }
+
+  async #account(rpcUrl: string, modalMode: ConnectModalMode): Promise<WalletAccount> {
+    const selected = await connect({ modalMode, exclude: ["metamask"] });
+
+    if (selected === null) {
+      throw new Error(modalMode === "alwaysAsk" ? "No wallet selected" : "No wallet connected");
+    }
+
+    return WalletAccount.connect({ nodeUrl: rpcUrl }, selected);
+  }
 }
+
+export const wallet = new Wallet();
