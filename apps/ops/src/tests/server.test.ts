@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { type LoginService } from "../login/services/login.service.js";
 import { createServer, listenPort, type RunningServer } from "../server.js";
+import { type StandupService } from "../standup/standup.service.js";
 
 function loginService(): LoginService {
   return {
@@ -9,6 +10,19 @@ function loginService(): LoginService {
     login: vi.fn(),
     authenticate: vi.fn(),
   } as unknown as LoginService;
+}
+
+function standupService(): StandupService {
+  return {
+    startStandUp: vi.fn(),
+    currentJob: vi.fn(),
+    currentMaci: vi.fn(),
+    subscribe: vi.fn(),
+  } as unknown as StandupService;
+}
+
+function deps(): { loginService: LoginService; standupService: StandupService } {
+  return { loginService: loginService(), standupService: standupService() };
 }
 
 describe("listenPort", () => {
@@ -34,7 +48,7 @@ describe("createServer", () => {
   });
 
   test("listens on a TCP port and serves POST /nonce", async () => {
-    server = await createServer({ loginService: loginService() }, 0);
+    server = await createServer(deps(), 0);
     const res = await fetch(`http://127.0.0.1:${server.port}/nonce`, { method: "POST" });
 
     expect(server.port).toBeGreaterThan(0);
@@ -43,7 +57,7 @@ describe("createServer", () => {
   });
 
   test("enables CORS for browser origins and authorization", async () => {
-    server = await createServer({ loginService: loginService() }, 0);
+    server = await createServer(deps(), 0);
     const res = await fetch(`http://127.0.0.1:${server.port}/nonce`, {
       method: "OPTIONS",
       headers: {
@@ -59,7 +73,7 @@ describe("createServer", () => {
   });
 
   test("close stops accepting connections", async () => {
-    server = await createServer({ loginService: loginService() }, 0);
+    server = await createServer(deps(), 0);
     const base = `http://127.0.0.1:${server.port}`;
     await server.close();
     server = undefined;

@@ -16,6 +16,7 @@ RUN pnpm install --frozen-lockfile --filter maci-ops...
 
 COPY tsconfig.json ./
 COPY apps/ops ./apps/ops
+COPY scripts/deploy_maci ./scripts/deploy_maci
 
 WORKDIR /repo/apps/ops
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { MemoryNonceRepository } from "../repositories/memoryNonce.repository.js";
+import { PostgresNonceRepository } from "../repositories/postgresNonce.repository.js";
 import { LoginService } from "../services/login.service.js";
 import { SessionService } from "../services/session.service.js";
 import { normalizeHex } from "../utils/allowlist.js";
@@ -16,6 +16,45 @@ function verifyWalletProof(_nonce: string, signature: string): Promise<string> {
   return Promise.resolve((JSON.parse(signature) as { address: string }).address);
 }
 
+function eqParam(condition: { queryChunks: unknown[] }): string {
+  const param = condition.queryChunks.find(
+    (chunk): chunk is { value: string } =>
+      typeof chunk === "object" && chunk !== null && "value" in chunk && typeof chunk.value === "string",
+  );
+
+  if (param === undefined) {
+    throw new Error("expected eq string param");
+  }
+
+  return param.value;
+}
+
+function postgresNonceRepository(): PostgresNonceRepository {
+  const saved = new Map<string, number>();
+
+  return new PostgresNonceRepository({
+    insert: () => ({
+      values: (row: { nonce: string; issuedAtMs: number }): Promise<void> => {
+        saved.set(row.nonce, row.issuedAtMs);
+
+        return Promise.resolve();
+      },
+    }),
+    delete: () => ({
+      where: (condition: { queryChunks: unknown[] }): { returning: () => Promise<{ nonce: string }[]> } => ({
+        returning: (): Promise<{ nonce: string }[]> => {
+          const nonce = eqParam(condition);
+          // Map#delete, not drizzle-orm's query builder.
+          // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
+          const existed = saved.delete(nonce);
+
+          return Promise.resolve(existed ? [{ nonce }] : []);
+        },
+      }),
+    }),
+  } as unknown as ConstructorParameters<typeof PostgresNonceRepository>[0]);
+}
+
 function loginHarness(
   options: {
     allowlist?: string[];
@@ -25,7 +64,7 @@ function loginHarness(
 ) {
   let now = 1_000_000;
   let n = 0;
-  const nonceRepository = new MemoryNonceRepository();
+  const nonceRepository = postgresNonceRepository();
 
   const service = new LoginService({
     nonceRepository,
@@ -79,7 +118,7 @@ describe("LoginService", () => {
   });
 
   test("re-checks the allowlist on authenticate so a smaller list revokes the session", async () => {
-    const nonceRepository = new MemoryNonceRepository();
+    const nonceRepository = postgresNonceRepository();
     const sessionService = new SessionService({ secret: "test-secret", ttlMs: 3_600_000 });
     let n = 0;
     const shared = {
