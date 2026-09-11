@@ -1,16 +1,33 @@
-import { createContext, useContext, useMemo, useState, type JSX, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type Dispatch,
+  type JSX,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 
 import type { StarkZap } from "starkzap";
 
-import { createSdk, defaultNetwork, type AppNetwork } from "../../config/network";
+import { chainIdFor, createSdk, defaultNetwork, type AppNetwork } from "../../config/network";
+import { storage } from "../../services/localStorage";
+import { wallet } from "../../services/wallet";
 
-interface NetworkContextValue {
+interface NetworkStore {
   network: AppNetwork;
-  setNetwork: (network: AppNetwork) => void;
+  setNetwork: Dispatch<SetStateAction<AppNetwork>>;
   sdk: StarkZap;
 }
 
-const NetworkContext = createContext<NetworkContextValue | undefined>(undefined);
+interface NetworkContextValue {
+  network: AppNetwork;
+  sdk: StarkZap;
+  setNetwork: (network: AppNetwork) => Promise<void>;
+}
+
+const NetworkContext = createContext<NetworkStore | undefined>(undefined);
 
 export const NetworkProvider = ({ children }: { children: ReactNode }): JSX.Element => {
   const [network, setNetwork] = useState<AppNetwork>(defaultNetwork);
@@ -27,5 +44,21 @@ export function useNetwork(): NetworkContextValue {
     throw new Error("useNetwork must be used within NetworkProvider");
   }
 
-  return value;
+  const setNetwork = async (next: AppNetwork): Promise<void> => {
+    if (next === value.network) {
+      return;
+    }
+
+    try {
+      await wallet.switchChain(chainIdFor(next));
+    } catch {
+      /* wallet refused or the chain is unlisted */
+    }
+
+    storage.clearStoredJwt();
+    await wallet.disconnect().catch(() => undefined);
+    value.setNetwork(next);
+  };
+
+  return { network: value.network, sdk: value.sdk, setNetwork };
 }

@@ -1,19 +1,32 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { connectInjectedWallet } from "../../../services/wallet";
 import { useConnectWallet } from "../useConnectWallet";
 
-vi.mock("../../../services/wallet", () => ({
-  connectInjectedWallet: vi.fn(),
+const { connectMock, disconnectMock } = vi.hoisted(() => ({
+  connectMock: vi.fn(),
+  disconnectMock: vi.fn(),
 }));
 
-const connectInjectedWalletMock = vi.mocked(connectInjectedWallet);
+vi.mock("../../../providers/Network", () => ({
+  useNetwork: (): { network: "local" } => ({
+    network: "local",
+  }),
+}));
+
+vi.mock("../../../services/wallet", () => ({
+  wallet: {
+    connect: connectMock,
+    disconnect: disconnectMock,
+  },
+}));
 
 describe("useConnectWallet", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    connectInjectedWalletMock.mockReset();
+    connectMock.mockReset();
+    disconnectMock.mockReset();
+    disconnectMock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -21,7 +34,7 @@ describe("useConnectWallet", () => {
   });
 
   it("sets the address after a successful connect", async () => {
-    connectInjectedWalletMock.mockResolvedValue("0xabc");
+    connectMock.mockResolvedValue("0xabc");
 
     const { result } = renderHook(() => useConnectWallet());
 
@@ -34,7 +47,7 @@ describe("useConnectWallet", () => {
   });
 
   it("records a wallet Error message and clears it after 4 seconds", async () => {
-    connectInjectedWalletMock.mockRejectedValue(new Error("No Argent or Braavos wallet found"));
+    connectMock.mockRejectedValue(new Error("No wallet selected"));
 
     const { result } = renderHook(() => useConnectWallet());
 
@@ -43,13 +56,13 @@ describe("useConnectWallet", () => {
     });
 
     expect(result.current.address).toBeUndefined();
-    expect(result.current.error).toBe("No Argent or Braavos wallet found");
+    expect(result.current.error).toBe("No wallet selected");
 
     act(() => {
       vi.advanceTimersByTime(3999);
     });
 
-    expect(result.current.error).toBe("No Argent or Braavos wallet found");
+    expect(result.current.error).toBe("No wallet selected");
 
     act(() => {
       vi.advanceTimersByTime(1);
@@ -59,7 +72,7 @@ describe("useConnectWallet", () => {
   });
 
   it("uses Connect failed when the rejection is not an Error", async () => {
-    connectInjectedWalletMock.mockRejectedValue("wallet unavailable");
+    connectMock.mockRejectedValue("wallet unavailable");
 
     const { result } = renderHook(() => useConnectWallet());
 
@@ -68,5 +81,22 @@ describe("useConnectWallet", () => {
     });
 
     expect(result.current.error).toBe("Connect failed");
+  });
+
+  it("clears the connected address on disconnect", async () => {
+    connectMock.mockResolvedValue("0xabc");
+
+    const { result } = renderHook(() => useConnectWallet());
+
+    await act(async () => {
+      await result.current.handleClick();
+    });
+
+    await act(async () => {
+      await result.current.disconnect();
+    });
+
+    expect(result.current.address).toBeUndefined();
+    expect(disconnectMock).toHaveBeenCalledTimes(1);
   });
 });
