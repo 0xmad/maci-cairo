@@ -21,8 +21,7 @@ export interface CreatePollResult {
 
 /** Reported Create Poll sncast steps (preflight, invoke, get_poll). The trailing poll_id call is not reported. */
 export type CreatePollStep =
-  | { kind: "call"; name: "coordinator" | "state_tree_depth" | "next_poll_id" | "get_poll" }
-  | { kind: "invoke"; name: "create_poll" };
+  { kind: "call"; name: "coordinator" | "next_poll_id" | "get_poll" } | { kind: "invoke"; name: "create_poll" };
 
 export interface CreatePollOptions {
   onStep?: (step: CreatePollStep) => void;
@@ -53,19 +52,11 @@ const createPollConfigSchema = strictObject({
   start_date: uintJson,
   end_date: uintJson,
   poll_public_key: tuple([uintJson, uintJson]),
-  state_tree_depth: uintJson,
-  vote_options: uintJson,
-  batch_size: uintJson,
-  empty_live_ballot_root: uintJson,
 }).transform((row) => ({
   maci: row.maci,
   startDate: row.start_date,
   endDate: row.end_date,
   pollPublicKey: row.poll_public_key,
-  stateTreeDepth: row.state_tree_depth,
-  voteOptions: row.vote_options,
-  batchSize: row.batch_size,
-  emptyLiveBallotRoot: row.empty_live_ballot_root,
 }));
 
 /** Parsed `CreatePollArgs` plus MACI address. */
@@ -176,7 +167,7 @@ export function parseCreatePollConfig(text: string): CreatePollConfig {
 function createPollArgumentsExpr(config: CreatePollConfig): string {
   const [keyX, keyY] = config.pollPublicKey;
 
-  return `maci_contracts::PollFactory::CreatePollArgs { start_date: ${config.startDate}, end_date: ${config.endDate}, poll_public_key: (${keyX}, ${keyY}), state_tree_depth: ${config.stateTreeDepth}, vote_options: ${config.voteOptions}, batch_size: ${config.batchSize}, empty_live_ballot_root: ${config.emptyLiveBallotRoot} }`;
+  return `maci_contracts::PollFactory::CreatePollArgs { start_date: ${config.startDate}, end_date: ${config.endDate}, poll_public_key: (${keyX}, ${keyY}) }`;
 }
 
 /** One `label: …` line per {@link CreatePollResult} field, for stdout. */
@@ -187,7 +178,7 @@ export function formatCreatePoll(result: CreatePollResult): string {
 /**
  * Create a Poll as seed-0 `devnet-1`. Does not stand up MACI.
  *
- * @throws If on-chain `coordinator()` is not `devnet-1`, `state_tree_depth` does not match the config, or `get_poll` is still zero after `create_poll`.
+ * @throws If on-chain `coordinator()` is not `devnet-1` or `get_poll` is still zero after `create_poll`.
  */
 export function createPoll(
   ops: CreatePollOps,
@@ -203,15 +194,6 @@ export function createPoll(
 
   if (actualCoordinator !== intended) {
     throw new Error(`coordinator mismatch: intended ${intended}, on-chain ${actualCoordinator}`);
-  }
-
-  const actualDepth = integerFromFelt(
-    ops.field("response", ["call", "--contract-address", config.maci, "--function", "state_tree_depth"]),
-  );
-  onStep?.({ kind: "call", name: "state_tree_depth" });
-
-  if (actualDepth !== config.stateTreeDepth) {
-    throw new Error(`state_tree_depth mismatch: config ${config.stateTreeDepth}, on-chain ${actualDepth}`);
   }
 
   const zero = normalizeHex("0x0");

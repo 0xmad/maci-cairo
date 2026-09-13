@@ -123,8 +123,8 @@ pub trait IMACI<TContractState> {
     /// `PollCreated`.
     ///
     /// Arguments:
-    /// - `args`: Schedule and poll public key. Circuit-profile dimensions on
-    ///   the args are ignored; MACI copies its stored values onto the Poll.
+    /// - `args`: Schedule and poll public key. MACI copies stored Circuit-profile
+    ///   dimensions onto the Poll.
     ///
     /// Returns:
     /// - The deployed Poll contract address.
@@ -438,8 +438,7 @@ pub mod MACI {
         /// The schedule end must be after the start. MACI assigns the next poll
         /// id, injects its own address, copies stored Circuit-profile
         /// dimensions onto the Poll, asks the factory to deploy, records the
-        /// Poll, and emits `PollCreated`. Coordinator-supplied dimension
-        /// fields on `args` are ignored.
+        /// Poll, and emits `PollCreated`.
         ///
         /// Arguments:
         /// - `args`: Schedule and poll public key.

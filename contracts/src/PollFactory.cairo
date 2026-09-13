@@ -10,14 +10,6 @@ pub struct CreatePollArgs {
     pub end_date: u64,
     /// Public key used for encrypting votes in the poll.
     pub poll_public_key: (u256, u256),
-    /// Depth of the state tree. MACI overwrites this from its Circuit profile.
-    pub state_tree_depth: u8,
-    /// Vote-option count. MACI overwrites this from its Circuit profile.
-    pub vote_options: u256,
-    /// Tally batch size. MACI overwrites this from its Circuit profile.
-    pub batch_size: u32,
-    /// Empty live-ballot root. MACI overwrites this from its Circuit profile.
-    pub empty_live_ballot_root: u256,
 }
 
 /// Arguments used to initialize a Poll contract at deploy time.
