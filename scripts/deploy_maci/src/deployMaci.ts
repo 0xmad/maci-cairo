@@ -8,7 +8,7 @@
 import { deployMaci, formatDeployMaci } from "./maci.js";
 import { declareClass, deployUnique, sncastField } from "./sncast.js";
 
-const result = deployMaci(
+const result = await deployMaci(
   { declareClass, deployUnique, field: sncastField },
   { coordinatorOverride: process.env.COORDINATOR_OVERRIDE },
 );

@@ -21,7 +21,7 @@ export const jobSteps = pgTable(
 );
 
 export const maciInstances = pgTable("maci_instances", {
-  id: integer("id").primaryKey(),
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   leanImt: text("lean_imt").notNull(),
   checker: text("checker").notNull(),
   enforcer: text("enforcer").notNull(),
@@ -31,5 +31,8 @@ export const maciInstances = pgTable("maci_instances", {
   maci: text("maci").notNull(),
   pollFactory: text("poll_factory").notNull(),
   coordinator: text("coordinator").notNull(),
+  deployer: text("deployer").notNull(),
   jobId: text("job_id").notNull(),
+  network: text("network").notNull(),
+  createdAtMs: bigint("created_at_ms", { mode: "number" }).notNull(),
 });

@@ -26,6 +26,7 @@ function sncastOk(stdout: string, stderr = ""): void {
 describe("sncast CLI adapter", () => {
   afterEach(() => {
     spawnSyncMock.mockReset();
+    Reflect.deleteProperty(process.env, "STARKNET_RPC_URL");
   });
 
   test("sncastField runs sncast --json --wait on the deploy package profile", () => {
@@ -51,6 +52,90 @@ describe("sncast CLI adapter", () => {
       encoding: "utf8",
       cwd: path.resolve(import.meta.dirname, "../.."),
     });
+  });
+
+  test("throws when sncast is not on PATH", () => {
+    spawnSyncMock.mockReturnValue({
+      pid: 0,
+      output: [null, "", ""],
+      stdout: "",
+      stderr: "",
+      status: null,
+      signal: null,
+      error: Object.assign(new Error("spawnSync sncast ENOENT"), { code: "ENOENT" }),
+    });
+
+    expect(() => {
+      sncastField("class_hash", ["declare"]);
+    }).toThrow(/sncast failed to start: spawnSync sncast ENOENT/u);
+  });
+
+  test("throws when sncast prints nothing", () => {
+    spawnSyncMock.mockReturnValue({
+      pid: 1,
+      output: [null, "", ""],
+      stdout: "",
+      stderr: "",
+      status: 127,
+      signal: null,
+      error: undefined,
+    });
+
+    expect(() => {
+      sncastField("class_hash", ["declare"]);
+    }).toThrow(/sncast produced no output \(exit 127\)/u);
+  });
+
+  test("includes CLI text when sncast prints no JSON", () => {
+    sncastOk("error: unexpected argument '--url' found\n");
+
+    expect(() => {
+      sncastField("class_hash", ["declare"]);
+    }).toThrow(/unexpected argument '--url' found/u);
+  });
+
+  test("rethrows a JSON parse error that is not missing JSON", () => {
+    sncastOk('{"command":"declare","type":"response"}');
+
+    expect(() => {
+      sncastField("class_hash", ["declare"]);
+    }).toThrow(/missing JSON field class_hash/u);
+  });
+
+  test("passes STARKNET_RPC_URL as sncast --url", () => {
+    process.env.STARKNET_RPC_URL = "http://devnet:5050/";
+    sncastOk('{"class_hash":"0xabc","command":"declare","type":"response"}');
+
+    expect(sncastField("class_hash", ["declare"])).toBe("0xabc");
+
+    expect(spawnSyncMock.mock.calls[0]?.[1]).toEqual([
+      "--json",
+      "--wait",
+      "--wait-timeout",
+      "300",
+      "--profile",
+      "devnet",
+      "declare",
+      "--url",
+      "http://devnet:5050/",
+    ]);
+  });
+
+  test("passes STARKNET_RPC_URL as --url when the subcommand is omitted", () => {
+    process.env.STARKNET_RPC_URL = "http://devnet:5050/";
+    sncastOk('{"class_hash":"0xabc","command":"declare","type":"response"}');
+
+    expect(sncastField("class_hash", [])).toBe("0xabc");
+    expect(spawnSyncMock.mock.calls[0]?.[1]).toEqual([
+      "--json",
+      "--wait",
+      "--wait-timeout",
+      "300",
+      "--profile",
+      "devnet",
+      "--url",
+      "http://devnet:5050/",
+    ]);
   });
 
   test("parses JSON from stderr when stdout is empty", () => {

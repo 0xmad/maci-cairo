@@ -6,11 +6,16 @@ import { fileURLToPath } from "node:url";
 
 const tongoStub = fileURLToPath(new URL("./src/stubs/tongo.ts", import.meta.url));
 
-const starknetRpcProxy = {
+const devProxies = {
   "/starknet-rpc": {
     target: "http://127.0.0.1:5050",
     changeOrigin: true,
     rewrite: (path: string): string => path.replace(/^\/starknet-rpc/u, "") || "/",
+  },
+  "/ops": {
+    target: "http://127.0.0.1:8787",
+    changeOrigin: true,
+    rewrite: (path: string): string => path.replace(/^\/ops/u, "") || "/",
   },
 };
 
@@ -22,10 +27,10 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: starknetRpcProxy,
+    proxy: devProxies,
   },
   preview: {
-    proxy: starknetRpcProxy,
+    proxy: devProxies,
   },
   test: {
     environment: "jsdom",

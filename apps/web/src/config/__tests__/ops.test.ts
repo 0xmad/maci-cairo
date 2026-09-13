@@ -13,7 +13,28 @@ describe("opsBaseUrl", () => {
     expect(opsBaseUrl()).toBe("http://ops.test");
   });
 
-  it("returns the local default when unset", () => {
+  it("proxies loopback ops through Vite in development", () => {
+    vi.stubEnv("DEV", true);
+    const env = import.meta.env as { VITE_BACKEND_OPS_URL?: string };
+
+    delete env.VITE_BACKEND_OPS_URL;
+
+    expect(opsBaseUrl()).toBe(`${window.location.origin}/ops`);
+
+    vi.stubEnv("VITE_BACKEND_OPS_URL", "http://127.0.0.1:8787");
+
+    expect(opsBaseUrl()).toBe(`${window.location.origin}/ops`);
+  });
+
+  it("keeps a configured ops URL that is not a valid loopback URL", () => {
+    vi.stubEnv("DEV", true);
+    vi.stubEnv("VITE_BACKEND_OPS_URL", "http://[");
+
+    expect(opsBaseUrl()).toBe("http://[");
+  });
+
+  it("returns the local default when unset outside development", () => {
+    vi.stubEnv("DEV", false);
     const env = import.meta.env as { VITE_BACKEND_OPS_URL?: string };
 
     delete env.VITE_BACKEND_OPS_URL;

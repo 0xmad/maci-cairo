@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OpsClient } from "../../../services/ops";
 import { operatorNonceMessage } from "../../../services/ops/nonceMessage";
+import { useOperatorSession } from "../../../stores/operatorSession";
 import { useOperatorLogin } from "../useOperatorLogin";
 
 const { signMock, storeJwtMock, readStoredJwtMock, clearStoredJwtMock, issueNonceMock, loginMock, readSessionMock } =
@@ -69,6 +70,7 @@ describe("useOperatorLogin", () => {
     readSessionMock.mockReset();
     signMock.mockReset();
     readStoredJwtMock.mockReturnValue(undefined);
+    useOperatorSession.setState({ token: undefined });
     signMock.mockResolvedValue(["0x1", "0x2"]);
     issueNonceMock.mockResolvedValue("nonce-1");
     loginMock.mockResolvedValue({
@@ -88,6 +90,7 @@ describe("useOperatorLogin", () => {
 
   it("restores the Operator from a stored JWT", async () => {
     readStoredJwtMock.mockReturnValue("stored-jwt");
+    useOperatorSession.setState({ token: "stored-jwt" });
     readSessionMock.mockResolvedValue("0xoperator");
 
     const { result } = renderHook(() => useOperatorLogin());
@@ -101,6 +104,7 @@ describe("useOperatorLogin", () => {
 
   it("is restoring while a stored JWT session is read", () => {
     readStoredJwtMock.mockReturnValue("stored-jwt");
+    useOperatorSession.setState({ token: "stored-jwt" });
     readSessionMock.mockImplementation(
       (): Promise<string> =>
         new Promise(() => {
@@ -122,6 +126,7 @@ describe("useOperatorLogin", () => {
 
   it("clears a stored JWT when session restore fails", async () => {
     readStoredJwtMock.mockReturnValue("stored-jwt");
+    useOperatorSession.setState({ token: "stored-jwt" });
     readSessionMock.mockRejectedValue(new Error("expired"));
 
     const { result } = renderHook(() => useOperatorLogin());
@@ -136,6 +141,7 @@ describe("useOperatorLogin", () => {
     let resolveSession: (address: string) => void = (): void => undefined;
 
     readStoredJwtMock.mockReturnValue("stored-jwt");
+    useOperatorSession.setState({ token: "stored-jwt" });
     readSessionMock.mockImplementation(
       (): Promise<string> =>
         new Promise((resolve) => {

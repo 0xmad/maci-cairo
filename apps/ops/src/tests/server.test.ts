@@ -16,7 +16,6 @@ function standupService(): StandupService {
   return {
     startStandUp: vi.fn(),
     currentJob: vi.fn(),
-    currentMaci: vi.fn(),
     subscribe: vi.fn(),
   } as unknown as StandupService;
 }

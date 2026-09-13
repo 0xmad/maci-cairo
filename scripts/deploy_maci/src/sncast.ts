@@ -10,6 +10,24 @@ import { parseSncastField } from "./sncastJson.js";
 
 const PACKAGE_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
+const SNCAST_GLOBALS = ["--json", "--wait", "--wait-timeout", "300", "--profile", "devnet"] as const;
+
+function sncastArgv(args: string[]): string[] {
+  const rpcUrl = process.env.STARKNET_RPC_URL;
+
+  if (rpcUrl === undefined || rpcUrl.length === 0) {
+    return [...SNCAST_GLOBALS, ...args];
+  }
+
+  if (args.length === 0) {
+    return [...SNCAST_GLOBALS, "--url", rpcUrl];
+  }
+
+  const [command, ...rest] = args;
+
+  return [...SNCAST_GLOBALS, command, "--url", rpcUrl, ...rest];
+}
+
 /**
  * Run sncast and return one field from the last JSON response or error.
  *
@@ -19,14 +37,31 @@ const PACKAGE_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
  * @param args - Subcommand tokens after the global flags.
  */
 export function sncastField(key: string, args: string[]): string {
-  const result = spawnSync("sncast", ["--json", "--wait", "--wait-timeout", "300", "--profile", "devnet", ...args], {
+  const result = spawnSync("sncast", sncastArgv(args), {
     cwd: PACKAGE_DIR,
     encoding: "utf8",
     env: process.env,
   });
 
+  if (result.error !== undefined) {
+    throw new Error(`sncast failed to start: ${result.error.message}`);
+  }
+
   const raw = `${result.stdout}${result.stderr}`;
-  return parseSncastField(raw, key);
+
+  if (raw.trim().length === 0) {
+    throw new Error(`sncast produced no output (exit ${String(result.status)})`);
+  }
+
+  try {
+    return parseSncastField(raw, key);
+  } catch (caught) {
+    if (caught instanceof Error && caught.message === "sncast output had no JSON object") {
+      throw new Error(`${caught.message}: ${raw.trim().slice(0, 500)}`);
+    }
+
+    throw caught;
+  }
 }
 
 /**

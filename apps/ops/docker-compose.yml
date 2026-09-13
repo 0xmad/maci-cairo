@@ -13,6 +13,11 @@ services:
       timeout: 5s
       retries: 10
 
+  devnet:
+    image: shardlabs/starknet-devnet-rs:0.9.0-seed0
+    ports:
+      - "5050:5050"
+
   ops:
     profiles: ["app"]
     build:
@@ -22,11 +27,11 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       PORT: "8787"
-      STARKNET_RPC_URL: http://host.docker.internal:5050
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      STARKNET_RPC_URL: http://devnet:5050
     ports:
       - "${PORT:-8787}:8787"
     depends_on:
       postgres:
         condition: service_healthy
+      devnet:
+        condition: service_started

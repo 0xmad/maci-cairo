@@ -11,6 +11,8 @@ const { disconnectMock, switchChainMock } = vi.hoisted(() => ({
 
 vi.mock("../../../services/localStorage", () => ({
   storage: {
+    readStoredJwt: (): undefined => undefined,
+    storeJwt: vi.fn(),
     clearStoredJwt: vi.fn(),
   },
 }));
@@ -50,7 +52,7 @@ describe("NetworkSwitcher", () => {
 
     expect(select.value).toBe("local");
     expect(select.title).toBe(`${window.location.origin}/starknet-rpc`);
-    expect(screen.getByRole("option", { name: "Local" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Starknet Local" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "Sepolia" })).toHaveProperty("disabled", true);
   });
 

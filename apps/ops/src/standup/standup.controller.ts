@@ -4,19 +4,22 @@ import {
   Controller,
   Get,
   Inject,
+  NotFoundException,
   Post,
   Req,
   Sse,
   UnauthorizedException,
 } from "@nestjs/common";
 import { type FastifyRequest } from "fastify";
+import { type DeployMaciResult } from "maci-deploy/maci";
 import { Observable } from "rxjs";
 
 import { LOGIN_SERVICE } from "../login/login.controller.js";
 import { type LoginService } from "../login/services/login.service.js";
 import { readBearer } from "../login/utils/bearer.js";
+import { type Paginated, readPagination } from "../utils/pagination.js";
 
-import { type CurrentMaci, type JobSnapshot } from "./repositories/job.store.js";
+import { type JobSnapshot, type MaciListItem } from "./repositories/job.store.js";
 import { type JobEvent, StandupService } from "./standup.service.js";
 
 export const STANDUP_SERVICE = "STANDUP_SERVICE";
@@ -43,11 +46,32 @@ export class StandupController {
     }
   }
 
-  @Get("maci")
-  async readCurrentMaci(@Req() request: FastifyRequest): Promise<{ maci: CurrentMaci | null }> {
+  @Get("macis")
+  async listMacis(@Req() request: FastifyRequest): Promise<Paginated<MaciListItem>> {
     await this.requireOperator(request);
 
-    return { maci: (await this.standupService.currentMaci()) ?? null };
+    const pagination = readPagination(request.query);
+
+    return { ...(await this.standupService.listMacis(pagination)), ...pagination };
+  }
+
+  @Get("macis/:address")
+  async readMaci(@Req() request: FastifyRequest): Promise<DeployMaciResult> {
+    await this.requireOperator(request);
+
+    const { address } = request.params as { address?: string };
+
+    if (address === undefined || address.length === 0) {
+      throw new BadRequestException({ error: "maci address required" });
+    }
+
+    const maci = await this.standupService.readMaci(address);
+
+    if (maci === undefined) {
+      throw new NotFoundException({ error: "maci not found" });
+    }
+
+    return maci;
   }
 
   @Get("job")

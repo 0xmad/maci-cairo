@@ -28,6 +28,9 @@ export interface SncastOps {
   field: (key: string, args: string[]) => string;
 }
 
+/** Starknet network this MACI was stood up on. */
+export type MaciNetwork = "starknet_local" | "sepolia";
+
 /** Addresses and class hashes printed after a successful MACI deploy. */
 export interface DeployMaciResult {
   leanImt: string;
@@ -39,18 +42,22 @@ export interface DeployMaciResult {
   maci: string;
   pollFactory: string;
   coordinator: string;
+  deployer: string;
+  network: MaciNetwork;
 }
 
 export interface DeployMaciOptions {
   /** Hex coordinator; empty or omitted uses seed-0 `devnet-1`. */
   coordinatorOverride?: string;
+  /** Defaults to `local` (sncast `devnet` profile). */
+  network?: MaciNetwork;
   /**
    * Partial stand-up already on-chain. Matching `deployUnique` and declare
    * steps are skipped; a missing class hash is declared again.
    */
   checkpoint?: DeployMaciCheckpoint;
-  /** Optional reporter for each sncast step. */
-  onStep?: (step: DeployMaciStep) => void;
+  /** Optional reporter for each sncast step. Awaited before the next step. */
+  onStep?: (step: DeployMaciStep) => void | Promise<void>;
 }
 
 /** Instance addresses and class hashes that may already exist from a partial MACI stand-up. */
@@ -82,45 +89,51 @@ export type DeployMaciStep =
   | { kind: "invoke"; name: "set_target" }
   | { kind: "call"; name: "coordinator" | "get_poll_factory" };
 
+type DeployMaciInstanceName = Extract<DeployMaciStep, { kind: "deploy" }>["name"];
+
+interface DeclareOrReuseArgs {
+  ops: SncastOps;
+  existing: string | undefined;
+  contractName: DeployMaciDeclareName;
+  onStep: DeployMaciOptions["onStep"];
+}
+
+interface DeployOrReuseArgs {
+  ops: SncastOps;
+  existing: string | undefined;
+  classHash: string;
+  argumentsExpr: string | undefined;
+  onStep: DeployMaciOptions["onStep"];
+  name: DeployMaciInstanceName;
+}
+
 function hasValue(value: string | undefined): value is string {
   return value !== undefined && value.length > 0;
 }
 
-function declareOrReuse(
-  ops: SncastOps,
-  existing: string | undefined,
-  contractName: DeployMaciDeclareName,
-  onStep: DeployMaciOptions["onStep"],
-): string {
-  if (hasValue(existing)) {
-    return existing;
+async function declareOrReuse(args: DeclareOrReuseArgs): Promise<string> {
+  if (hasValue(args.existing)) {
+    return args.existing;
   }
 
-  const classHash = ops.declareClass(contractName);
-  onStep?.({ kind: "declare", name: contractName });
+  const classHash = args.ops.declareClass(args.contractName);
+  await args.onStep?.({ kind: "declare", name: args.contractName });
 
   return classHash;
 }
 
-function deployOrReuse(
-  ops: SncastOps,
-  existing: string | undefined,
-  classHash: string,
-  argumentsExpr: string | undefined,
-  onStep: DeployMaciOptions["onStep"],
-  name: "leanImt" | "checker" | "enforcer" | "assigner" | "maci",
-): string {
-  if (hasValue(existing)) {
-    return existing;
+async function deployOrReuse(args: DeployOrReuseArgs): Promise<string> {
+  if (hasValue(args.existing)) {
+    return args.existing;
   }
 
-  const address = ops.deployUnique(classHash, argumentsExpr);
-  onStep?.({ kind: "deploy", name });
+  const address = args.ops.deployUnique(args.classHash, args.argumentsExpr);
+  await args.onStep?.({ kind: "deploy", name: args.name });
 
   return address;
 }
 
-/** One `label: 0x…` line per {@link DeployMaciResult} field, for stdout. */
+/** Labeled stdout record for a successful MACI deploy. */
 export function formatDeployMaci(result: DeployMaciResult): string {
   return [
     `lean_imt: ${result.leanImt}`,
@@ -132,6 +145,8 @@ export function formatDeployMaci(result: DeployMaciResult): string {
     `maci: ${result.maci}`,
     `poll_factory: ${result.pollFactory}`,
     `coordinator: ${result.coordinator}`,
+    `deployer: ${result.deployer}`,
+    `network: ${result.network}`,
   ].join("\n");
 }
 
@@ -143,36 +158,74 @@ export function formatDeployMaci(result: DeployMaciResult): string {
  *
  * @throws If on-chain `coordinator()` does not match the intended coordinator.
  */
-export function deployMaci(ops: SncastOps, options: DeployMaciOptions = {}): DeployMaciResult {
-  const { onStep, checkpoint = {}, coordinatorOverride } = options;
+export async function deployMaci(ops: SncastOps, options: DeployMaciOptions = {}): Promise<DeployMaciResult> {
+  const { onStep, checkpoint = {}, coordinatorOverride, network = "starknet_local" } = options;
   const coordinator = intendedCoordinator(coordinatorOverride);
   const deployer = normalizeHex(DEVNET_SEED0_DEVNET_1);
 
-  const leanImtClass = declareOrReuse(ops, undefined, "LeanIMT", onStep);
-  const leanImt = deployOrReuse(ops, checkpoint.leanImt, leanImtClass, undefined, onStep, "leanImt");
-
-  const checkerClass = declareOrReuse(ops, undefined, "FreeForAllChecker", onStep);
-  const checker = deployOrReuse(ops, checkpoint.checker, checkerClass, undefined, onStep, "checker");
-
-  const enforcerClass = declareOrReuse(ops, undefined, "FreeForAllEnforcer", onStep);
-  const enforcer = deployOrReuse(
+  const leanImtClass = await declareOrReuse({ ops, existing: undefined, contractName: "LeanIMT", onStep });
+  const leanImt = await deployOrReuse({
     ops,
-    checkpoint.enforcer,
-    enforcerClass,
-    `${checker}, ${deployer}`,
+    existing: checkpoint.leanImt,
+    classHash: leanImtClass,
+    argumentsExpr: undefined,
     onStep,
-    "enforcer",
-  );
+    name: "leanImt",
+  });
 
-  const assignerClass = declareOrReuse(ops, undefined, "ConstantInitialVoteBalance", onStep);
-  const assigner = deployOrReuse(ops, checkpoint.assigner, assignerClass, String(VOTE_BALANCE), onStep, "assigner");
+  const checkerClass = await declareOrReuse({ ops, existing: undefined, contractName: "FreeForAllChecker", onStep });
+  const checker = await deployOrReuse({
+    ops,
+    existing: checkpoint.checker,
+    classHash: checkerClass,
+    argumentsExpr: undefined,
+    onStep,
+    name: "checker",
+  });
 
-  const pollClass = declareOrReuse(ops, checkpoint.pollClassHash, "Poll", onStep);
-  const pollFactoryClass = declareOrReuse(ops, checkpoint.pollFactoryClassHash, "PollFactory", onStep);
-  const maciClass = declareOrReuse(ops, checkpoint.maciClassHash, "MACI", onStep);
+  const enforcerClass = await declareOrReuse({ ops, existing: undefined, contractName: "FreeForAllEnforcer", onStep });
+  const enforcer = await deployOrReuse({
+    ops,
+    existing: checkpoint.enforcer,
+    classHash: enforcerClass,
+    argumentsExpr: `${checker}, ${deployer}`,
+    onStep,
+    name: "enforcer",
+  });
+
+  const assignerClass = await declareOrReuse({
+    ops,
+    existing: undefined,
+    contractName: "ConstantInitialVoteBalance",
+    onStep,
+  });
+  const assigner = await deployOrReuse({
+    ops,
+    existing: checkpoint.assigner,
+    classHash: assignerClass,
+    argumentsExpr: String(VOTE_BALANCE),
+    onStep,
+    name: "assigner",
+  });
+
+  const pollClass = await declareOrReuse({ ops, existing: checkpoint.pollClassHash, contractName: "Poll", onStep });
+  const pollFactoryClass = await declareOrReuse({
+    ops,
+    existing: checkpoint.pollFactoryClassHash,
+    contractName: "PollFactory",
+    onStep,
+  });
+  const maciClass = await declareOrReuse({ ops, existing: checkpoint.maciClassHash, contractName: "MACI", onStep });
 
   const maciArgs = `maci_contracts::MACI::ConstructorParams { state_tree_depth: ${STATE_TREE_DEPTH}, state_tree_address: ${leanImt}, empty_ballot_roots: (${EMPTY_BALLOT_ROOTS.join(", ")}), enforcer: ${enforcer}, vote_balance_assigner: ${assigner}, coordinator: ${coordinator}, poll_factory_class_hash: ${pollFactoryClass}, poll_class_hash: ${pollClass} }`;
-  const maci = deployOrReuse(ops, checkpoint.maci, maciClass, maciArgs, onStep, "maci");
+  const maci = await deployOrReuse({
+    ops,
+    existing: checkpoint.maci,
+    classHash: maciClass,
+    argumentsExpr: maciArgs,
+    onStep,
+    name: "maci",
+  });
 
   ops.field("transaction_hash", [
     "invoke",
@@ -183,12 +236,12 @@ export function deployMaci(ops: SncastOps, options: DeployMaciOptions = {}): Dep
     "--arguments",
     maci,
   ]);
-  onStep?.({ kind: "invoke", name: "set_target" });
+  await onStep?.({ kind: "invoke", name: "set_target" });
 
   const actualCoordinator = normalizeHex(
     ops.field("response", ["call", "--contract-address", maci, "--function", "coordinator"]),
   );
-  onStep?.({ kind: "call", name: "coordinator" });
+  await onStep?.({ kind: "call", name: "coordinator" });
 
   if (actualCoordinator !== coordinator) {
     throw new Error(`coordinator mismatch: intended ${coordinator}, on-chain ${actualCoordinator}`);
@@ -197,7 +250,7 @@ export function deployMaci(ops: SncastOps, options: DeployMaciOptions = {}): Dep
   const pollFactory = normalizeHex(
     ops.field("response", ["call", "--contract-address", maci, "--function", "get_poll_factory"]),
   );
-  onStep?.({ kind: "call", name: "get_poll_factory" });
+  await onStep?.({ kind: "call", name: "get_poll_factory" });
 
   return {
     leanImt,
@@ -209,5 +262,7 @@ export function deployMaci(ops: SncastOps, options: DeployMaciOptions = {}): Dep
     maci,
     pollFactory,
     coordinator: actualCoordinator,
+    deployer,
+    network,
   };
 }

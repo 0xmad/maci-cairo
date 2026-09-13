@@ -12,8 +12,8 @@ import {
 import type { StarkZap } from "starkzap";
 
 import { chainIdFor, createSdk, defaultNetwork, type AppNetwork } from "../../config/network";
-import { storage } from "../../services/localStorage";
 import { wallet } from "../../services/wallet";
+import { useOperatorSession } from "../../stores/operatorSession";
 
 interface NetworkStore {
   network: AppNetwork;
@@ -55,7 +55,7 @@ export function useNetwork(): NetworkContextValue {
       /* wallet refused or the chain is unlisted */
     }
 
-    storage.clearStoredJwt();
+    useOperatorSession.getState().clearToken();
     await wallet.disconnect().catch(() => undefined);
     value.setNetwork(next);
   };

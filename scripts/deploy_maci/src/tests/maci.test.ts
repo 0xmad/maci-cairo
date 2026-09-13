@@ -62,9 +62,9 @@ function recordingOps(options: { coordinatorOnChain?: string } = {}): SncastOps 
 }
 
 describe("deployMaci", () => {
-  test("declares and deploys in MACI deploy order", () => {
+  test("declares and deploys in MACI deploy order", async () => {
     const ops = recordingOps();
-    const result = deployMaci(ops);
+    const result = await deployMaci(ops);
 
     expect(ops.declares).toEqual([
       "LeanIMT",
@@ -98,23 +98,25 @@ describe("deployMaci", () => {
     });
     expect(ops.fields[1]?.args).toEqual(["call", "--contract-address", result.maci, "--function", "coordinator"]);
     expect(ops.fields[2]?.args).toEqual(["call", "--contract-address", result.maci, "--function", "get_poll_factory"]);
+    expect(result.network).toBe("starknet_local");
+    expect(result.deployer).toBe(normalizeHex(DEVNET_SEED0_DEVNET_1));
   });
 
-  test("uses COORDINATOR_OVERRIDE in MACI constructor calldata", () => {
+  test("uses COORDINATOR_OVERRIDE in MACI constructor calldata", async () => {
     const ops = recordingOps({
       coordinatorOnChain: intendedCoordinator("0x1"),
     });
-    const result = deployMaci(ops, { coordinatorOverride: "0x1" });
+    const result = await deployMaci(ops, { coordinatorOverride: "0x1" });
 
     expect(ops.deploys[4]?.argumentsExpr).toContain(`coordinator: ${intendedCoordinator("0x1")}`);
     expect(result.coordinator).toBe(intendedCoordinator("0x1"));
   });
 
-  test("reports each declare, deploy, invoke, and check when onStep is set", () => {
+  test("reports each declare, deploy, invoke, and check when onStep is set", async () => {
     const ops = recordingOps();
     const steps: DeployMaciStep[] = [];
 
-    deployMaci(ops, {
+    await deployMaci(ops, {
       onStep: (step) => {
         steps.push(step);
       },
@@ -139,7 +141,7 @@ describe("deployMaci", () => {
     ]);
   });
 
-  test("skips deployUnique for checkpointed instance addresses and still declares", () => {
+  test("skips deployUnique for checkpointed instance addresses and still declares", async () => {
     const ops = recordingOps();
     const checkpoint = {
       leanImt: "0xaaa",
@@ -149,7 +151,7 @@ describe("deployMaci", () => {
       maci: "0xeee",
     };
 
-    const result = deployMaci(ops, { checkpoint });
+    const result = await deployMaci(ops, { checkpoint });
 
     expect(ops.declares).toEqual([
       "LeanIMT",
@@ -177,18 +179,18 @@ describe("deployMaci", () => {
     ]);
   });
 
-  test("redeploys instances that are not in the checkpoint", () => {
+  test("redeploys instances that are not in the checkpoint", async () => {
     const ops = recordingOps();
-    const result = deployMaci(ops, { checkpoint: { leanImt: "0xaaa" } });
+    const result = await deployMaci(ops, { checkpoint: { leanImt: "0xaaa" } });
 
     expect(ops.deploys).toHaveLength(4);
     expect(result.leanImt).toBe("0xaaa");
     expect(result.checker).not.toBe("0xaaa");
   });
 
-  test("skips declare when the checkpoint already has that class hash", () => {
+  test("skips declare when the checkpoint already has that class hash", async () => {
     const ops = recordingOps();
-    const result = deployMaci(ops, {
+    const result = await deployMaci(ops, {
       checkpoint: {
         pollClassHash: "0x5",
         pollFactoryClassHash: "0x6",
@@ -203,11 +205,11 @@ describe("deployMaci", () => {
     expect(ops.deploys[4]?.argumentsExpr).toContain("poll_factory_class_hash: 0x6");
   });
 
-  test("does not report skipped declare or deploy steps", () => {
+  test("does not report skipped declare or deploy steps", async () => {
     const ops = recordingOps();
     const steps: DeployMaciStep[] = [];
 
-    deployMaci(ops, {
+    await deployMaci(ops, {
       checkpoint: {
         leanImt: "0xaaa",
         checker: "0xbbb",
@@ -237,40 +239,62 @@ describe("deployMaci", () => {
     ]);
   });
 
-  test("treats an empty checkpoint address as missing and still deploys", () => {
+  test("treats an empty checkpoint address as missing and still deploys", async () => {
     const ops = recordingOps();
-    const result = deployMaci(ops, { checkpoint: { leanImt: "" } });
+    const result = await deployMaci(ops, { checkpoint: { leanImt: "" } });
 
     expect(ops.deploys).toHaveLength(5);
     expect(result.leanImt).not.toBe("");
   });
 
-  test("reports steps completed before a coordinator mismatch", () => {
+  test("reports steps completed before a coordinator mismatch", async () => {
     const ops = recordingOps({ coordinatorOnChain: "0x2" });
     const steps: DeployMaciStep[] = [];
 
-    expect(() => {
+    await expect(
       deployMaci(ops, {
         onStep: (step) => {
           steps.push(step);
         },
-      });
-    }).toThrow(/coordinator mismatch/u);
+      }),
+    ).rejects.toThrow(/coordinator mismatch/u);
 
     expect(steps.at(-1)).toEqual({ kind: "call", name: "coordinator" });
     expect(steps.some((step) => step.kind === "invoke")).toBe(true);
     expect(steps.some((step) => step.kind === "call" && step.name === "get_poll_factory")).toBe(false);
   });
 
-  test("fails when on-chain coordinator does not match", () => {
+  test("fails when on-chain coordinator does not match", async () => {
     const ops = recordingOps({ coordinatorOnChain: "0x2" });
 
-    expect(() => {
-      deployMaci(ops);
-    }).toThrow(/coordinator mismatch/u);
+    await expect(deployMaci(ops)).rejects.toThrow(/coordinator mismatch/u);
   });
 
-  test("formatDeployMaci prints one labeled hex line per MACI address", () => {
+  test("awaits onStep before the next sncast operation", async () => {
+    const ops = recordingOps();
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const running = deployMaci(ops, {
+      onStep: async (step): Promise<void> => {
+        if (step.name === "LeanIMT") {
+          await gate;
+        }
+      },
+    });
+
+    await Promise.resolve();
+    expect(ops.deploys).toHaveLength(0);
+
+    release?.();
+    await running;
+
+    expect(ops.deploys.length).toBeGreaterThan(0);
+  });
+
+  test("formatDeployMaci prints one labeled line per field", () => {
     const result: DeployMaciResult = {
       leanImt: "0x1",
       checker: "0x2",
@@ -281,6 +305,8 @@ describe("deployMaci", () => {
       maci: "0x7",
       pollFactory: "0x8",
       coordinator: "0x9",
+      deployer: "0xa",
+      network: "starknet_local",
     };
 
     expect(formatDeployMaci(result)).toBe(
@@ -294,6 +320,8 @@ describe("deployMaci", () => {
         "maci: 0x7",
         "poll_factory: 0x8",
         "coordinator: 0x9",
+        "deployer: 0xa",
+        "network: starknet_local",
       ].join("\n"),
     );
   });
