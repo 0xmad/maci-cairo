@@ -20,6 +20,12 @@ pub struct ConstructorParams {
     ///
     /// The maximum number of state-tree leaves is `2^state_tree_depth`.
     pub state_tree_depth: u8,
+    /// Vote-option count copied onto every Poll.
+    pub vote_options: u256,
+    /// Tally batch size copied onto every Poll.
+    pub batch_size: u32,
+    /// Empty live-ballot tree root copied onto every Poll.
+    pub empty_live_ballot_root: u256,
     /// Address of the LeanIMT contract used as the MACI state tree.
     pub state_tree_address: ContractAddress,
     /// Precomputed empty ballot tree roots for supported depths.
@@ -45,6 +51,15 @@ pub struct ConstructorParams {
 pub trait IMACI<TContractState> {
     /// Returns the configured state tree depth.
     fn state_tree_depth(self: @TContractState) -> u8;
+
+    /// Returns the vote-option count copied onto every Poll.
+    fn vote_options(self: @TContractState) -> u256;
+
+    /// Returns the tally batch size copied onto every Poll.
+    fn batch_size(self: @TContractState) -> u32;
+
+    /// Returns the empty live-ballot root copied onto every Poll.
+    fn empty_live_ballot_root(self: @TContractState) -> u256;
 
     /// Returns the current root of the MACI state tree.
     fn get_state_tree_root(self: @TContractState) -> u256;
@@ -108,8 +123,8 @@ pub trait IMACI<TContractState> {
     /// `PollCreated`.
     ///
     /// Arguments:
-    /// - `args`: Schedule, poll public key, state-tree depth, vote options,
-    ///   and empty live-ballot root.
+    /// - `args`: Schedule and poll public key. Circuit-profile dimensions on
+    ///   the args are ignored; MACI copies its stored values onto the Poll.
     ///
     /// Returns:
     /// - The deployed Poll contract address.
@@ -159,7 +174,7 @@ pub mod MACI {
     use starknet::{ContractAddress, SyscallResultTrait, get_caller_address, get_contract_address};
     use crate::PollFactory::{
         CreatePollArgs, IPollFactoryDispatcher, IPollFactoryDispatcherTrait, PollConstructorArgs,
-        assert_poll_config,
+        assert_poll_schedule,
     };
     use crate::policies::interfaces::IEnforcer::{IEnforcerDispatcher, IEnforcerDispatcherTrait};
     use crate::trees::LeanIMT::{ILeanIMTDispatcher, ILeanIMTDispatcherTrait};
@@ -177,6 +192,12 @@ pub mod MACI {
         vote_balance_assigner: IVoteBalanceAssignerDispatcher,
         /// Configured depth of the state tree.
         state_tree_depth: u8,
+        /// Vote-option count copied onto every Poll.
+        vote_options: u256,
+        /// Tally batch size copied onto every Poll.
+        batch_size: u32,
+        /// Empty live-ballot tree root copied onto every Poll.
+        empty_live_ballot_root: u256,
         /// Maximum number of leaves that can be stored in the state tree.
         ///
         /// This is calculated as `STATE_TREE_ARITY^state_tree_depth`.
@@ -251,6 +272,9 @@ pub mod MACI {
     /// - Deploys the Poll factory with this MACI as its deployer.
     #[constructor]
     fn constructor(ref self: ContractState, params: ConstructorParams) {
+        assert(params.vote_options != 0, crate::PollFactory::Errors::INVALID_POLL_CONFIG);
+        assert(params.batch_size != 0, crate::PollFactory::Errors::INVALID_POLL_CONFIG);
+
         let arity: u256 = Constants::STATE_TREE_ARITY.into();
         let max_signups: u256 = arity.pow(params.state_tree_depth.into());
         let state_tree = ILeanIMTDispatcher { contract_address: params.state_tree_address };
@@ -265,6 +289,9 @@ pub mod MACI {
         self.vote_balance_assigner.write(vote_balance_assigner);
         self.state_roots_on_signup.push(Constants::PAD_KEY_HASH);
         self.state_tree_depth.write(params.state_tree_depth);
+        self.vote_options.write(params.vote_options);
+        self.batch_size.write(params.batch_size);
+        self.empty_live_ballot_root.write(params.empty_live_ballot_root);
         self.max_signups.write(max_signups);
         self.empty_ballot_roots.write(params.empty_ballot_roots);
         self.state_tree.write(state_tree);
@@ -286,6 +313,18 @@ pub mod MACI {
         /// Returns the configured state tree depth.
         fn state_tree_depth(self: @ContractState) -> u8 {
             self.state_tree_depth.read()
+        }
+
+        fn vote_options(self: @ContractState) -> u256 {
+            self.vote_options.read()
+        }
+
+        fn batch_size(self: @ContractState) -> u32 {
+            self.batch_size.read()
+        }
+
+        fn empty_live_ballot_root(self: @ContractState) -> u256 {
+            self.empty_live_ballot_root.read()
         }
 
         /// Returns the current MACI state tree root.
@@ -396,20 +435,20 @@ pub mod MACI {
 
         /// Creates a Poll. The caller must be the Coordinator.
         ///
-        /// The schedule end must be after the start and vote options must be
-        /// nonzero. MACI assigns the next poll id, injects its own address,
-        /// asks the factory to deploy, records the Poll, and emits
-        /// `PollCreated`.
+        /// The schedule end must be after the start. MACI assigns the next poll
+        /// id, injects its own address, copies stored Circuit-profile
+        /// dimensions onto the Poll, asks the factory to deploy, records the
+        /// Poll, and emits `PollCreated`. Coordinator-supplied dimension
+        /// fields on `args` are ignored.
         ///
         /// Arguments:
-        /// - `args`: Schedule, poll public key, state-tree depth, vote options,
-        ///   tally batch size, and empty live-ballot root.
+        /// - `args`: Schedule and poll public key.
         ///
         /// Returns:
         /// - The deployed Poll contract address.
         fn create_poll(ref self: ContractState, args: CreatePollArgs) -> ContractAddress {
             assert(get_caller_address() == self.coordinator.read(), Errors::NOT_COORDINATOR);
-            assert_poll_config(args.start_date, args.end_date, args.vote_options, args.batch_size);
+            assert_poll_schedule(args.start_date, args.end_date);
 
             let poll_id = self.next_poll_id.read();
             self.next_poll_id.write(poll_id + 1);
@@ -423,11 +462,11 @@ pub mod MACI {
                         end_date: args.end_date,
                         poll_public_key: args.poll_public_key,
                         maci: get_contract_address(),
-                        state_tree_depth: args.state_tree_depth,
-                        vote_options: args.vote_options,
+                        state_tree_depth: self.state_tree_depth.read(),
+                        vote_options: self.vote_options.read(),
                         poll_id,
-                        batch_size: args.batch_size,
-                        empty_live_ballot_root: args.empty_live_ballot_root,
+                        batch_size: self.batch_size.read(),
+                        empty_live_ballot_root: self.empty_live_ballot_root.read(),
                     },
                 );
 

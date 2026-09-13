@@ -13,8 +13,17 @@ use starknet::SyscallResultTrait;
 const FIRST_VOTE_CHAIN_HASH: u256 =
     5404176071187867183128936264657385541614671583170553453444335674304907852880;
 
+fn identity_point() -> Span<u256> {
+    array![0, 1].span()
+}
+
 fn identity_accumulator() -> Span<Span<u256>> {
-    array![array![0, 1].span(), array![0, 1].span()].span()
+    array![identity_point(), identity_point(), identity_point(), identity_point(), identity_point()]
+        .span()
+}
+
+fn padded_accumulator(first: Span<u256>, second: Span<u256>) -> Span<Span<u256>> {
+    array![first, second, identity_point(), identity_point(), identity_point()].span()
 }
 
 fn deploy() -> IPollDispatcher {
@@ -65,10 +74,10 @@ fn test_create_poll_persists_config() {
     assert_eq!(poll.start_date(), args.start_date);
     assert_eq!(poll.end_date(), args.end_date);
     assert_eq!(poll.poll_public_key(), args.poll_public_key);
-    assert_eq!(poll.state_tree_depth(), args.state_tree_depth);
-    assert_eq!(poll.vote_options(), args.vote_options);
-    assert_eq!(poll.batch_size(), args.batch_size);
-    assert_eq!(poll.tally_live_root(), args.empty_live_ballot_root);
+    assert_eq!(poll.state_tree_depth(), 5);
+    assert_eq!(poll.vote_options(), 5);
+    assert_eq!(poll.batch_size(), 4);
+    assert_eq!(poll.tally_live_root(), crate::maci::TEST_EMPTY_LIVE_BALLOT_ROOT);
     assert_eq!(poll.get_chain_hash(), 0);
     assert_eq!(poll.ballot_count(), 0);
     assert_eq!(poll.tally_batches_processed(), 0);
@@ -153,8 +162,10 @@ fn test_full_batch_writes_checkpoint_on_vote() {
     let poll = deploy();
     poll.vote(sample_ballot());
     poll.vote(sample_ballot());
+    poll.vote(sample_ballot());
+    poll.vote(sample_ballot());
 
-    assert_eq!(poll.ballot_count(), 2);
+    assert_eq!(poll.ballot_count(), 4);
     assert_eq!(poll.chain_hash_checkpoint(0), poll.get_chain_hash());
 }
 
@@ -218,8 +229,8 @@ fn test_process_tally_batch_then_finalize() {
     let mut spy = spy_events();
     let poll = deploy();
     let new_live_root: u256 = 0xdef;
-    let new_acc_c1 = array![array![2, 3].span(), array![4, 5].span()].span();
-    let new_acc_c2 = array![array![6, 7].span(), array![8, 9].span()].span();
+    let new_acc_c1 = padded_accumulator(array![2, 3].span(), array![4, 5].span());
+    let new_acc_c2 = padded_accumulator(array![6, 7].span(), array![8, 9].span());
     let totals = array![11_u256, 22].span();
 
     poll.vote(sample_ballot());
@@ -263,10 +274,10 @@ fn test_process_tally_batch_then_finalize() {
 fn test_multiple_checkpoints_and_batches() {
     let mut spy = spy_events();
     let poll = deploy();
-    let first_acc_c1 = array![array![2, 3].span(), array![4, 5].span()].span();
-    let first_acc_c2 = array![array![6, 7].span(), array![8, 9].span()].span();
-    let second_acc_c1 = array![array![10, 11].span(), array![12, 13].span()].span();
-    let second_acc_c2 = array![array![14, 15].span(), array![16, 17].span()].span();
+    let first_acc_c1 = padded_accumulator(array![2, 3].span(), array![4, 5].span());
+    let first_acc_c2 = padded_accumulator(array![6, 7].span(), array![8, 9].span());
+    let second_acc_c1 = padded_accumulator(array![10, 11].span(), array![12, 13].span());
+    let second_acc_c2 = padded_accumulator(array![14, 15].span(), array![16, 17].span());
     let first_live_root: u256 = 0x111;
     let second_live_root: u256 = 0x222;
     let totals = array![3_u256, 4].span();
@@ -275,12 +286,16 @@ fn test_multiple_checkpoints_and_batches() {
     poll.vote(sample_ballot());
     poll.vote(sample_ballot());
     poll.vote(sample_ballot());
+    poll.vote(sample_ballot());
+    poll.vote(sample_ballot());
+    poll.vote(sample_ballot());
+    poll.vote(sample_ballot());
 
     let first_checkpoint = poll.chain_hash_checkpoint(0);
     let second_checkpoint = poll.chain_hash_checkpoint(1);
 
-    assert_eq!(poll.ballot_count(), 4);
-    assert_eq!(poll.batch_size(), 2);
+    assert_eq!(poll.ballot_count(), 8);
+    assert_eq!(poll.batch_size(), 4);
     assert!(first_checkpoint != second_checkpoint);
     assert_eq!(second_checkpoint, poll.get_chain_hash());
 
@@ -407,21 +422,23 @@ fn test_create_poll_rejects_empty_schedule() {
 }
 
 #[test]
-#[should_panic(expected: 'Invalid poll config')]
-fn test_create_poll_rejects_zero_vote_options() {
+fn test_create_poll_ignores_coordinator_zero_vote_options() {
     let (maci, _) = crate::maci::deploy();
     let mut args = crate::maci::default_create_poll_args();
     args.vote_options = 0;
     start_cheat_caller_address(maci.contract_address, crate::maci::coordinator());
-    maci.create_poll(args);
+    let poll = IPollDispatcher { contract_address: maci.create_poll(args) };
+    stop_cheat_caller_address(maci.contract_address);
+    assert_eq!(poll.vote_options(), 5);
 }
 
 #[test]
-#[should_panic(expected: 'Invalid poll config')]
-fn test_create_poll_rejects_zero_batch_size() {
+fn test_create_poll_ignores_coordinator_zero_batch_size() {
     let (maci, _) = crate::maci::deploy();
     let mut args = crate::maci::default_create_poll_args();
     args.batch_size = 0;
     start_cheat_caller_address(maci.contract_address, crate::maci::coordinator());
-    maci.create_poll(args);
+    let poll = IPollDispatcher { contract_address: maci.create_poll(args) };
+    stop_cheat_caller_address(maci.contract_address);
+    assert_eq!(poll.batch_size(), 4);
 }

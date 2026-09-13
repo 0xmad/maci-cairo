@@ -3,6 +3,7 @@ use maci_common::crypto::BabyJubJub::BabyJubJub;
 use maci_contracts::MACI::{
     Constants, ConstructorParams, IMACIDispatcher, IMACIDispatcherTrait, MACI, PublicKey,
 };
+use maci_contracts::Poll::{IPollDispatcher, IPollDispatcherTrait};
 use maci_contracts::PollFactory::CreatePollArgs;
 use maci_contracts::policies::interfaces::IEnforcer::{
     IEnforcerDispatcher, IEnforcerDispatcherTrait,
@@ -22,6 +23,9 @@ const TEST_EMPTY_BALLOT_ROOTS: (u256, u256, u256, u256, u256) = (
     4904828619307091008204672239231377290495002626534171783829482835985709082773,
     18694062287284245784028624966421731916526814537891066525886866373016385890569,
 );
+
+pub const TEST_EMPTY_LIVE_BALLOT_ROOT: u256 =
+    13014191666213395169542407912453925109537961341471919263423658514128524472753;
 
 
 #[starknet::contract]
@@ -93,7 +97,10 @@ pub fn default_create_poll_args() -> CreatePollArgs {
 }
 
 fn deploy_maci(
-    vote_balance_assigner: ContractAddress, state_tree_depth: u8,
+    vote_balance_assigner: ContractAddress,
+    state_tree_depth: u8,
+    vote_options: u256,
+    batch_size: u32,
 ) -> (IMACIDispatcher, ILeanIMTDispatcher) {
     let maci_contract = declare("MACI").unwrap_syscall().contract_class();
     let imt_contract = declare("LeanIMT").unwrap_syscall().contract_class();
@@ -109,6 +116,9 @@ fn deploy_maci(
 
     let params = ConstructorParams {
         state_tree_depth,
+        vote_options,
+        batch_size,
+        empty_live_ballot_root: TEST_EMPTY_LIVE_BALLOT_ROOT,
         state_tree_address,
         empty_ballot_roots: TEST_EMPTY_BALLOT_ROOTS,
         enforcer: enforcer_address,
@@ -133,7 +143,7 @@ fn deploy_maci(
 
 pub fn deploy() -> (IMACIDispatcher, ILeanIMTDispatcher) {
     let assigner = deploy_constant_vote_balance_assigner();
-    deploy_maci(assigner, 5)
+    deploy_maci(assigner, 5, 5, 4)
 }
 
 #[test]
@@ -142,6 +152,9 @@ fn test_constructor() {
 
     assert_eq!(maci.total_signups(), 0);
     assert_eq!(maci.state_tree_depth(), 5);
+    assert_eq!(maci.vote_options(), 5);
+    assert_eq!(maci.batch_size(), 4);
+    assert_eq!(maci.empty_live_ballot_root(), TEST_EMPTY_LIVE_BALLOT_ROOT);
     assert_eq!(maci.get_state_tree_root(), Constants::PAD_KEY_HASH);
     assert_eq!(maci.get_state_tree_root_indexed_signup(0), Constants::PAD_KEY_HASH);
     assert_eq!(maci.get_state_index(Constants::PAD_KEY_HASH), 0);
@@ -151,10 +164,24 @@ fn test_constructor() {
 }
 
 #[test]
+#[should_panic(expected: 'Invalid poll config')]
+fn test_constructor_rejects_zero_vote_options() {
+    let assigner = deploy_constant_vote_balance_assigner();
+    deploy_maci(assigner, 5, 0, 4);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid poll config')]
+fn test_constructor_rejects_zero_batch_size() {
+    let assigner = deploy_constant_vote_balance_assigner();
+    deploy_maci(assigner, 5, 5, 0);
+}
+
+#[test]
 #[should_panic(expected: 'Too many signups')]
 fn test_signup_too_many_signups() {
     let assigner = deploy_constant_vote_balance_assigner();
-    let (maci, _) = deploy_maci(assigner, 2);
+    let (maci, _) = deploy_maci(assigner, 2, 5, 4);
 
     for private_key in 1_u32..5_u32 {
         let value: felt252 = private_key.into();
@@ -275,7 +302,7 @@ fn test_signup_leaf_binds_public_key_and_vote_balance() {
 fn test_signup_rejects_zero_vote_balance() {
     let stub = declare("ZeroVoteBalanceAssigner").unwrap_syscall().contract_class();
     let (assigner, _) = stub.deploy(@array![]).unwrap_syscall();
-    let (maci, _) = deploy_maci(assigner, 5);
+    let (maci, _) = deploy_maci(assigner, 5, 5, 4);
     maci.sign_up(generate_public_key(9000), "");
 }
 
@@ -284,7 +311,7 @@ fn test_signup_rejects_zero_vote_balance() {
 fn test_signup_rejects_vote_balance_too_large() {
     let stub = declare("OversizedVoteBalanceAssigner").unwrap_syscall().contract_class();
     let (assigner, _) = stub.deploy(@array![]).unwrap_syscall();
-    let (maci, _) = deploy_maci(assigner, 5);
+    let (maci, _) = deploy_maci(assigner, 5, 5, 4);
     maci.sign_up(generate_public_key(9000), "");
 }
 
@@ -327,6 +354,41 @@ fn test_create_poll_assigns_sequential_ids() {
     assert_eq!(maci.get_poll(0), poll0);
     assert_eq!(maci.get_poll(1), poll1);
     assert_eq!(maci.next_poll_id(), 2);
+}
+
+#[test]
+fn test_create_poll_copies_maci_dimensions() {
+    let (maci, _) = deploy();
+    let mut args = default_create_poll_args();
+    args.vote_options = 2;
+
+    start_cheat_caller_address(maci.contract_address, coordinator());
+    let poll_address = maci.create_poll(args);
+    stop_cheat_caller_address(maci.contract_address);
+
+    let poll = IPollDispatcher { contract_address: poll_address };
+    assert_eq!(poll.state_tree_depth(), 5);
+    assert_eq!(poll.vote_options(), 5);
+    assert_eq!(poll.batch_size(), 4);
+    assert_eq!(poll.tally_live_root(), TEST_EMPTY_LIVE_BALLOT_ROOT);
+}
+
+#[test]
+fn test_second_poll_copies_the_same_dimensions() {
+    let (maci, _) = deploy();
+    let args = default_create_poll_args();
+
+    start_cheat_caller_address(maci.contract_address, coordinator());
+    let first = IPollDispatcher { contract_address: maci.create_poll(args) };
+    let second = IPollDispatcher { contract_address: maci.create_poll(args) };
+    stop_cheat_caller_address(maci.contract_address);
+
+    assert_eq!(first.vote_options(), second.vote_options());
+    assert_eq!(first.batch_size(), second.batch_size());
+    assert_eq!(first.state_tree_depth(), second.state_tree_depth());
+    assert_eq!(first.tally_live_root(), second.tally_live_root());
+    assert_eq!(first.vote_options(), 5);
+    assert_eq!(first.batch_size(), 4);
 }
 
 #[test]

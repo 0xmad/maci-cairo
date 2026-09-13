@@ -1,3 +1,4 @@
+import { SMALL_STANDUP_INTENT } from "maci-deploy/intent";
 import { deployMaci, type DeployMaciResult, type DeployMaciStep, type SncastOps } from "maci-deploy/maci";
 
 import { type Page, type Pagination } from "../utils/pagination.js";
@@ -104,7 +105,7 @@ export class StandupService {
     let seq = 0;
 
     try {
-      const result = await deployMaci(this.#deps.sncast, {
+      const result = await deployMaci(this.#deps.sncast, SMALL_STANDUP_INTENT, {
         onStep: async (step: DeployMaciStep): Promise<void> => {
           if (step.kind === "declare") {
             return;

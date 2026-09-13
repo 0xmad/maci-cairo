@@ -2,24 +2,11 @@
  * MACI deploy graph: LeanIMT → FreeForAll Policy → vote-balance assigner →
  * declare Poll/PollFactory → deploy MACI → Enforcer `set_target` → check coordinator.
  *
- * Depth, vote balance, and empty ballot roots match `contracts/tests/maci.cairo`.
+ * Circuit profile `small`, Policy, and assigner are explicit stand-up intent.
  */
+import { EMPTY_BALLOT_ROOTS } from "./config.js";
 import { DEVNET_SEED0_DEVNET_1, intendedCoordinator, normalizeHex } from "./hex.js";
-
-/** `MACI` constructor `state_tree_depth`. */
-export const STATE_TREE_DEPTH = 5;
-
-/** `ConstantInitialVoteBalance` constructor amount. */
-export const VOTE_BALANCE = 3;
-
-/** Five empty-ballot Merkle roots for `state_tree_depth` 5. */
-export const EMPTY_BALLOT_ROOTS = [
-  "16015576667038038422103932363190100635991292382181099511410843174865570503661",
-  "166510078825589460025300915201657086611944528317298994959376081297530246971",
-  "10057734083972610459557695472359628128485394923403014377687504571662791937025",
-  "4904828619307091008204672239231377290495002626534171783829482835985709082773",
-  "18694062287284245784028624966421731916526814537891066525886866373016385890569",
-] as const;
+import { resolveStandupIntent, type DeployMaciIntent } from "./intent.js";
 
 /** sncast operations used by {@link deployMaci}; tests inject a recorder. */
 export interface SncastOps {
@@ -156,9 +143,16 @@ export function formatDeployMaci(result: DeployMaciResult): string {
  * FreeForAllEnforcer is constructed with the checker and seed-0 `devnet-1` as
  * owner: UDC deploy would otherwise make the UDC the owner.
  *
- * @throws If on-chain `coordinator()` does not match the intended coordinator.
+ * @throws If on-chain `coordinator()` does not match the intended coordinator,
+ *   the Circuit profile, Policy, or assigner name is unknown, or the constant
+ *   assigner amount is 0 or at least `2^251`.
  */
-export async function deployMaci(ops: SncastOps, options: DeployMaciOptions = {}): Promise<DeployMaciResult> {
+export async function deployMaci(
+  ops: SncastOps,
+  intent: DeployMaciIntent,
+  options: DeployMaciOptions = {},
+): Promise<DeployMaciResult> {
+  const resolved = resolveStandupIntent(intent);
   const { onStep, checkpoint = {}, coordinatorOverride, network = "starknet_local" } = options;
   const coordinator = intendedCoordinator(coordinatorOverride);
   const deployer = normalizeHex(DEVNET_SEED0_DEVNET_1);
@@ -203,7 +197,7 @@ export async function deployMaci(ops: SncastOps, options: DeployMaciOptions = {}
     ops,
     existing: checkpoint.assigner,
     classHash: assignerClass,
-    argumentsExpr: String(VOTE_BALANCE),
+    argumentsExpr: resolved.constantVoteBalance.toString(),
     onStep,
     name: "assigner",
   });
@@ -217,7 +211,7 @@ export async function deployMaci(ops: SncastOps, options: DeployMaciOptions = {}
   });
   const maciClass = await declareOrReuse({ ops, existing: checkpoint.maciClassHash, contractName: "MACI", onStep });
 
-  const maciArgs = `maci_contracts::MACI::ConstructorParams { state_tree_depth: ${STATE_TREE_DEPTH}, state_tree_address: ${leanImt}, empty_ballot_roots: (${EMPTY_BALLOT_ROOTS.join(", ")}), enforcer: ${enforcer}, vote_balance_assigner: ${assigner}, coordinator: ${coordinator}, poll_factory_class_hash: ${pollFactoryClass}, poll_class_hash: ${pollClass} }`;
+  const maciArgs = `maci_contracts::MACI::ConstructorParams { state_tree_depth: ${resolved.stateTreeDepth}, vote_options: ${resolved.voteOptions}, batch_size: ${resolved.batchSize}, empty_live_ballot_root: ${resolved.emptyLiveBallotRoot}, state_tree_address: ${leanImt}, empty_ballot_roots: (${EMPTY_BALLOT_ROOTS.join(", ")}), enforcer: ${enforcer}, vote_balance_assigner: ${assigner}, coordinator: ${coordinator}, poll_factory_class_hash: ${pollFactoryClass}, poll_class_hash: ${pollClass} }`;
   const maci = await deployOrReuse({
     ops,
     existing: checkpoint.maci,
