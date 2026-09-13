@@ -62,17 +62,17 @@ describe("Shell", () => {
     renderShell("/");
 
     expect(screen.getByRole("link", { name: "Deploy" }).getAttribute("href")).toBe("/");
-    expect(screen.getByRole("link", { name: "MACI" }).getAttribute("href")).toBe("/maci");
+    expect(screen.queryByRole("link", { name: "MACI" })).toBeNull();
     expect(screen.getByText("NetworkSwitcher")).toBeTruthy();
     expect(screen.getByText("ConnectWallet")).toBeTruthy();
     expect(screen.getByText("outlet")).toBeTruthy();
     expect(screen.queryByText(/Showing this MACI/)).toBeNull();
   });
 
-  it("points MACI at the address in the URL and shows the network banner", () => {
+  it("shows the network banner on a MACI instance page", () => {
     renderShell("/maci/0xabc");
 
-    expect(screen.getByRole("link", { name: "MACI" }).getAttribute("href")).toBe("/maci/0xabc");
+    expect(screen.queryByRole("link", { name: "MACI" })).toBeNull();
     expect(screen.getByText("Showing this MACI on local. Contract addresses are network-specific.")).toBeTruthy();
   });
 

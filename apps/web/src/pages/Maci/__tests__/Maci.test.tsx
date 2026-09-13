@@ -1,81 +1,87 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MaciPage } from "..";
-import { useMaciPage } from "../useMaciPage";
+import { useMaciInstance } from "../useMaciInstance";
 
-vi.mock("../useMaciPage", () => ({
-  useMaciPage: vi.fn(),
+vi.mock("../useMaciInstance", () => ({
+  useMaciInstance: vi.fn(),
 }));
 
-const useMaciPageMock = vi.mocked(useMaciPage);
+const useMaciInstanceMock = vi.mocked(useMaciInstance);
+
+const INSTANCE = {
+  leanImt: "0x1",
+  checker: "0x2",
+  enforcer: "0x3",
+  assigner: "0x4",
+  pollClassHash: "0x5",
+  pollFactoryClassHash: "0x6",
+  maci: "0x7",
+  pollFactory: "0x8",
+  coordinator: "0x9",
+  deployer: "0xa",
+  network: "starknet_local" as const,
+};
 
 describe("MaciPage", () => {
-  const handleChange = vi.fn();
-  const handleSubmit = vi.fn();
-
   beforeEach(() => {
-    handleChange.mockReset();
-    handleSubmit.mockReset();
+    useMaciInstanceMock.mockReturnValue({
+      address: "0x7",
+      signedIn: false,
+    });
   });
 
-  it("prompts to paste an address when no MACI is selected", () => {
-    useMaciPageMock.mockReturnValue({
-      draft: "",
-      handleChange,
-      handleSubmit,
-      hasMaci: false,
-    });
-
+  it("asks an unsigned-in visitor to sign in and keeps Create Poll disabled", () => {
     render(<MaciPage />);
 
     expect(screen.getByRole("heading", { name: "MACI" })).toBeTruthy();
-    expect(screen.getByRole("textbox", { name: "MACI address" })).toHaveProperty("value", "");
-    expect(screen.getByText("Paste a MACI address. No chain reads in this scaffold.")).toBeTruthy();
+    expect(screen.getByText("Sign in as Operator to view this MACI.")).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.getByRole("button", { name: "Create Poll" })).toHaveProperty("disabled", true);
     expect(screen.queryByText("Create Poll is not wired and sends no transaction.")).toBeNull();
   });
 
-  it("shows the selected MACI and enables Create Poll", () => {
-    useMaciPageMock.mockReturnValue({
-      address: "0xabc123",
-      draft: "0xabc123",
-      handleChange,
-      handleSubmit,
-      hasMaci: true,
+  it("shows related contracts, the deployer, and enables Create Poll", () => {
+    useMaciInstanceMock.mockReturnValue({
+      address: "0x7",
+      signedIn: true,
+      instance: INSTANCE,
     });
 
     render(<MaciPage />);
 
-    expect(screen.getByRole("textbox", { name: "MACI address" })).toHaveProperty("value", "0xabc123");
-    expect(screen.getByText("0xabc123")).toBeTruthy();
+    expect(screen.getByText("LeanIMT")).toBeTruthy();
+    expect(screen.getByText("0x1")).toBeTruthy();
+    expect(screen.getByText("Deployer")).toBeTruthy();
+    expect(screen.getByText("0xa")).toBeTruthy();
+    expect(screen.getByText("Starknet Local")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create Poll" })).toHaveProperty("disabled", false);
     expect(screen.getByText("Create Poll is not wired and sends no transaction.")).toBeTruthy();
   });
 
-  it("forwards address input and Open submit to the hook", () => {
-    useMaciPageMock.mockReturnValue({
-      draft: "",
-      handleChange,
-      handleSubmit,
-      hasMaci: false,
+  it("labels a sepolia instance", () => {
+    useMaciInstanceMock.mockReturnValue({
+      address: "0x7",
+      signedIn: true,
+      instance: { ...INSTANCE, network: "sepolia" },
     });
 
     render(<MaciPage />);
 
-    fireEvent.change(screen.getByRole("textbox", { name: "MACI address" }), {
-      target: { value: "0xdef" },
+    expect(screen.getByText("Sepolia")).toBeTruthy();
+  });
+
+  it("shows a load error", () => {
+    useMaciInstanceMock.mockReturnValue({
+      address: "0x7",
+      signedIn: true,
+      error: "maci not found",
     });
 
-    const form = screen.getByRole("button", { name: "Open" }).closest("form");
+    render(<MaciPage />);
 
-    expect(form).toBeTruthy();
-
-    if (form !== null) {
-      fireEvent.submit(form);
-    }
-
-    expect(handleChange).toHaveBeenCalledTimes(1);
-    expect(handleSubmit).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("maci not found")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Create Poll" })).toHaveProperty("disabled", true);
   });
 });

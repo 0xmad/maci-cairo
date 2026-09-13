@@ -1,21 +1,19 @@
-import { type JSX } from "react";
+import { type JSX, useEffect } from "react";
 
-import { Toast } from "../Toast";
+import { useToasts } from "../../stores/toast";
+import { truncateAddress } from "../../utils/truncateAddress";
 
 import { useConnectWallet } from "./useConnectWallet";
 import { useOperatorLogin } from "./useOperatorLogin";
 
-function shortenAddress(address: string): string {
-  if (address.length <= 12) {
-    return address;
-  }
-
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
-
 export const ConnectWallet = (): JSX.Element => {
   const { address, error, handleClick, disconnect } = useConnectWallet();
   const { operator, error: loginError, restoring, signIn, signOut } = useOperatorLogin(address);
+  const showConnectError = useToasts((state) => state.showConnectError);
+
+  useEffect(() => {
+    showConnectError({ operator, walletError: error, loginError });
+  }, [showConnectError, operator, error, loginError]);
 
   if (operator !== undefined) {
     return (
@@ -23,7 +21,7 @@ export const ConnectWallet = (): JSX.Element => {
         <span className="text-sm text-zinc-400">Operator</span>
 
         <span className="font-mono text-sm" title={operator}>
-          {shortenAddress(operator)}
+          {truncateAddress(operator)}
         </span>
 
         <button
@@ -52,29 +50,23 @@ export const ConnectWallet = (): JSX.Element => {
     );
   }
 
-  return (
-    <>
-      {address === undefined ? (
-        <button
-          className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-800"
-          type="button"
-          onClick={handleClick}
-        >
-          Connect
-        </button>
-      ) : (
-        <button
-          className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-800"
-          type="button"
-          onClick={() => {
-            signIn().catch(() => undefined);
-          }}
-        >
-          Sign in as Operator
-        </button>
-      )}
-
-      <Toast message={error ?? loginError} />
-    </>
+  return address === undefined ? (
+    <button
+      className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-800"
+      type="button"
+      onClick={handleClick}
+    >
+      Connect
+    </button>
+  ) : (
+    <button
+      className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-800"
+      type="button"
+      onClick={() => {
+        signIn().catch(() => undefined);
+      }}
+    >
+      Sign in as Operator
+    </button>
   );
 };

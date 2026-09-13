@@ -10,5 +10,3 @@ snfoundry_trace
 .pnpm-store
 *.md
 docs
-common
-contracts

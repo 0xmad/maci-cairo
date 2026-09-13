@@ -1,26 +1,16 @@
-import { BadRequestException, ConflictException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { type FastifyRequest } from "fastify";
+import { type DeployMaciResult } from "maci-deploy/maci";
 import { type Observable } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
 import { type LoginService } from "../../login/services/login.service.js";
-import { type CurrentMaci, type JobSnapshot } from "../repositories/job.store.js";
+import { type Page } from "../../utils/pagination.js";
+import { type JobSnapshot, type MaciListItem } from "../repositories/job.store.js";
 import { StandupController } from "../standup.controller.js";
 import { type JobEvent, type StandupService } from "../standup.service.js";
 
 const OPERATOR = "0x0000000000000000000000000000000000000000000000000000000000000001";
-
-const MACI: CurrentMaci = {
-  leanImt: "0x1",
-  checker: "0x2",
-  enforcer: "0x3",
-  assigner: "0x4",
-  pollClassHash: "0x5",
-  pollFactoryClassHash: "0x6",
-  maci: "0x7",
-  pollFactory: "0x8",
-  coordinator: "0x9",
-};
 
 const STEP = { seq: 1, kind: "declare", name: "LeanIMT" };
 
@@ -56,14 +46,16 @@ function harness(
   standupController: StandupController;
   authenticate: ReturnType<typeof vi.fn>;
   startStandUp: ReturnType<typeof vi.fn>;
-  currentMaci: ReturnType<typeof vi.fn>;
   currentJob: ReturnType<typeof vi.fn>;
+  listMacis: ReturnType<typeof vi.fn>;
+  readMaci: ReturnType<typeof vi.fn>;
   subscribe: ReturnType<typeof vi.fn>;
 } {
   const authenticate = vi.fn((): Promise<string> => Promise.resolve(OPERATOR));
   const startStandUp = vi.fn((): Promise<{ jobId: string }> => Promise.resolve({ jobId: "job-1" }));
-  const currentMaci = vi.fn((): Promise<CurrentMaci | undefined> => Promise.resolve(undefined));
   const currentJob = vi.fn((): Promise<JobSnapshot | undefined> => Promise.resolve(undefined));
+  const listMacis = vi.fn((): Promise<Page<MaciListItem>> => Promise.resolve({ items: [], total: 0 }));
+  const readMaci = vi.fn((): Promise<DeployMaciResult | undefined> => Promise.resolve(undefined));
   const subscribe = vi.fn((listener: (event: JobEvent) => void): Promise<() => void> => {
     listener({ type: "step", step: STEP });
     listener({ type: "completed", status: "succeeded" });
@@ -73,8 +65,9 @@ function harness(
   const loginService = { authenticate, ...loginOverrides } as unknown as LoginService;
   const standupService = {
     startStandUp,
-    currentMaci,
     currentJob,
+    listMacis,
+    readMaci,
     subscribe,
     ...standupOverrides,
   } as unknown as StandupService;
@@ -83,14 +76,19 @@ function harness(
     standupController: new StandupController(loginService, standupService),
     authenticate,
     startStandUp,
-    currentMaci,
     currentJob,
+    listMacis,
+    readMaci,
     subscribe,
   };
 }
 
-function request(authorization?: string): FastifyRequest {
-  return { headers: { authorization } } as unknown as FastifyRequest;
+function request(
+  authorization?: string,
+  query: Record<string, string> = {},
+  params: Record<string, string> = {},
+): FastifyRequest {
+  return { headers: { authorization }, query, params } as unknown as FastifyRequest;
 }
 
 describe("StandupController", () => {
@@ -145,18 +143,101 @@ describe("StandupController", () => {
     });
   });
 
-  test("readCurrentMaci returns null when no MACI is recorded", async () => {
-    const { standupController } = harness();
+  test("listMacis returns a page of instances for an authenticated Operator", async () => {
+    const listMacis = vi.fn((): Promise<Page<MaciListItem>> =>
+      Promise.resolve({ items: [{ address: "0x7", network: "starknet_local" }], total: 1 }),
+    );
+    const { standupController } = harness({ listMacis });
 
-    await expect(standupController.readCurrentMaci(request("Bearer jwt-token"))).resolves.toEqual({ maci: null });
+    await expect(
+      standupController.listMacis(request("Bearer jwt-token", { page: "2", pageSize: "1" })),
+    ).resolves.toEqual({
+      items: [{ address: "0x7", network: "starknet_local" }],
+      total: 1,
+      page: 2,
+      pageSize: 1,
+    });
+    expect(listMacis).toHaveBeenCalledWith({ page: 2, pageSize: 1 });
   });
 
-  test("readCurrentMaci returns the recorded MACI", async () => {
-    const { standupController } = harness({
-      currentMaci: vi.fn((): Promise<CurrentMaci | undefined> => Promise.resolve(MACI)),
-    });
+  test("listMacis defaults page and pageSize", async () => {
+    const listMacis = vi.fn((): Promise<Page<MaciListItem>> => Promise.resolve({ items: [], total: 0 }));
+    const { standupController } = harness({ listMacis });
 
-    await expect(standupController.readCurrentMaci(request("Bearer jwt-token"))).resolves.toEqual({ maci: MACI });
+    await expect(standupController.listMacis(request("Bearer jwt-token"))).resolves.toEqual({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 10,
+    });
+    expect(listMacis).toHaveBeenCalledWith({ page: 1, pageSize: 10 });
+  });
+
+  test("listMacis rejects a request without a Bearer token", async () => {
+    const { standupController, listMacis } = harness();
+
+    await expect(standupController.listMacis(request())).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(listMacis).not.toHaveBeenCalled();
+  });
+
+  test("readMaci returns the instance for an authenticated Operator", async () => {
+    const instance: DeployMaciResult = {
+      leanImt: "0x1",
+      checker: "0x2",
+      enforcer: "0x3",
+      assigner: "0x4",
+      pollClassHash: "0x5",
+      pollFactoryClassHash: "0x6",
+      maci: "0x7",
+      pollFactory: "0x8",
+      coordinator: "0x9",
+      deployer: "0xa",
+      network: "starknet_local",
+    };
+    const readMaci = vi.fn((): Promise<DeployMaciResult | undefined> => Promise.resolve(instance));
+    const { standupController } = harness({ readMaci });
+
+    await expect(standupController.readMaci(request("Bearer jwt-token", {}, { address: "0x7" }))).resolves.toEqual(
+      instance,
+    );
+    expect(readMaci).toHaveBeenCalledWith("0x7");
+  });
+
+  test("readMaci rejects a missing address", async () => {
+    const { standupController, readMaci } = harness();
+
+    await expect(standupController.readMaci(request("Bearer jwt-token"))).rejects.toBeInstanceOf(BadRequestException);
+    await expect(standupController.readMaci(request("Bearer jwt-token"))).rejects.toMatchObject({
+      response: { error: "maci address required" },
+    });
+    expect(readMaci).not.toHaveBeenCalled();
+  });
+
+  test("readMaci rejects an empty address", async () => {
+    const { standupController, readMaci } = harness();
+
+    await expect(standupController.readMaci(request("Bearer jwt-token", {}, { address: "" }))).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(readMaci).not.toHaveBeenCalled();
+  });
+
+  test("readMaci is not found when the instance is missing", async () => {
+    const { standupController, readMaci } = harness();
+
+    await expect(
+      standupController.readMaci(request("Bearer jwt-token", {}, { address: "0x7" })),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(readMaci).toHaveBeenCalledWith("0x7");
+  });
+
+  test("readMaci rejects a request without a Bearer token", async () => {
+    const { standupController, readMaci } = harness();
+
+    await expect(standupController.readMaci(request(undefined, {}, { address: "0x7" }))).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(readMaci).not.toHaveBeenCalled();
   });
 
   test("readCurrentJob returns null when no job exists", async () => {

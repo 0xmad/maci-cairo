@@ -25,7 +25,7 @@ export const NetworkSwitcher = (): JSX.Element => {
         value={network}
         onChange={handleChange}
       >
-        <option value="local">Local</option>
+        <option value="local">Starknet Local</option>
 
         <option disabled value="sepolia">
           Sepolia

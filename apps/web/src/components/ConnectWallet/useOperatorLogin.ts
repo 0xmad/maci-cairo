@@ -3,10 +3,10 @@ import { useCallback, useEffect, useState } from "react";
 import { rpcUrlFor } from "../../config/network";
 import { opsBaseUrl } from "../../config/ops";
 import { useNetwork } from "../../providers/Network";
-import { storage } from "../../services/localStorage";
 import { OpsClient } from "../../services/ops";
 import { operatorNonceMessage } from "../../services/ops/nonceMessage";
 import { wallet } from "../../services/wallet";
+import { useOperatorSession } from "../../stores/operatorSession";
 
 interface UseOperatorLoginResult {
   operator?: string;
@@ -18,14 +18,15 @@ interface UseOperatorLoginResult {
 
 export function useOperatorLogin(walletAddress?: string): UseOperatorLoginResult {
   const { network } = useNetwork();
+  const { token, setToken, clearToken } = useOperatorSession();
   const [operator, setOperator] = useState<string>();
   const [error, setError] = useState<string>();
-  const [restoring, setRestoring] = useState(() => storage.readStoredJwt() !== undefined);
+  const [restoring, setRestoring] = useState(() => token !== undefined);
 
   useEffect(() => {
-    const token = storage.readStoredJwt();
+    const sessionToken = useOperatorSession.getState().token;
 
-    if (token === undefined) {
+    if (sessionToken === undefined) {
       return undefined;
     }
 
@@ -33,14 +34,14 @@ export function useOperatorLogin(walletAddress?: string): UseOperatorLoginResult
     let cancelled = false;
 
     client
-      .readSession(token)
+      .readSession(sessionToken)
       .then((address) => {
         if (!cancelled) {
           setOperator(address);
         }
       })
       .catch(() => {
-        storage.clearStoredJwt();
+        clearToken();
       })
       .finally(() => {
         if (!cancelled) {
@@ -51,7 +52,7 @@ export function useOperatorLogin(walletAddress?: string): UseOperatorLoginResult
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clearToken]);
 
   const signIn = useCallback(async (): Promise<void> => {
     if (walletAddress === undefined) {
@@ -67,19 +68,19 @@ export function useOperatorLogin(walletAddress?: string): UseOperatorLoginResult
       const nonce = await client.issueNonce();
       const signature = await wallet.signMessage(rpcUrlFor(network), operatorNonceMessage(nonce, "SN_SEPOLIA"));
       const session = await client.login(nonce, JSON.stringify({ address: walletAddress, signature }));
-      storage.storeJwt(session.token);
+      setToken(session.token);
       setOperator(session.address);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Sign-in failed");
     }
-  }, [network, walletAddress]);
+  }, [network, setToken, walletAddress]);
 
   const signOut = useCallback((): void => {
-    storage.clearStoredJwt();
+    clearToken();
     setOperator(undefined);
     setError(undefined);
     setRestoring(false);
-  }, []);
+  }, [clearToken]);
 
   return { operator, error, restoring, signIn, signOut };
 }

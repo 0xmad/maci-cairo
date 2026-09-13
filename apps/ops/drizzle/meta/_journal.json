@@ -15,6 +15,27 @@
       "when": 2,
       "tag": "0001_standup_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 3,
+      "tag": "0002_maci_instance_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 4,
+      "tag": "0003_maci_deployer",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 5,
+      "tag": "0004_maci_network_starknet_local",
+      "breakpoints": true
     }
   ]
 }

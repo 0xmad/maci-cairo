@@ -1,6 +1,8 @@
-import { deployMaci, type DeployMaciStep, type SncastOps } from "maci-deploy/maci";
+import { deployMaci, type DeployMaciResult, type DeployMaciStep, type SncastOps } from "maci-deploy/maci";
 
-import { type CurrentMaci, type JobSnapshot, type JobStep, type JobStore } from "./repositories/job.store.js";
+import { type Page, type Pagination } from "../utils/pagination.js";
+
+import { type JobSnapshot, type JobStep, type JobStore, type MaciListItem } from "./repositories/job.store.js";
 
 export interface StandupServiceDeps {
   store: JobStore;
@@ -15,7 +17,7 @@ export type JobEvent =
   { type: "step"; step: JobStep } | { type: "completed"; status: "succeeded" | "failed"; error?: string };
 
 /**
- * MACI stand-up jobs: at most one running, current MACI only after a full success.
+ * MACI stand-up jobs: at most one running, instances recorded only after a full success.
  */
 export class StandupService {
   readonly #deps: StandupServiceDeps;
@@ -49,8 +51,12 @@ export class StandupService {
     return this.#deps.store.latest();
   }
 
-  currentMaci(): Promise<CurrentMaci | undefined> {
-    return this.#deps.store.currentMaci();
+  listMacis(pagination: Pagination): Promise<Page<MaciListItem>> {
+    return this.#deps.store.listMacis(pagination);
+  }
+
+  readMaci(address: string): Promise<DeployMaciResult | undefined> {
+    return this.#deps.store.readMaci(address);
   }
 
   async subscribe(listener: (event: JobEvent) => void): Promise<() => void> {
@@ -58,11 +64,6 @@ export class StandupService {
     let lastSeq = 0;
 
     if (job !== undefined) {
-      job.steps.forEach((step) => {
-        listener({ type: "step", step });
-        lastSeq = step.seq;
-      });
-
       if (job.status !== "running") {
         const completed: JobEvent =
           job.status === "succeeded"
@@ -73,6 +74,15 @@ export class StandupService {
 
         return (): void => undefined;
       }
+
+      job.steps.forEach((step) => {
+        if (step.kind === "declare") {
+          return;
+        }
+
+        listener({ type: "step", step });
+        lastSeq = step.seq;
+      });
     }
 
     const live = (event: JobEvent): void => {
@@ -92,25 +102,24 @@ export class StandupService {
 
   private async run(jobId: string): Promise<void> {
     let seq = 0;
-    let persist = Promise.resolve();
 
     try {
-      const result = deployMaci(this.#deps.sncast, {
-        onStep: (step: DeployMaciStep): void => {
+      const result = await deployMaci(this.#deps.sncast, {
+        onStep: async (step: DeployMaciStep): Promise<void> => {
+          if (step.kind === "declare") {
+            return;
+          }
+
           seq += 1;
           const recorded: JobStep = { seq, kind: step.kind, name: step.name };
-          persist = persist.then(async () => {
-            await this.#deps.store.appendStep(jobId, recorded);
-            this.emit({ type: "step", step: recorded });
-          });
+          await this.#deps.store.appendStep(jobId, recorded);
+          this.emit({ type: "step", step: recorded });
         },
       });
-      await persist;
       await this.#deps.store.succeed(jobId, this.#deps.nowMs(), result);
       this.emit({ type: "completed", status: "succeeded" });
     } catch (caught) {
       const error = caught instanceof Error ? caught.message : "failed";
-      await persist;
       await this.#deps.store.fail(jobId, this.#deps.nowMs(), error);
       this.emit({ type: "completed", status: "failed", error });
     }

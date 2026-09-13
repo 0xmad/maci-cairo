@@ -1,4 +1,6 @@
-import { type DeployMaciResult } from "maci-deploy/maci";
+import { type DeployMaciResult, type MaciNetwork } from "maci-deploy/maci";
+
+import { type Page, type Pagination } from "../../utils/pagination.js";
 
 export type JobStatus = "running" | "succeeded" | "failed";
 
@@ -8,7 +10,10 @@ export interface JobStep {
   name: string;
 }
 
-export type CurrentMaci = DeployMaciResult;
+export interface MaciListItem {
+  address: string;
+  network: MaciNetwork;
+}
 
 export interface JobSnapshot {
   id: string;
@@ -24,12 +29,13 @@ export interface NewJob {
   createdAtMs: number;
 }
 
-/** Durable MACI stand-up job, step log, and current MACI. */
+/** Durable MACI stand-up job, step log, and recorded instances. */
 export interface JobStore {
   tryBegin: (job: NewJob) => Promise<boolean>;
   appendStep: (jobId: string, step: JobStep) => Promise<void>;
-  succeed: (jobId: string, completedAtMs: number, maci: CurrentMaci) => Promise<void>;
+  succeed: (jobId: string, completedAtMs: number, maci: DeployMaciResult) => Promise<void>;
   fail: (jobId: string, completedAtMs: number, error: string) => Promise<void>;
   latest: () => Promise<JobSnapshot | undefined>;
-  currentMaci: () => Promise<CurrentMaci | undefined>;
+  listMacis: (pagination: Pagination) => Promise<Page<MaciListItem>>;
+  readMaci: (address: string) => Promise<DeployMaciResult | undefined>;
 }

@@ -8,15 +8,17 @@ import type { StarkZap } from "starkzap";
 import { NetworkProvider, useNetwork } from "..";
 import { createSdk, defaultNetwork, type AppNetwork } from "../../../config/network";
 
-const { clearStoredJwtMock, disconnectMock, switchChainMock } = vi.hoisted(() => ({
-  clearStoredJwtMock: vi.fn(),
+const { clearTokenMock, disconnectMock, switchChainMock } = vi.hoisted(() => ({
+  clearTokenMock: vi.fn(),
   disconnectMock: vi.fn(),
   switchChainMock: vi.fn(),
 }));
 
-vi.mock("../../../services/localStorage", () => ({
-  storage: {
-    clearStoredJwt: clearStoredJwtMock,
+vi.mock("../../../stores/operatorSession", () => ({
+  useOperatorSession: {
+    getState: (): { clearToken: () => void } => ({
+      clearToken: clearTokenMock,
+    }),
   },
 }));
 
@@ -45,7 +47,7 @@ const wrapper = ({ children }: { children: ReactNode }): JSX.Element => <Network
 describe("useNetwork", () => {
   beforeEach(() => {
     createSdkMock.mockReset();
-    clearStoredJwtMock.mockReset();
+    clearTokenMock.mockReset();
     disconnectMock.mockReset();
     switchChainMock.mockReset();
     disconnectMock.mockResolvedValue(undefined);
@@ -79,7 +81,7 @@ describe("useNetwork", () => {
     expect(result.current.sdk).toEqual({ id: "sepolia" });
     expect(createSdkMock).toHaveBeenCalledWith("sepolia");
     expect(switchChainMock).toHaveBeenCalledWith(constants.StarknetChainId.SN_SEPOLIA);
-    expect(clearStoredJwtMock).toHaveBeenCalledTimes(1);
+    expect(clearTokenMock).toHaveBeenCalledTimes(1);
     expect(disconnectMock).toHaveBeenCalledTimes(1);
   });
 
@@ -90,7 +92,7 @@ describe("useNetwork", () => {
       await result.current.setNetwork("local");
     });
 
-    expect(clearStoredJwtMock).not.toHaveBeenCalled();
+    expect(clearTokenMock).not.toHaveBeenCalled();
     expect(disconnectMock).not.toHaveBeenCalled();
     expect(createSdkMock).toHaveBeenCalledTimes(1);
   });
@@ -105,7 +107,7 @@ describe("useNetwork", () => {
     });
 
     expect(result.current.network).toBe("sepolia");
-    expect(clearStoredJwtMock).toHaveBeenCalledTimes(1);
+    expect(clearTokenMock).toHaveBeenCalledTimes(1);
     expect(disconnectMock).toHaveBeenCalledTimes(1);
   });
 

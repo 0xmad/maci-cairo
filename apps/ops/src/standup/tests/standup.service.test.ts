@@ -1,9 +1,9 @@
 import { intendedCoordinator, normalizeHex } from "maci-deploy/hex";
-import { type SncastOps } from "maci-deploy/maci";
+import { type DeployMaciResult, type MaciNetwork, type SncastOps } from "maci-deploy/maci";
 import { describe, expect, test, vi } from "vitest";
 
 import { jobs, jobSteps } from "../repositories/job.schema.js";
-import { type CurrentMaci, type JobStore } from "../repositories/job.store.js";
+import { type JobStore } from "../repositories/job.store.js";
 import { PostgresJobStore } from "../repositories/postgresJob.store.js";
 import { StandupService, type JobEvent } from "../standup.service.js";
 
@@ -76,7 +76,7 @@ interface StepRow {
   name: string;
 }
 
-interface MaciRow extends CurrentMaci {
+interface MaciRow extends DeployMaciResult {
   id: number;
   jobId: string;
 }
@@ -116,13 +116,25 @@ function postgresJobStore(): PostgresJobStore {
         return Promise.resolve();
       }
 
-      return {
-        onConflictDoUpdate: (): Promise<void> => {
-          maciRow = row as unknown as MaciRow;
+      const previous = maciRow;
 
-          return Promise.resolve();
-        },
+      maciRow = {
+        id: (previous?.id ?? 0) + 1,
+        jobId: row.jobId as string,
+        leanImt: row.leanImt as string,
+        checker: row.checker as string,
+        enforcer: row.enforcer as string,
+        assigner: row.assigner as string,
+        pollClassHash: row.pollClassHash as string,
+        pollFactoryClassHash: row.pollFactoryClassHash as string,
+        maci: row.maci as string,
+        pollFactory: row.pollFactory as string,
+        coordinator: row.coordinator as string,
+        deployer: row.deployer as string,
+        network: row.network as MaciNetwork,
       };
+
+      return Promise.resolve();
     },
   });
   const update = (): { set: (patch: Record<string, unknown>) => { where: () => Promise<void> } } => ({
@@ -163,9 +175,24 @@ function postgresJobStore(): PostgresJobStore {
         };
       }
 
+      const rows = maciRow === undefined ? [] : [maciRow];
+
       return {
+        then: (resolve: (value: { total: number }[]) => unknown) =>
+          Promise.resolve([{ total: rows.length }]).then(resolve),
         where: (): { limit: () => Promise<NonNullable<typeof maciRow>[]> } => ({
-          limit: (): Promise<NonNullable<typeof maciRow>[]> => Promise.resolve(maciRow === undefined ? [] : [maciRow]),
+          limit: (): Promise<NonNullable<typeof maciRow>[]> => Promise.resolve(rows),
+        }),
+        orderBy: (): {
+          limit: (take: number) => Promise<NonNullable<typeof maciRow>[]> & {
+            offset: (skip: number) => Promise<NonNullable<typeof maciRow>[]>;
+          };
+        } => ({
+          limit: (take: number) =>
+            Object.assign(Promise.resolve(rows.slice(0, take)), {
+              offset: (skip: number): Promise<NonNullable<typeof maciRow>[]> =>
+                Promise.resolve(rows.slice(skip, skip + take)),
+            }),
         }),
       };
     },
@@ -211,34 +238,33 @@ describe("StandupService", () => {
 
     await expect(first).resolves.toEqual({ jobId: "job-1" });
     await expect(second).rejects.toThrow(/^busy$/u);
-    await expect(service.currentMaci()).resolves.toBeUndefined();
+    await expect(service.listMacis({ page: 1, pageSize: 10 })).resolves.toEqual({ items: [], total: 0 });
   });
 
-  test("successful stand-up sets current MACI with the server Coordinator and no Poll", async () => {
+  test("successful stand-up records a MACI instance with the server Coordinator and no Poll", async () => {
     const ops = recordingOps();
     const { service } = harness(ops);
 
     await expect(service.startStandUp()).resolves.toEqual({ jobId: "job-1" });
     await settle(service);
 
-    const maci = await service.currentMaci();
+    const listed = await service.listMacis({ page: 1, pageSize: 10 });
     const job = await service.currentJob();
 
     expect(job?.status).toBe("succeeded");
-    expect(maci?.coordinator).toBe(intendedCoordinator(undefined));
-    expect(maci?.maci).toMatch(/^0x/u);
-    expect(maci?.pollFactory).toMatch(/^0x/u);
-    expect(maci?.leanImt).toBeDefined();
-    expect(maci?.checker).toBeDefined();
-    expect(maci?.enforcer).toBeDefined();
-    expect(maci?.assigner).toBeDefined();
-    expect(maci?.pollClassHash).toBeDefined();
-    expect(maci?.pollFactoryClassHash).toBeDefined();
+    expect(listed.total).toBe(1);
+    expect(listed.items[0]?.address).toMatch(/^0x/u);
+    expect(listed.items[0]?.network).toBe("starknet_local");
+    await expect(service.readMaci(listed.items[0]?.address ?? "")).resolves.toMatchObject({
+      maci: listed.items[0]?.address,
+      deployer: intendedCoordinator(undefined),
+      network: "starknet_local",
+    });
     expect(ops.fieldCalls.some((args) => args.includes("create_poll"))).toBe(false);
     expect(ops.maciCoordinatorArg).toBe(intendedCoordinator(undefined));
   });
 
-  test("current MACI is unchanged when set_target fails", async () => {
+  test("no instance is recorded when set_target fails", async () => {
     const { service } = harness(recordingOps({ failOn: "set_target" }));
 
     await service.startStandUp();
@@ -249,10 +275,10 @@ describe("StandupService", () => {
     expect(job?.status).toBe("failed");
     expect(job?.error).toBe("set_target failed");
     expect(job?.steps.some((step) => step.name === "set_target")).toBe(false);
-    await expect(service.currentMaci()).resolves.toBeUndefined();
+    await expect(service.listMacis({ page: 1, pageSize: 10 })).resolves.toEqual({ items: [], total: 0 });
   });
 
-  test("current MACI is unchanged when the coordinator check fails", async () => {
+  test("no instance is recorded when the coordinator check fails", async () => {
     const { service } = harness(recordingOps({ failOn: "coordinator" }));
 
     await service.startStandUp();
@@ -263,10 +289,10 @@ describe("StandupService", () => {
     expect(job?.status).toBe("failed");
     expect(job?.error).toBe("coordinator check failed");
     expect(job?.steps.some((step) => step.name === "set_target")).toBe(true);
-    await expect(service.currentMaci()).resolves.toBeUndefined();
+    await expect(service.listMacis({ page: 1, pageSize: 10 })).resolves.toEqual({ items: [], total: 0 });
   });
 
-  test("subscribe replays stored steps then a completion event", async () => {
+  test("subscribe on a finished job emits completion without replaying steps", async () => {
     const { service } = harness();
     const events: JobEvent[] = [];
 
@@ -276,24 +302,7 @@ describe("StandupService", () => {
       events.push(event);
     });
 
-    expect(events.at(-1)).toEqual({ type: "completed", status: "succeeded" });
-    expect(events.filter((event) => event.type === "step").map((event) => event.step.name)).toEqual([
-      "LeanIMT",
-      "leanImt",
-      "FreeForAllChecker",
-      "checker",
-      "FreeForAllEnforcer",
-      "enforcer",
-      "ConstantInitialVoteBalance",
-      "assigner",
-      "Poll",
-      "PollFactory",
-      "MACI",
-      "maci",
-      "set_target",
-      "coordinator",
-      "get_poll_factory",
-    ]);
+    expect(events).toEqual([{ type: "completed", status: "succeeded" }]);
     unsub();
   });
 
@@ -352,8 +361,8 @@ describe("StandupService", () => {
     await settle(service);
 
     const steps = events.filter((event) => event.type === "step");
-    expect(steps).toHaveLength(15);
-    expect(new Set(steps.map((event) => event.step.seq)).size).toBe(15);
+    expect(steps).toHaveLength(8);
+    expect(new Set(steps.map((event) => event.step.seq)).size).toBe(8);
     expect(events.at(-1)).toEqual({ type: "completed", status: "succeeded" });
   });
 
@@ -395,6 +404,30 @@ describe("StandupService", () => {
     unsub();
   });
 
+  test("subscribe does not emit declare steps", async () => {
+    const { service } = harness();
+    const events: JobEvent[] = [];
+    const unsub = await service.subscribe((event) => {
+      events.push(event);
+    });
+
+    await service.startStandUp();
+    await settle(service);
+
+    const steps = events.filter((event) => event.type === "step");
+    expect(steps.map((event) => event.step.kind)).toEqual([
+      "deploy",
+      "deploy",
+      "deploy",
+      "deploy",
+      "deploy",
+      "invoke",
+      "call",
+      "call",
+    ]);
+    unsub();
+  });
+
   test("subscribe replays a failed job's completion", async () => {
     const { service } = harness(recordingOps({ failOn: "set_target" }));
     const events: JobEvent[] = [];
@@ -406,6 +439,7 @@ describe("StandupService", () => {
     });
 
     expect(events.at(-1)).toEqual({ type: "completed", status: "failed", error: "set_target failed" });
+    expect(events.filter((event) => event.type === "step")).toEqual([]);
   });
 
   test("a non-Error throw from sncast fails the job as failed", async () => {
@@ -420,6 +454,6 @@ describe("StandupService", () => {
     await settle(service);
 
     await expect(service.currentJob()).resolves.toMatchObject({ status: "failed", error: "failed" });
-    await expect(service.currentMaci()).resolves.toBeUndefined();
+    await expect(service.listMacis({ page: 1, pageSize: 10 })).resolves.toEqual({ items: [], total: 0 });
   });
 });

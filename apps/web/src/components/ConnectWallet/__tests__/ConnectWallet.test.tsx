@@ -1,9 +1,18 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConnectWallet } from "..";
 import { useConnectWallet } from "../useConnectWallet";
 import { useOperatorLogin } from "../useOperatorLogin";
+
+const { toast } = vi.hoisted(() => ({
+  toast: { success: vi.fn(), error: vi.fn(), dismiss: vi.fn() },
+}));
+
+vi.mock("sonner", () => ({
+  toast,
+  Toaster: (): null => null,
+}));
 
 vi.mock("../useConnectWallet", () => ({
   useConnectWallet: vi.fn(),
@@ -21,7 +30,9 @@ describe("ConnectWallet", () => {
   const signIn = vi.fn();
 
   beforeEach(() => {
-    vi.useFakeTimers();
+    toast.success.mockReset();
+    toast.error.mockReset();
+    toast.dismiss.mockReset();
     handleClick.mockReset();
     signIn.mockReset();
     useOperatorLoginMock.mockReturnValue({
@@ -29,10 +40,6 @@ describe("ConnectWallet", () => {
       signIn,
       signOut: vi.fn(),
     });
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it("shows Sign in as Operator after the wallet is connected", () => {
@@ -118,7 +125,7 @@ describe("ConnectWallet", () => {
       disconnect: vi.fn().mockResolvedValue(undefined),
     });
     useOperatorLoginMock.mockReturnValue({
-      operator: "0xoperator",
+      operator: "0xabc",
       restoring: false,
       signIn,
       signOut: vi.fn(),
@@ -126,9 +133,9 @@ describe("ConnectWallet", () => {
 
     render(<ConnectWallet />);
 
-    const shown = screen.getByText("0xoperator");
+    const shown = screen.getByText("0xabc");
 
-    expect(shown.getAttribute("title")).toBe("0xoperator");
+    expect(shown.getAttribute("title")).toBe("0xabc");
   });
 
   it("disconnects the Operator session and wallet", () => {
@@ -181,7 +188,7 @@ describe("ConnectWallet", () => {
     expect(disconnect).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a connect error toast that disappears after the error clears", () => {
+  it("shows a connect error toast that stays after the error clears", () => {
     useConnectWalletMock.mockReturnValue({
       error: "No Argent or Braavos wallet found",
       handleClick,
@@ -190,7 +197,11 @@ describe("ConnectWallet", () => {
 
     const { rerender } = render(<ConnectWallet />);
 
-    expect(screen.getByRole("status").textContent).toBe("No Argent or Braavos wallet found");
+    expect(toast.error).toHaveBeenCalledWith("No Argent or Braavos wallet found", {
+      id: "connect-wallet",
+      duration: Number.POSITIVE_INFINITY,
+      closeButton: true,
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Connect" }));
     expect(handleClick).toHaveBeenCalledTimes(1);
@@ -199,12 +210,11 @@ describe("ConnectWallet", () => {
       handleClick,
       disconnect: vi.fn(),
     });
+    toast.error.mockClear();
+    toast.dismiss.mockClear();
     rerender(<ConnectWallet />);
 
-    act(() => {
-      vi.advanceTimersByTime(300);
-    });
-
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.dismiss).not.toHaveBeenCalled();
   });
 });

@@ -14,11 +14,11 @@ pnpm --filter maci-web dev
 
 Or `make types-web` / `make test-web` / `make test-web-coverage`.
 
-Connect uses injected Argent or Braavos. There is no paymaster. Deploy and Create Poll are not wired.
+Connect uses injected Argent or Braavos. There is no paymaster. Create Poll is not wired. MACI stand-up is a server job started from Deploy after Operator sign-in.
 
 ## Networks
 
-`VITE_RPC_URL` and `VITE_NETWORK_ID` set the default (local `5050` or `sepolia`). In `pnpm dev`, loopback `5050` is served as `/starknet-rpc` so the browser is not blocked by CORS. The switcher's Sepolia option is disabled for now. Switching network asks the connected wallet for `wallet_switchStarknetChain`, then disconnects and signs the Operator out (clears `maci.operator.jwt`). A MACI address in the URL is kept and noted as network-specific.
+`VITE_RPC_URL` and `VITE_NETWORK_ID` set the default (local `5050` or `sepolia`). In `pnpm dev`, loopback `5050` is served as `/starknet-rpc` and loopback `8787` as `/ops` so the browser is not blocked by CORS. The switcher's Sepolia option is disabled for now. Switching network asks the connected wallet for `wallet_switchStarknetChain`, then disconnects and signs the Operator out (clears `maci.operator.jwt`). A MACI address in the URL is kept and noted as network-specific.
 
 ## Scaffold note
 
