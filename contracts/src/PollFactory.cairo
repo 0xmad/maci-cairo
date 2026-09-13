@@ -10,13 +10,13 @@ pub struct CreatePollArgs {
     pub end_date: u64,
     /// Public key used for encrypting votes in the poll.
     pub poll_public_key: (u256, u256),
-    /// Depth of the state tree used by the poll.
+    /// Depth of the state tree. MACI overwrites this from its Circuit profile.
     pub state_tree_depth: u8,
-    /// Number of available vote options for the poll.
+    /// Vote-option count. MACI overwrites this from its Circuit profile.
     pub vote_options: u256,
-    /// Maximum Ballots consumed by one tally batch.
+    /// Tally batch size. MACI overwrites this from its Circuit profile.
     pub batch_size: u32,
-    /// Merkle root of the empty live-ballot tree for this poll's tally.
+    /// Empty live-ballot root. MACI overwrites this from its Circuit profile.
     pub empty_live_ballot_root: u256,
 }
 
@@ -71,10 +71,15 @@ pub mod Errors {
     pub const INVALID_POLL_CONFIG: felt252 = 'Invalid poll config';
 }
 
+/// Rejects a Poll whose schedule end is not after the start.
+pub fn assert_poll_schedule(start_date: u64, end_date: u64) {
+    assert(end_date > start_date, Errors::INVALID_POLL_CONFIG);
+}
+
 /// Rejects a Poll with an empty schedule, zero vote options, or zero batch
 /// size.
 pub fn assert_poll_config(start_date: u64, end_date: u64, vote_options: u256, batch_size: u32) {
-    assert(end_date > start_date, Errors::INVALID_POLL_CONFIG);
+    assert_poll_schedule(start_date, end_date);
     assert(vote_options != 0, Errors::INVALID_POLL_CONFIG);
     assert(batch_size != 0, Errors::INVALID_POLL_CONFIG);
 }

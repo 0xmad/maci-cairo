@@ -6,6 +6,7 @@
   "license": "MIT",
   "exports": {
     "./maci": "./src/maci.ts",
+    "./intent": "./src/intent.ts",
     "./sncast": "./src/sncast.ts",
     "./hex": "./src/hex.ts"
   },

@@ -193,3 +193,23 @@ A human on the ops-console allowlist who may start MACI stand-up or Poll
 create. They prove that with a wallet signature; that wallet is not the
 Coordinator and does not sign protocol transactions.
 _Avoid_: Coordinator, admin, user (as this role)
+
+**Circuit profile**:
+A named Operator choice at MACI stand-up that fixes state-tree depth,
+tally batch size, live-ballot tree depth, and max vote options, and binds
+that compiled Ballot / TallyBatch / TallyFinalize trio to the MACI. The
+Operator picks the name, not the raw params. Every Poll under the MACI
+uses those values; Poll create does not pick circuits. Only `small`
+exists now.
+_Avoid_: Circuit size, voter count (as this choice)
+
+**Max Signups**:
+The Signup capacity of a MACI: `2^state_tree_depth` leaves, including the
+padding leaf. Derived from the Circuit profile; not typed in.
+_Avoid_: Max voters, voter limit
+
+**Max vote options**:
+The vote-option count derived from the Circuit profile. The Poll stores
+that number exactly. It is shown read-only at stand-up. It is not chosen
+at Poll create.
+_Avoid_: Candidate count (as this limit)

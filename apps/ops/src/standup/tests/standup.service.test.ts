@@ -404,6 +404,36 @@ describe("StandupService", () => {
     unsub();
   });
 
+  test("subscribe on a running job does not replay stored declare steps", async () => {
+    const store: JobStore = {
+      tryBegin: () => Promise.resolve(true),
+      appendStep: () => Promise.resolve(),
+      succeed: () => Promise.resolve(),
+      fail: () => Promise.resolve(),
+      latest: () =>
+        Promise.resolve({
+          id: "job-1",
+          kind: "standup",
+          status: "running",
+          steps: [
+            { seq: 1, kind: "declare", name: "LeanIMT" },
+            { seq: 2, kind: "deploy", name: "leanImt" },
+          ],
+        }),
+      listMacis: () => Promise.resolve({ items: [], total: 0 }),
+      readMaci: () => Promise.resolve(undefined),
+    };
+    const { service } = harness(recordingOps(), store);
+    const events: JobEvent[] = [];
+
+    const unsub = await service.subscribe((event) => {
+      events.push(event);
+    });
+
+    expect(events).toEqual([{ type: "step", step: { seq: 2, kind: "deploy", name: "leanImt" } }]);
+    unsub();
+  });
+
   test("subscribe does not emit declare steps", async () => {
     const { service } = harness();
     const events: JobEvent[] = [];
