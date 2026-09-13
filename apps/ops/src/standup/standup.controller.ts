@@ -1,28 +1,56 @@
 import {
   BadRequestException,
+  Body,
   ConflictException,
   Controller,
   Get,
   Inject,
   NotFoundException,
+  Param,
   Post,
+  Query,
   Req,
   Sse,
   UnauthorizedException,
 } from "@nestjs/common";
 import { type FastifyRequest } from "fastify";
-import { type DeployMaciResult } from "maci-deploy/maci";
 import { Observable } from "rxjs";
 
 import { LOGIN_SERVICE } from "../login/login.controller.js";
 import { type LoginService } from "../login/services/login.service.js";
 import { readBearer } from "../login/utils/bearer.js";
-import { type Paginated, readPagination } from "../utils/pagination.js";
 
-import { type JobSnapshot, type MaciListItem } from "./repositories/job.store.js";
+import { CurrentJobResponseDto } from "./dto/currentJob.dto.js";
+import { ListMacisQueryDto, MacisPageDto, parseListMacisQueryDto } from "./dto/listMacis.dto.js";
+import { MaciInstanceDto, parseReadMaciParamsDto, ReadMaciParamsDto } from "./dto/readMaci.dto.js";
+import { StandUpCatalogDto } from "./dto/standUpCatalog.dto.js";
+import { parseStartStandUpDto, StartStandUpDto, StartStandUpResponseDto } from "./dto/startStandUp.dto.js";
 import { type JobEvent, StandupService } from "./standup.service.js";
 
 export const STANDUP_SERVICE = "STANDUP_SERVICE";
+
+const OPERATOR_STANDUP_ERRORS = new Set(["Zero vote balance", "Vote balance too large"]);
+
+function isOperatorStandUpError(message: string): boolean {
+  return (
+    OPERATOR_STANDUP_ERRORS.has(message) ||
+    message.startsWith("unknown circuit profile:") ||
+    message.startsWith("unknown policy:") ||
+    message.startsWith("unknown assigner:")
+  );
+}
+
+function httpErrorForStandUpStart(caught: unknown): Error {
+  if (caught instanceof Error && caught.message === "busy") {
+    return new ConflictException({ error: "busy" });
+  }
+
+  if (caught instanceof Error && isOperatorStandUpError(caught.message)) {
+    return new BadRequestException({ error: caught.message });
+  }
+
+  return caught instanceof Error ? caught : new BadRequestException({ error: "failed" });
+}
 
 @Controller()
 export class StandupController {
@@ -31,40 +59,38 @@ export class StandupController {
     @Inject(STANDUP_SERVICE) private readonly standupService: StandupService,
   ) {}
 
+  @Get("standup")
+  async readStandUpCatalog(@Req() request: FastifyRequest): Promise<StandUpCatalogDto> {
+    await this.requireOperator(request);
+
+    return this.standupService.readStandUpCatalog();
+  }
+
   @Post("standup")
-  async startStandUp(@Req() request: FastifyRequest): Promise<{ jobId: string }> {
+  async startStandUp(@Req() request: FastifyRequest, @Body() body: StartStandUpDto): Promise<StartStandUpResponseDto> {
     await this.requireOperator(request);
 
     try {
-      return await this.standupService.startStandUp();
+      return await this.standupService.startStandUp(parseStartStandUpDto(body));
     } catch (caught) {
-      if (caught instanceof Error && caught.message === "busy") {
-        throw new ConflictException({ error: "busy" });
-      }
-
-      throw caught instanceof Error ? caught : new BadRequestException({ error: "failed" });
+      throw httpErrorForStandUpStart(caught);
     }
   }
 
   @Get("macis")
-  async listMacis(@Req() request: FastifyRequest): Promise<Paginated<MaciListItem>> {
+  async listMacis(@Req() request: FastifyRequest, @Query() query: ListMacisQueryDto): Promise<MacisPageDto> {
     await this.requireOperator(request);
 
-    const pagination = readPagination(request.query);
+    const pagination = parseListMacisQueryDto(query);
 
     return { ...(await this.standupService.listMacis(pagination)), ...pagination };
   }
 
   @Get("macis/:address")
-  async readMaci(@Req() request: FastifyRequest): Promise<DeployMaciResult> {
+  async readMaci(@Req() request: FastifyRequest, @Param() params: ReadMaciParamsDto): Promise<MaciInstanceDto> {
     await this.requireOperator(request);
 
-    const { address } = request.params as { address?: string };
-
-    if (address === undefined || address.length === 0) {
-      throw new BadRequestException({ error: "maci address required" });
-    }
-
+    const address = parseReadMaciParamsDto(params);
     const maci = await this.standupService.readMaci(address);
 
     if (maci === undefined) {
@@ -75,7 +101,7 @@ export class StandupController {
   }
 
   @Get("job")
-  async readCurrentJob(@Req() request: FastifyRequest): Promise<{ job: JobSnapshot | null }> {
+  async readCurrentJob(@Req() request: FastifyRequest): Promise<CurrentJobResponseDto> {
     await this.requireOperator(request);
 
     return { job: (await this.standupService.currentJob()) ?? null };

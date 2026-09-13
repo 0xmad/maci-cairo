@@ -15,6 +15,12 @@ export interface MaciListItem {
   network: MaciNetwork;
 }
 
+export interface MaciInstanceRecord extends DeployMaciResult {
+  circuitProfile: string;
+  policy: string;
+  voteBalanceAssigner: string;
+}
+
 export interface JobSnapshot {
   id: string;
   kind: "standup";
@@ -33,9 +39,9 @@ export interface NewJob {
 export interface JobStore {
   tryBegin: (job: NewJob) => Promise<boolean>;
   appendStep: (jobId: string, step: JobStep) => Promise<void>;
-  succeed: (jobId: string, completedAtMs: number, maci: DeployMaciResult) => Promise<void>;
+  succeed: (jobId: string, completedAtMs: number, maci: MaciInstanceRecord) => Promise<void>;
   fail: (jobId: string, completedAtMs: number, error: string) => Promise<void>;
   latest: () => Promise<JobSnapshot | undefined>;
   listMacis: (pagination: Pagination) => Promise<Page<MaciListItem>>;
-  readMaci: (address: string) => Promise<DeployMaciResult | undefined>;
+  readMaci: (address: string) => Promise<MaciInstanceRecord | undefined>;
 }

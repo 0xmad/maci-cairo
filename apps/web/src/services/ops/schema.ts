@@ -8,6 +8,18 @@ export const operatorSessionSchema = strictObject({
 });
 export const sessionAddressSchema = strictObject({ address: string().min(1) });
 export const startStandUpSchema = strictObject({ jobId: string().min(1) });
+export const standUpBodySchema = strictObject({
+  circuitProfile: string().min(1),
+  policy: string().min(1),
+  assigner: string().min(1),
+  voteBalance: union([string().min(1), number().int()]).optional(),
+});
+/** Only catalog choice today: `small` / Free for all / Constant vote balance. */
+export const SMALL_STAND_UP_BODY = {
+  circuitProfile: "small",
+  policy: "Free for all",
+  assigner: "Constant vote balance",
+} as const;
 export const jobStepSchema = strictObject({
   seq: number(),
   kind: string().min(1),
@@ -39,6 +51,9 @@ export const maciInstanceSchema = strictObject({
   coordinator: string().min(1),
   deployer: string().min(1),
   network: maciNetworkSchema,
+  circuitProfile: string().min(1),
+  policy: string().min(1),
+  voteBalanceAssigner: string().min(1),
 });
 export interface Paginated<T> {
   items: T[];
@@ -65,6 +80,7 @@ export const jobEventSchema = union([
   }),
 ]);
 
+export type StandUpBody = ZodInfer<typeof standUpBodySchema>;
 export type OperatorSession = ZodInfer<typeof operatorSessionSchema>;
 export type JobStep = ZodInfer<typeof jobStepSchema>;
 export type JobSnapshot = ZodInfer<typeof jobSnapshotSchema>;

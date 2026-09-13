@@ -10,11 +10,13 @@ import {
   operatorSessionSchema,
   sessionAddressSchema,
   startStandUpSchema,
+  SMALL_STAND_UP_BODY,
   type JobEvent,
   type JobSnapshot,
   type MaciInstance,
   type MaciListPage,
   type OperatorSession,
+  type StandUpBody,
 } from "./schema";
 
 export type {
@@ -26,6 +28,7 @@ export type {
   MaciListPage,
   OperatorSession,
   Paginated,
+  StandUpBody,
 } from "./schema";
 
 function readError(body: unknown, fallback: string): string {
@@ -104,10 +107,11 @@ export class OpsClient {
     return parsed.data.address;
   }
 
-  async startStandUp(token: string): Promise<string> {
+  async startStandUp(token: string, intent: StandUpBody = SMALL_STAND_UP_BODY): Promise<string> {
     const res = await fetch(`${this.#root}/standup`, {
       method: "POST",
-      headers: authHeaders(token),
+      headers: { ...authHeaders(token), "content-type": "application/json" },
+      body: JSON.stringify(intent),
     });
     const body: unknown = await res.json();
     const parsed = startStandUpSchema.safeParse(body);

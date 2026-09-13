@@ -18,6 +18,9 @@ const INSTANCE = {
   coordinator: "0x9",
   deployer: "0xa",
   network: "starknet_local" as const,
+  circuitProfile: "small",
+  policy: "Free for all",
+  voteBalanceAssigner: "Constant vote balance",
 };
 
 const { readStoredJwtMock, readMaciMock } = vi.hoisted(() => ({

@@ -1,11 +1,10 @@
-import { type DeployMaciResult } from "maci-deploy/maci";
 import { describe, expect, test, vi } from "vitest";
 
 import { jobs, jobSteps } from "../repositories/job.schema.js";
-import { type JobStep } from "../repositories/job.store.js";
+import { type JobStep, type MaciInstanceRecord } from "../repositories/job.store.js";
 import { PostgresJobStore } from "../repositories/postgresJob.store.js";
 
-const MACI: DeployMaciResult = {
+const MACI: MaciInstanceRecord = {
   leanImt: "0x1",
   checker: "0x2",
   enforcer: "0x3",
@@ -17,6 +16,9 @@ const MACI: DeployMaciResult = {
   coordinator: "0x9",
   deployer: "0xa",
   network: "starknet_local",
+  circuitProfile: "small",
+  policy: "Free for all",
+  voteBalanceAssigner: "Constant vote balance",
 };
 
 const STEP: JobStep = { seq: 1, kind: "declare", name: "LeanIMT" };
@@ -42,6 +44,9 @@ const MACI_ROW = {
   pollFactory: MACI.pollFactory,
   coordinator: MACI.coordinator,
   deployer: MACI.deployer,
+  circuitProfile: MACI.circuitProfile,
+  policy: MACI.policy,
+  voteBalanceAssigner: MACI.voteBalanceAssigner,
   jobId: "job-1",
   network: "starknet_local",
   createdAtMs: 1_000_100,

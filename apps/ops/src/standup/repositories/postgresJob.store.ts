@@ -1,6 +1,6 @@
 import { count, desc, eq } from "drizzle-orm";
 import { type NodePgDatabase } from "drizzle-orm/node-postgres";
-import { type DeployMaciResult, type MaciNetwork } from "maci-deploy/maci";
+import { type MaciNetwork } from "maci-deploy/maci";
 
 import { type Page, type Pagination } from "../../utils/pagination.js";
 
@@ -10,6 +10,7 @@ import {
   type JobStatus,
   type JobStep,
   type JobStore,
+  type MaciInstanceRecord,
   type MaciListItem,
   type NewJob,
 } from "./job.store.js";
@@ -50,7 +51,7 @@ function asNetwork(value: string): MaciNetwork {
   throw new Error(`unknown MACI network ${value}`);
 }
 
-function asMaci(row: MaciInstanceRow): DeployMaciResult {
+function asMaci(row: MaciInstanceRow): MaciInstanceRecord {
   return {
     leanImt: row.leanImt,
     checker: row.checker,
@@ -63,6 +64,9 @@ function asMaci(row: MaciInstanceRow): DeployMaciResult {
     coordinator: row.coordinator,
     deployer: row.deployer,
     network: asNetwork(row.network),
+    circuitProfile: row.circuitProfile,
+    policy: row.policy,
+    voteBalanceAssigner: row.voteBalanceAssigner,
   };
 }
 
@@ -102,7 +106,7 @@ export class PostgresJobStore implements JobStore {
     });
   }
 
-  async succeed(jobId: string, completedAtMs: number, maci: DeployMaciResult): Promise<void> {
+  async succeed(jobId: string, completedAtMs: number, maci: MaciInstanceRecord): Promise<void> {
     await this.#db.transaction(async (tx) => {
       await tx.update(jobs).set({ status: "succeeded", completedAtMs }).where(eq(jobs.id, jobId));
       await tx.insert(maciInstances).values({
@@ -116,6 +120,9 @@ export class PostgresJobStore implements JobStore {
         pollFactory: maci.pollFactory,
         coordinator: maci.coordinator,
         deployer: maci.deployer,
+        circuitProfile: maci.circuitProfile,
+        policy: maci.policy,
+        voteBalanceAssigner: maci.voteBalanceAssigner,
         jobId,
         network: maci.network,
         createdAtMs: completedAtMs,
@@ -165,7 +172,7 @@ export class PostgresJobStore implements JobStore {
     };
   }
 
-  async readMaci(address: string): Promise<DeployMaciResult | undefined> {
+  async readMaci(address: string): Promise<MaciInstanceRecord | undefined> {
     const rows = await this.#db.select().from(maciInstances).where(eq(maciInstances.maci, address)).limit(1);
 
     if (rows.length === 0) {
