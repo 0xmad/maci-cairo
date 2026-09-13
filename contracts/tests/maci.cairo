@@ -85,15 +85,7 @@ pub fn coordinator() -> ContractAddress {
 }
 
 pub fn default_create_poll_args() -> CreatePollArgs {
-    CreatePollArgs {
-        start_date: 0,
-        end_date: 1_000,
-        poll_public_key: (0, 1),
-        state_tree_depth: 5,
-        vote_options: 2,
-        batch_size: 2,
-        empty_live_ballot_root: 0xabc,
-    }
+    CreatePollArgs { start_date: 0, end_date: 1_000, poll_public_key: (0, 1) }
 }
 
 fn deploy_maci(
@@ -359,14 +351,17 @@ fn test_create_poll_assigns_sequential_ids() {
 #[test]
 fn test_create_poll_copies_maci_dimensions() {
     let (maci, _) = deploy();
-    let mut args = default_create_poll_args();
-    args.vote_options = 2;
+    let args = default_create_poll_args();
 
     start_cheat_caller_address(maci.contract_address, coordinator());
     let poll_address = maci.create_poll(args);
     stop_cheat_caller_address(maci.contract_address);
 
     let poll = IPollDispatcher { contract_address: poll_address };
+    assert_eq!(poll.state_tree_depth(), maci.state_tree_depth());
+    assert_eq!(poll.vote_options(), maci.vote_options());
+    assert_eq!(poll.batch_size(), maci.batch_size());
+    assert_eq!(poll.tally_live_root(), maci.empty_live_ballot_root());
     assert_eq!(poll.state_tree_depth(), 5);
     assert_eq!(poll.vote_options(), 5);
     assert_eq!(poll.batch_size(), 4);

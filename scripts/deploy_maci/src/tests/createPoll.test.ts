@@ -20,17 +20,12 @@ const VALID_JSON = `{
   "maci": "0x7",
   "start_date": 0,
   "end_date": 1000,
-  "poll_public_key": [0, 1],
-  "state_tree_depth": 5,
-  "vote_options": 2,
-  "batch_size": 2,
-  "empty_live_ballot_root": "0xabc"
+  "poll_public_key": [0, 1]
 }`;
 
 function recordingOps(
   options: {
     coordinatorOnChain?: string;
-    depthOnChain?: string;
     nextPollIdOnChain?: string;
     poll?: string;
     pollId?: string;
@@ -46,10 +41,6 @@ function recordingOps(
 
       if (args[0] === "call" && args.includes("coordinator")) {
         return options.coordinatorOnChain ?? DEVNET_SEED0_DEVNET_1;
-      }
-
-      if (args[0] === "call" && args.includes("state_tree_depth")) {
-        return options.depthOnChain ?? "0x5";
       }
 
       if (args[0] === "call" && args.includes("next_poll_id")) {
@@ -79,46 +70,69 @@ function recordingOps(
 }
 
 describe("parseCreatePollConfig", () => {
-  test("accepts fixture keys with hex empty live-ballot root", () => {
+  test("accepts only maci, schedule, and poll public key", () => {
     const config = parseCreatePollConfig(VALID_JSON);
 
     expect(config.maci).toBe(normalizeHex("0x7"));
     expect(config.startDate).toBe(0n);
     expect(config.endDate).toBe(1000n);
     expect(config.pollPublicKey).toEqual([0n, 1n]);
-    expect(config.stateTreeDepth).toBe(5n);
-    expect(config.voteOptions).toBe(2n);
-    expect(config.batchSize).toBe(2n);
-    expect(config.emptyLiveBallotRoot).toBe(0xabcn);
+  });
+
+  test("accepts hex and decimal strings for schedule and poll public key", () => {
+    const config = parseCreatePollConfig(`{
+      "maci": "0x7",
+      "start_date": "0",
+      "end_date": "0x3e8",
+      "poll_public_key": ["0", "0x1"]
+    }`);
+
+    expect(config.startDate).toBe(0n);
+    expect(config.endDate).toBe(1000n);
+    expect(config.pollPublicKey).toEqual([0n, 1n]);
   });
 
   test("parses the committed example file", () => {
     const config = parseCreatePollConfig(readFileSync(EXAMPLE_PATH, "utf8"));
 
     expect(config.maci).toBe(normalizeHex("0x0"));
-    expect(config.stateTreeDepth).toBe(5n);
-    expect(config.emptyLiveBallotRoot).toBe(0xabcn);
+    expect(config.startDate).toBe(0n);
+    expect(config.endDate).toBe(1000n);
+    expect(config.pollPublicKey).toEqual([0n, 1n]);
   });
 
   test("rejects poll_id and other unknown keys", () => {
     expect(() => {
-      parseCreatePollConfig(VALID_JSON.replace('"batch_size": 2', '"batch_size": 2, "poll_id": 0'));
+      parseCreatePollConfig(VALID_JSON.replace('"poll_public_key": [0, 1]', '"poll_public_key": [0, 1], "poll_id": 0'));
     }).toThrow(/unknown key poll_id/u);
+  });
+
+  test.each(["state_tree_depth", "vote_options", "batch_size", "empty_live_ballot_root"] as const)(
+    "rejects old dimension key %s",
+    (key) => {
+      expect(() => {
+        parseCreatePollConfig(
+          VALID_JSON.replace('"poll_public_key": [0, 1]', `"poll_public_key": [0, 1], "${key}": 1`),
+        );
+      }).toThrow(new RegExp(`unknown key ${key}`, "u"));
+    },
+  );
+
+  test("rejects a missing start_date", () => {
+    expect(() => {
+      parseCreatePollConfig(`{"maci":"0x1","end_date":1,"poll_public_key":[0,1]}`);
+    }).toThrow(/missing key start_date/u);
   });
 
   test("rejects a missing key", () => {
     expect(() => {
-      parseCreatePollConfig(
-        `{"maci":"0x1","start_date":0,"end_date":1,"poll_public_key":[0,1],"state_tree_depth":5,"vote_options":1,"batch_size":1}`,
-      );
-    }).toThrow(/missing key empty_live_ballot_root/u);
+      parseCreatePollConfig(`{"maci":"0x1","start_date":0,"end_date":1}`);
+    }).toThrow(/missing key poll_public_key/u);
   });
 
   test("rejects a missing maci", () => {
     expect(() => {
-      parseCreatePollConfig(
-        `{"start_date":0,"end_date":1,"poll_public_key":[0,1],"state_tree_depth":5,"vote_options":1,"batch_size":1,"empty_live_ballot_root":1}`,
-      );
+      parseCreatePollConfig(`{"start_date":0,"end_date":1,"poll_public_key":[0,1]}`);
     }).toThrow(/missing key maci/u);
   });
 
@@ -142,15 +156,14 @@ describe("parseCreatePollConfig", () => {
 });
 
 describe("createPoll", () => {
-  test("preflights coordinator and depth then invokes create_poll", () => {
+  test("preflights coordinator then invokes create_poll without Circuit-profile fields", () => {
     const ops = recordingOps({ poll: "0xbb", pollId: "0x0" });
     const config = parseCreatePollConfig(VALID_JSON);
     const result = createPoll(ops, config);
 
     expect(ops.fields[0]?.args).toEqual(["call", "--contract-address", config.maci, "--function", "coordinator"]);
-    expect(ops.fields[1]?.args).toEqual(["call", "--contract-address", config.maci, "--function", "state_tree_depth"]);
-    expect(ops.fields[2]?.args).toEqual(["call", "--contract-address", config.maci, "--function", "next_poll_id"]);
-    expect(ops.fields[3]).toEqual({
+    expect(ops.fields[1]?.args).toEqual(["call", "--contract-address", config.maci, "--function", "next_poll_id"]);
+    expect(ops.fields[2]).toEqual({
       key: "transaction_hash",
       args: [
         "invoke",
@@ -159,10 +172,10 @@ describe("createPoll", () => {
         "--function",
         "create_poll",
         "--arguments",
-        "maci_contracts::PollFactory::CreatePollArgs { start_date: 0, end_date: 1000, poll_public_key: (0, 1), state_tree_depth: 5, vote_options: 2, batch_size: 2, empty_live_ballot_root: 2748 }",
+        "maci_contracts::PollFactory::CreatePollArgs { start_date: 0, end_date: 1000, poll_public_key: (0, 1) }",
       ],
     });
-    expect(ops.fields[4]?.args).toEqual([
+    expect(ops.fields[3]?.args).toEqual([
       "call",
       "--contract-address",
       config.maci,
@@ -171,7 +184,7 @@ describe("createPoll", () => {
       "--arguments",
       "0",
     ]);
-    expect(ops.fields[5]?.args).toEqual(["call", "--contract-address", result.poll, "--function", "poll_id"]);
+    expect(ops.fields[4]?.args).toEqual(["call", "--contract-address", result.poll, "--function", "poll_id"]);
     expect(result).toEqual({
       maci: config.maci,
       poll: normalizeHex("0xbb"),
@@ -191,7 +204,6 @@ describe("createPoll", () => {
 
     expect(steps).toEqual([
       { kind: "call", name: "coordinator" },
-      { kind: "call", name: "state_tree_depth" },
       { kind: "call", name: "next_poll_id" },
       { kind: "invoke", name: "create_poll" },
       { kind: "call", name: "get_poll" },
@@ -213,33 +225,24 @@ describe("createPoll", () => {
     expect(steps).toEqual([{ kind: "call", name: "coordinator" }]);
   });
 
-  test("fails when on-chain state tree depth does not match the config", () => {
-    const ops = recordingOps({ depthOnChain: "0x4" });
-    const steps: CreatePollStep[] = [];
+  test("does not call state_tree_depth", () => {
+    const ops = recordingOps({ poll: "0xbb", pollId: "0x0" });
 
-    expect(() => {
-      createPoll(ops, parseCreatePollConfig(VALID_JSON), {
-        onStep: (step) => {
-          steps.push(step);
-        },
-      });
-    }).toThrow(/state_tree_depth mismatch/u);
+    createPoll(ops, parseCreatePollConfig(VALID_JSON));
 
-    expect(steps).toEqual([
-      { kind: "call", name: "coordinator" },
-      { kind: "call", name: "state_tree_depth" },
-    ]);
+    expect(ops.fields.some((field) => field.args.includes("state_tree_depth"))).toBe(false);
   });
 
-  test("reads decimal sncast felts for depth and poll_id", () => {
-    const ops = recordingOps({ depthOnChain: "5", pollId: "1" });
+  test("reads decimal sncast felts for next_poll_id and poll_id", () => {
+    const ops = recordingOps({ nextPollIdOnChain: "1", poll: "0xcc", pollId: "1" });
     const result = createPoll(ops, parseCreatePollConfig(VALID_JSON));
 
+    expect(ops.fields[3]?.args.at(-1)).toBe("1");
     expect(result.pollId).toBe("1");
   });
 
-  test("fails when sncast depth is not an integer felt", () => {
-    const ops = recordingOps({ depthOnChain: "nope" });
+  test("fails when sncast next_poll_id is not an integer felt", () => {
+    const ops = recordingOps({ nextPollIdOnChain: "nope" });
 
     expect(() => {
       createPoll(ops, parseCreatePollConfig(VALID_JSON));
@@ -251,7 +254,7 @@ describe("createPoll", () => {
     const ops = recordingOps({ nextPollIdOnChain: "0x1", poll: "0xcc", pollId: "0x1" });
     const result = createPoll(ops, config);
 
-    expect(ops.fields[4]?.args.at(-1)).toBe("1");
+    expect(ops.fields[3]?.args.at(-1)).toBe("1");
     expect(result).toEqual({
       maci: config.maci,
       poll: normalizeHex("0xcc"),
@@ -273,7 +276,6 @@ describe("createPoll", () => {
 
     expect(steps).toEqual([
       { kind: "call", name: "coordinator" },
-      { kind: "call", name: "state_tree_depth" },
       { kind: "call", name: "next_poll_id" },
       { kind: "invoke", name: "create_poll" },
       { kind: "call", name: "get_poll" },

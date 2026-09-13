@@ -420,25 +420,3 @@ fn test_create_poll_rejects_empty_schedule() {
     start_cheat_caller_address(maci.contract_address, crate::maci::coordinator());
     maci.create_poll(args);
 }
-
-#[test]
-fn test_create_poll_ignores_coordinator_zero_vote_options() {
-    let (maci, _) = crate::maci::deploy();
-    let mut args = crate::maci::default_create_poll_args();
-    args.vote_options = 0;
-    start_cheat_caller_address(maci.contract_address, crate::maci::coordinator());
-    let poll = IPollDispatcher { contract_address: maci.create_poll(args) };
-    stop_cheat_caller_address(maci.contract_address);
-    assert_eq!(poll.vote_options(), 5);
-}
-
-#[test]
-fn test_create_poll_ignores_coordinator_zero_batch_size() {
-    let (maci, _) = crate::maci::deploy();
-    let mut args = crate::maci::default_create_poll_args();
-    args.batch_size = 0;
-    start_cheat_caller_address(maci.contract_address, crate::maci::coordinator());
-    let poll = IPollDispatcher { contract_address: maci.create_poll(args) };
-    stop_cheat_caller_address(maci.contract_address);
-    assert_eq!(poll.batch_size(), 4);
-}
