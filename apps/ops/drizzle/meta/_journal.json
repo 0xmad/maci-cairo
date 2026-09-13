@@ -36,6 +36,13 @@
       "when": 5,
       "tag": "0004_maci_network_starknet_local",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 6,
+      "tag": "0005_maci_standup_choices",
+      "breakpoints": true
     }
   ]
 }

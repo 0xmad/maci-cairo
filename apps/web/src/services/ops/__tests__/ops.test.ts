@@ -43,7 +43,7 @@ describe("OpsClient", () => {
     vi.unstubAllGlobals();
   });
 
-  it("starts MACI stand-up with the Operator JWT and no RPC body", async () => {
+  it("starts MACI stand-up with the Operator JWT and the small catalog body", async () => {
     const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
       let url: string;
 
@@ -57,8 +57,17 @@ describe("OpsClient", () => {
 
       expect(url).toBe("http://ops.test/standup");
       expect(init?.method).toBe("POST");
-      expect(init?.headers).toEqual({ authorization: "Bearer jwt" });
-      expect(init?.body).toBeUndefined();
+      expect(init?.headers).toEqual({
+        authorization: "Bearer jwt",
+        "content-type": "application/json",
+      });
+      expect(init?.body).toBe(
+        JSON.stringify({
+          circuitProfile: "small",
+          policy: "Free for all",
+          assigner: "Constant vote balance",
+        }),
+      );
 
       return new Response(JSON.stringify({ jobId: "job-1" }), { status: 201 });
     });
@@ -215,6 +224,9 @@ describe("OpsClient", () => {
       coordinator: "0x9",
       deployer: "0xa",
       network: "starknet_local" as const,
+      circuitProfile: "small",
+      policy: "Free for all",
+      voteBalanceAssigner: "Constant vote balance",
     };
     const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
       let url: string;

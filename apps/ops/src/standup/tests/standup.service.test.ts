@@ -1,4 +1,5 @@
 import { intendedCoordinator, normalizeHex } from "maci-deploy/hex";
+import { SMALL_STANDUP_INTENT } from "maci-deploy/intent";
 import { type DeployMaciResult, type MaciNetwork, type SncastOps } from "maci-deploy/maci";
 import { describe, expect, test, vi } from "vitest";
 
@@ -13,10 +14,10 @@ function padIndex(index: number): string {
 
 function recordingOps(
   options: { failOn?: "set_target" | "coordinator"; coordinatorOnChain?: string } = {},
-): SncastOps & { fieldCalls: string[][]; maciCoordinatorArg?: string } {
+): SncastOps & { fieldCalls: string[][]; maciCoordinatorArg?: string; assignerArg?: string } {
   let next = 1;
   const fieldCalls: string[][] = [];
-  const ops: SncastOps & { fieldCalls: string[][]; maciCoordinatorArg?: string } = {
+  const ops: SncastOps & { fieldCalls: string[][]; maciCoordinatorArg?: string; assignerArg?: string } = {
     fieldCalls,
     declareClass(): string {
       const classHash = padIndex(next);
@@ -28,6 +29,8 @@ function recordingOps(
 
       if (coordinator !== undefined) {
         ops.maciCoordinatorArg = coordinator;
+      } else if (argumentsExpr !== undefined && !argumentsExpr.includes(",")) {
+        ops.assignerArg = argumentsExpr;
       }
 
       const address = padIndex(next);
@@ -79,6 +82,9 @@ interface StepRow {
 interface MaciRow extends DeployMaciResult {
   id: number;
   jobId: string;
+  circuitProfile: string;
+  policy: string;
+  voteBalanceAssigner: string;
 }
 
 function postgresJobStore(): PostgresJobStore {
@@ -131,6 +137,9 @@ function postgresJobStore(): PostgresJobStore {
         pollFactory: row.pollFactory as string,
         coordinator: row.coordinator as string,
         deployer: row.deployer as string,
+        circuitProfile: row.circuitProfile as string,
+        policy: row.policy as string,
+        voteBalanceAssigner: row.voteBalanceAssigner as string,
         network: row.network as MaciNetwork,
       };
 
@@ -230,11 +239,70 @@ async function settle(service: StandupService): Promise<void> {
 }
 
 describe("StandupService", () => {
+  test("catalog lists small Circuit profile capacity, Free for all Policy, and Constant vote balance", () => {
+    const { service } = harness();
+    const catalog = service.readStandUpCatalog();
+    const serialized = JSON.stringify(catalog);
+
+    expect(catalog).toEqual({
+      circuitProfiles: [{ id: "small", maxSignups: 32, maxVoteOptions: 5 }],
+      policies: [{ id: "Free for all" }],
+      assigners: [{ id: "Constant vote balance" }],
+    });
+    expect(serialized).not.toMatch(/checker/iu);
+    expect(serialized).not.toMatch(/enforcer/iu);
+  });
+
+  test("rejects an unknown Circuit profile without starting a job", async () => {
+    const { service } = harness();
+
+    await expect(service.startStandUp({ ...SMALL_STANDUP_INTENT, circuitProfile: "medium" })).rejects.toThrow(
+      /^unknown circuit profile: medium$/u,
+    );
+    await expect(service.currentJob()).resolves.toBeUndefined();
+  });
+
+  test("rejects an unknown Policy without starting a job", async () => {
+    const { service } = harness();
+
+    await expect(service.startStandUp({ ...SMALL_STANDUP_INTENT, policy: "Allowlist" })).rejects.toThrow(
+      /^unknown policy: Allowlist$/u,
+    );
+    await expect(service.currentJob()).resolves.toBeUndefined();
+  });
+
+  test("rejects an unknown assigner without starting a job", async () => {
+    const { service } = harness();
+
+    await expect(service.startStandUp({ ...SMALL_STANDUP_INTENT, assigner: "Token gate" })).rejects.toThrow(
+      /^unknown assigner: Token gate$/u,
+    );
+    await expect(service.currentJob()).resolves.toBeUndefined();
+  });
+
+  test("rejects a zero constant vote balance without starting a job", async () => {
+    const { service } = harness();
+
+    await expect(service.startStandUp({ ...SMALL_STANDUP_INTENT, constantVoteBalance: 0n })).rejects.toThrow(
+      /^Zero vote balance$/u,
+    );
+    await expect(service.currentJob()).resolves.toBeUndefined();
+  });
+
+  test("rejects a constant vote balance at 2^251 without starting a job", async () => {
+    const { service } = harness();
+
+    await expect(service.startStandUp({ ...SMALL_STANDUP_INTENT, constantVoteBalance: 2n ** 251n })).rejects.toThrow(
+      /^Vote balance too large$/u,
+    );
+    await expect(service.currentJob()).resolves.toBeUndefined();
+  });
+
   test("rejects a second start while MACI stand-up is running", async () => {
     const { service } = harness();
 
-    const first = service.startStandUp();
-    const second = service.startStandUp();
+    const first = service.startStandUp(SMALL_STANDUP_INTENT);
+    const second = service.startStandUp(SMALL_STANDUP_INTENT);
 
     await expect(first).resolves.toEqual({ jobId: "job-1" });
     await expect(second).rejects.toThrow(/^busy$/u);
@@ -245,7 +313,7 @@ describe("StandupService", () => {
     const ops = recordingOps();
     const { service } = harness(ops);
 
-    await expect(service.startStandUp()).resolves.toEqual({ jobId: "job-1" });
+    await expect(service.startStandUp(SMALL_STANDUP_INTENT)).resolves.toEqual({ jobId: "job-1" });
     await settle(service);
 
     const listed = await service.listMacis({ page: 1, pageSize: 10 });
@@ -259,15 +327,39 @@ describe("StandupService", () => {
       maci: listed.items[0]?.address,
       deployer: intendedCoordinator(undefined),
       network: "starknet_local",
+      circuitProfile: "small",
+      policy: "Free for all",
+      voteBalanceAssigner: "Constant vote balance",
     });
     expect(ops.fieldCalls.some((args) => args.includes("create_poll"))).toBe(false);
     expect(ops.maciCoordinatorArg).toBe(intendedCoordinator(undefined));
+    expect(ops.assignerArg).toBe("3");
+  });
+
+  test("omitted constant vote balance deploys amount 3", async () => {
+    const ops = recordingOps();
+    const { service } = harness(ops);
+
+    await service.startStandUp(SMALL_STANDUP_INTENT);
+    await settle(service);
+
+    expect(ops.assignerArg).toBe("3");
+  });
+
+  test("constant vote balance 7 is deployed as the assigner amount", async () => {
+    const ops = recordingOps();
+    const { service } = harness(ops);
+
+    await service.startStandUp({ ...SMALL_STANDUP_INTENT, constantVoteBalance: 7n });
+    await settle(service);
+
+    expect(ops.assignerArg).toBe("7");
   });
 
   test("no instance is recorded when set_target fails", async () => {
     const { service } = harness(recordingOps({ failOn: "set_target" }));
 
-    await service.startStandUp();
+    await service.startStandUp(SMALL_STANDUP_INTENT);
     await settle(service);
 
     const job = await service.currentJob();
@@ -281,7 +373,7 @@ describe("StandupService", () => {
   test("no instance is recorded when the coordinator check fails", async () => {
     const { service } = harness(recordingOps({ failOn: "coordinator" }));
 
-    await service.startStandUp();
+    await service.startStandUp(SMALL_STANDUP_INTENT);
     await settle(service);
 
     const job = await service.currentJob();
@@ -296,7 +388,7 @@ describe("StandupService", () => {
     const { service } = harness();
     const events: JobEvent[] = [];
 
-    await service.startStandUp();
+    await service.startStandUp(SMALL_STANDUP_INTENT);
     await settle(service);
     const unsub = await service.subscribe((event) => {
       events.push(event);
@@ -311,7 +403,7 @@ describe("StandupService", () => {
     const firstLog: JobEvent[] = [];
     const secondLog: JobEvent[] = [];
 
-    await service.startStandUp();
+    await service.startStandUp(SMALL_STANDUP_INTENT);
     const unsubFirst = await service.subscribe((event) => {
       firstLog.push(event);
     });
@@ -319,7 +411,7 @@ describe("StandupService", () => {
       secondLog.push(event);
     });
 
-    await expect(service.startStandUp()).rejects.toThrow(/^busy$/u);
+    await expect(service.startStandUp(SMALL_STANDUP_INTENT)).rejects.toThrow(/^busy$/u);
     await settle(service);
 
     expect(firstLog.at(-1)).toEqual({ type: "completed", status: "succeeded" });
@@ -357,7 +449,7 @@ describe("StandupService", () => {
       },
     });
 
-    await service.startStandUp();
+    await service.startStandUp(SMALL_STANDUP_INTENT);
     await settle(service);
 
     const steps = events.filter((event) => event.type === "step");
@@ -380,7 +472,7 @@ describe("StandupService", () => {
       },
     });
 
-    await expect(service.startStandUp()).resolves.toEqual({ jobId: "job-1" });
+    await expect(service.startStandUp(SMALL_STANDUP_INTENT)).resolves.toEqual({ jobId: "job-1" });
     await vi.waitFor(async () => {
       const job = await service.currentJob();
       expect(job?.status).toBe("running");
@@ -397,7 +489,7 @@ describe("StandupService", () => {
 
     expect(events).toEqual([]);
 
-    await service.startStandUp();
+    await service.startStandUp(SMALL_STANDUP_INTENT);
     await settle(service);
 
     expect(events.at(-1)).toEqual({ type: "completed", status: "succeeded" });
@@ -441,7 +533,7 @@ describe("StandupService", () => {
       events.push(event);
     });
 
-    await service.startStandUp();
+    await service.startStandUp(SMALL_STANDUP_INTENT);
     await settle(service);
 
     const steps = events.filter((event) => event.type === "step");
@@ -462,7 +554,7 @@ describe("StandupService", () => {
     const { service } = harness(recordingOps({ failOn: "set_target" }));
     const events: JobEvent[] = [];
 
-    await service.startStandUp();
+    await service.startStandUp(SMALL_STANDUP_INTENT);
     await settle(service);
     await service.subscribe((event) => {
       events.push(event);
@@ -480,7 +572,7 @@ describe("StandupService", () => {
     };
     const { service } = harness(ops);
 
-    await service.startStandUp();
+    await service.startStandUp(SMALL_STANDUP_INTENT);
     await settle(service);
 
     await expect(service.currentJob()).resolves.toMatchObject({ status: "failed", error: "failed" });

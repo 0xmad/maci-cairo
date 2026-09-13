@@ -1,9 +1,22 @@
-import { SMALL_STANDUP_INTENT } from "maci-deploy/intent";
-import { deployMaci, type DeployMaciResult, type DeployMaciStep, type SncastOps } from "maci-deploy/maci";
+import {
+  ASSIGNER_CONSTANT_VOTE_BALANCE,
+  CIRCUIT_PROFILE_SMALL,
+  POLICY_FREE_FOR_ALL,
+  STATE_TREE_DEPTH,
+  VOTE_OPTIONS,
+} from "maci-deploy/config";
+import { resolveStandupIntent, type DeployMaciIntent } from "maci-deploy/intent";
+import { deployMaci, type DeployMaciStep, type SncastOps } from "maci-deploy/maci";
 
 import { type Page, type Pagination } from "../utils/pagination.js";
 
-import { type JobSnapshot, type JobStep, type JobStore, type MaciListItem } from "./repositories/job.store.js";
+import {
+  type JobSnapshot,
+  type JobStep,
+  type JobStore,
+  type MaciInstanceRecord,
+  type MaciListItem,
+} from "./repositories/job.store.js";
 
 export interface StandupServiceDeps {
   store: JobStore;
@@ -17,6 +30,12 @@ export interface StandupServiceDeps {
 export type JobEvent =
   { type: "step"; step: JobStep } | { type: "completed"; status: "succeeded" | "failed"; error?: string };
 
+export interface StandUpCatalog {
+  circuitProfiles: { id: string; maxSignups: number; maxVoteOptions: number }[];
+  policies: { id: string }[];
+  assigners: { id: string }[];
+}
+
 /**
  * MACI stand-up jobs: at most one running, instances recorded only after a full success.
  */
@@ -29,7 +48,23 @@ export class StandupService {
     this.#deps = deps;
   }
 
-  async startStandUp(): Promise<{ jobId: string }> {
+  readStandUpCatalog(): StandUpCatalog {
+    return {
+      circuitProfiles: [
+        {
+          id: CIRCUIT_PROFILE_SMALL,
+          maxSignups: 2 ** STATE_TREE_DEPTH,
+          maxVoteOptions: VOTE_OPTIONS,
+        },
+      ],
+      policies: [{ id: POLICY_FREE_FOR_ALL }],
+      assigners: [{ id: ASSIGNER_CONSTANT_VOTE_BALANCE }],
+    };
+  }
+
+  async startStandUp(intent: DeployMaciIntent): Promise<{ jobId: string }> {
+    resolveStandupIntent(intent);
+
     const jobId = this.#deps.randomId();
     const began = await this.#deps.store.tryBegin({ id: jobId, kind: "standup", createdAtMs: this.#deps.nowMs() });
 
@@ -39,7 +74,7 @@ export class StandupService {
 
     const schedule = this.#deps.scheduleWork ?? setImmediate;
     schedule(() => {
-      this.run(jobId).then(
+      this.run(jobId, intent).then(
         () => undefined,
         () => undefined,
       );
@@ -56,7 +91,7 @@ export class StandupService {
     return this.#deps.store.listMacis(pagination);
   }
 
-  readMaci(address: string): Promise<DeployMaciResult | undefined> {
+  readMaci(address: string): Promise<MaciInstanceRecord | undefined> {
     return this.#deps.store.readMaci(address);
   }
 
@@ -101,11 +136,11 @@ export class StandupService {
     };
   }
 
-  private async run(jobId: string): Promise<void> {
+  private async run(jobId: string, intent: DeployMaciIntent): Promise<void> {
     let seq = 0;
 
     try {
-      const result = await deployMaci(this.#deps.sncast, SMALL_STANDUP_INTENT, {
+      const result = await deployMaci(this.#deps.sncast, intent, {
         onStep: async (step: DeployMaciStep): Promise<void> => {
           if (step.kind === "declare") {
             return;
@@ -117,7 +152,12 @@ export class StandupService {
           this.emit({ type: "step", step: recorded });
         },
       });
-      await this.#deps.store.succeed(jobId, this.#deps.nowMs(), result);
+      await this.#deps.store.succeed(jobId, this.#deps.nowMs(), {
+        ...result,
+        circuitProfile: intent.circuitProfile,
+        policy: intent.policy,
+        voteBalanceAssigner: intent.assigner,
+      });
       this.emit({ type: "completed", status: "succeeded" });
     } catch (caught) {
       const error = caught instanceof Error ? caught.message : "failed";
