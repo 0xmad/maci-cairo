@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OpsClient } from "../../../services/ops";
+import { SMALL_STAND_UP_BODY } from "../../../services/ops/schema";
 import { useOperatorSession } from "../../../stores/operatorSession";
 import { useStandUpJob } from "../../../stores/standUpJob";
 import { useMaciStandUp } from "../useMaciStandUp";
@@ -75,11 +76,10 @@ describe("useMaciStandUp", () => {
     const { result } = renderHook(() => useMaciStandUp());
 
     await act(async () => {
-      await result.current.startStandUp();
+      await result.current.startStandUp(SMALL_STAND_UP_BODY);
     });
 
-    expect(startStandUpMock).toHaveBeenCalledWith("jwt");
-    expect(startStandUpMock.mock.calls[0]).toHaveLength(1);
+    expect(startStandUpMock).toHaveBeenCalledWith("jwt", SMALL_STAND_UP_BODY);
     expect(result.current.running).toBe(true);
   });
 
@@ -89,7 +89,7 @@ describe("useMaciStandUp", () => {
     const { result } = renderHook(() => useMaciStandUp());
 
     await act(async () => {
-      await result.current.startStandUp();
+      await result.current.startStandUp(SMALL_STAND_UP_BODY);
     });
 
     expect(result.current.error).toBe("busy");

@@ -8,17 +8,38 @@ export const operatorSessionSchema = strictObject({
 });
 export const sessionAddressSchema = strictObject({ address: string().min(1) });
 export const startStandUpSchema = strictObject({ jobId: string().min(1) });
-export const standUpBodySchema = strictObject({
+export const standUpCatalogSchema = strictObject({
+  circuitProfiles: strictObject({
+    id: string().min(1),
+    maxSignups: number().int().positive(),
+    maxVoteOptions: number().int().positive(),
+  }).array(),
+  policies: strictObject({ id: string().min(1) }).array(),
+  assigners: strictObject({ id: string().min(1) }).array(),
+});
+const standUpChoiceFields = {
   circuitProfile: string().min(1),
   policy: string().min(1),
   assigner: string().min(1),
+};
+export const standUpBodySchema = strictObject({
+  ...standUpChoiceFields,
   voteBalance: union([string().min(1), number().int()]).optional(),
 });
+const POSITIVE_INT_AMOUNT = "Constant amount must be a positive integer";
+export const standUpIntentSchema = strictObject({
+  ...standUpChoiceFields,
+  voteBalance: number({ error: POSITIVE_INT_AMOUNT }).int({ error: POSITIVE_INT_AMOUNT }).positive({
+    error: POSITIVE_INT_AMOUNT,
+  }),
+});
 /** Only catalog choice today: `small` / Free for all / Constant vote balance. */
+export const DEFAULT_CONSTANT_VOTE_BALANCE = 3;
 export const SMALL_STAND_UP_BODY = {
   circuitProfile: "small",
   policy: "Free for all",
   assigner: "Constant vote balance",
+  voteBalance: DEFAULT_CONSTANT_VOTE_BALANCE,
 } as const;
 export const jobStepSchema = strictObject({
   seq: number(),
@@ -38,6 +59,7 @@ export const maciNetworkSchema = union([literal("starknet_local"), literal("sepo
 export const maciListItemSchema = strictObject({
   address: string().min(1),
   network: maciNetworkSchema,
+  createdAtMs: number().int().nonnegative(),
 });
 export const maciInstanceSchema = strictObject({
   leanImt: string().min(1),
@@ -81,6 +103,8 @@ export const jobEventSchema = union([
 ]);
 
 export type StandUpBody = ZodInfer<typeof standUpBodySchema>;
+export type StandUpIntent = ZodInfer<typeof standUpIntentSchema>;
+export type StandUpCatalog = ZodInfer<typeof standUpCatalogSchema>;
 export type OperatorSession = ZodInfer<typeof operatorSessionSchema>;
 export type JobStep = ZodInfer<typeof jobStepSchema>;
 export type JobSnapshot = ZodInfer<typeof jobSnapshotSchema>;

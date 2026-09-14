@@ -61,12 +61,20 @@ describe("Shell", () => {
   it("renders nav, header controls, and the outlet without a MACI banner", () => {
     renderShell("/");
 
-    expect(screen.getByRole("link", { name: "Deploy" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("link", { name: "Deploy" }).getAttribute("href")).toBe("/deploy");
     expect(screen.queryByRole("link", { name: "MACI" })).toBeNull();
     expect(screen.getByText("NetworkSwitcher")).toBeTruthy();
     expect(screen.getByText("ConnectWallet")).toBeTruthy();
     expect(screen.getByText("outlet")).toBeTruthy();
     expect(screen.queryByText(/Showing this MACI/)).toBeNull();
+  });
+
+  it("marks Deploy as the current nav link on the Deploy page", () => {
+    renderShell("/deploy");
+
+    expect(screen.getByRole("link", { name: "Deploy" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Home" }).getAttribute("aria-current")).toBeNull();
   });
 
   it("shows the network banner on a MACI instance page", () => {

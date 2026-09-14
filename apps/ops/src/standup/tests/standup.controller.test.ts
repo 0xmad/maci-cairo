@@ -275,14 +275,14 @@ describe("StandupController", () => {
 
   test("listMacis returns a page of instances for an authenticated Operator", async () => {
     const listMacis = vi.fn((): Promise<Page<MaciListItem>> =>
-      Promise.resolve({ items: [{ address: "0x7", network: "starknet_local" }], total: 1 }),
+      Promise.resolve({ items: [{ address: "0x7", network: "starknet_local", createdAtMs: 1_000_100 }], total: 1 }),
     );
     const { standupController } = harness({ listMacis });
 
     await expect(
       standupController.listMacis(request("Bearer jwt-token"), listMacisQuery({ page: "2", pageSize: "1" })),
     ).resolves.toEqual({
-      items: [{ address: "0x7", network: "starknet_local" }],
+      items: [{ address: "0x7", network: "starknet_local", createdAtMs: 1_000_100 }],
       total: 1,
       page: 2,
       pageSize: 1,

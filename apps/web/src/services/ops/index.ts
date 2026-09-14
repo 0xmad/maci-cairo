@@ -10,13 +10,14 @@ import {
   operatorSessionSchema,
   sessionAddressSchema,
   startStandUpSchema,
-  SMALL_STAND_UP_BODY,
+  standUpCatalogSchema,
   type JobEvent,
   type JobSnapshot,
   type MaciInstance,
   type MaciListPage,
   type OperatorSession,
   type StandUpBody,
+  type StandUpCatalog,
 } from "./schema";
 
 export type {
@@ -29,7 +30,11 @@ export type {
   OperatorSession,
   Paginated,
   StandUpBody,
+  StandUpCatalog,
+  StandUpIntent,
 } from "./schema";
+
+export { DEFAULT_CONSTANT_VOTE_BALANCE, SMALL_STAND_UP_BODY, standUpIntentSchema } from "./schema";
 
 function readError(body: unknown, fallback: string): string {
   const parsed = errorBodySchema.safeParse(body);
@@ -107,7 +112,21 @@ export class OpsClient {
     return parsed.data.address;
   }
 
-  async startStandUp(token: string, intent: StandUpBody = SMALL_STAND_UP_BODY): Promise<string> {
+  async readStandUpCatalog(token: string): Promise<StandUpCatalog> {
+    const res = await fetch(`${this.#root}/standup`, {
+      headers: authHeaders(token),
+    });
+    const body: unknown = await res.json();
+    const parsed = standUpCatalogSchema.safeParse(body);
+
+    if (!res.ok || !parsed.success) {
+      throw new Error(readError(body, "catalog failed"));
+    }
+
+    return parsed.data;
+  }
+
+  async startStandUp(token: string, intent: StandUpBody): Promise<string> {
     const res = await fetch(`${this.#root}/standup`, {
       method: "POST",
       headers: { ...authHeaders(token), "content-type": "application/json" },

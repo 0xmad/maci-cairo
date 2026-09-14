@@ -37,7 +37,11 @@ describe("useMaciInstances", () => {
     useOperatorSession.setState({ token: "jwt" });
     listMacisMock.mockResolvedValue({
       items: [
-        { address: "0x064b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691", network: "starknet_local" },
+        {
+          address: "0x064b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691",
+          network: "starknet_local",
+          createdAtMs: 1_000_100,
+        },
       ],
       total: 11,
       page: 1,
@@ -71,7 +75,7 @@ describe("useMaciInstances", () => {
     });
 
     listMacisMock.mockResolvedValue({
-      items: [{ address: "0x22", network: "starknet_local" }],
+      items: [{ address: "0x22", network: "starknet_local", createdAtMs: 1_000_100 }],
       total: 11,
       page: 2,
       pageSize: MACI_LIST_PAGE_SIZE,
@@ -131,7 +135,7 @@ describe("useMaciInstances", () => {
 
   it("does not apply a list page after unmount", async () => {
     let resolveList: (page: {
-      items: { address: string; network: "starknet_local" }[];
+      items: { address: string; network: "starknet_local"; createdAtMs: number }[];
       total: number;
       page: number;
       pageSize: number;
@@ -150,7 +154,7 @@ describe("useMaciInstances", () => {
 
     await act(async () => {
       resolveList({
-        items: [{ address: "0x7", network: "starknet_local" }],
+        items: [{ address: "0x7", network: "starknet_local", createdAtMs: 1_000_100 }],
         total: 1,
         page: 1,
         pageSize: MACI_LIST_PAGE_SIZE,

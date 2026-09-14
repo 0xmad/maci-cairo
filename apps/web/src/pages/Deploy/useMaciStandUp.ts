@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 
 import { opsBaseUrl } from "../../config/ops";
-import { OpsClient, type JobSnapshot, type JobStep } from "../../services/ops";
+import { OpsClient, type JobSnapshot, type JobStep, type StandUpBody } from "../../services/ops";
 import { useOperatorSession } from "../../stores/operatorSession";
 import { useStandUpJob } from "../../stores/standUpJob";
 
@@ -12,7 +12,7 @@ export interface UseMaciStandUpResult {
   error?: string;
   job?: JobSnapshot;
   steps: JobStep[];
-  startStandUp: () => Promise<void>;
+  startStandUp: (intent: StandUpBody) => Promise<void>;
 }
 
 /** Wires Operator JWT and job SSE into the stand-up job store. */
@@ -74,9 +74,12 @@ export function useMaciStandUp(): UseMaciStandUpResult {
     };
   }, [token, streamId, applySnapshot, applyEvent, failWatch, reset]);
 
-  const startStandUp = useCallback(async (): Promise<void> => {
-    await startStoredJob(token);
-  }, [startStoredJob, token]);
+  const startStandUp = useCallback(
+    async (intent: StandUpBody): Promise<void> => {
+      await startStoredJob(token, intent);
+    },
+    [startStoredJob, token],
+  );
 
   return {
     signedIn,

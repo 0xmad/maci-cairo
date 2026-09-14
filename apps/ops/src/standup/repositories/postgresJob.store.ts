@@ -167,6 +167,7 @@ export class PostgresJobStore implements JobStore {
       items: rows.map((row): MaciListItem => ({
         address: row.maci,
         network: asMaci(row).network,
+        createdAtMs: row.createdAtMs,
       })),
       total: totals[0]?.total ?? 0,
     };

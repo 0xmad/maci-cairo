@@ -73,8 +73,7 @@ export type DeployMaciDeclareName =
 export type DeployMaciStep =
   | { kind: "declare"; name: DeployMaciDeclareName }
   | { kind: "deploy"; name: "leanImt" | "checker" | "enforcer" | "assigner" | "maci" }
-  | { kind: "invoke"; name: "set_target" }
-  | { kind: "call"; name: "coordinator" | "get_poll_factory" };
+  | { kind: "invoke"; name: "set_target" };
 
 type DeployMaciInstanceName = Extract<DeployMaciStep, { kind: "deploy" }>["name"];
 
@@ -235,7 +234,6 @@ export async function deployMaci(
   const actualCoordinator = normalizeHex(
     ops.field("response", ["call", "--contract-address", maci, "--function", "coordinator"]),
   );
-  await onStep?.({ kind: "call", name: "coordinator" });
 
   if (actualCoordinator !== coordinator) {
     throw new Error(`coordinator mismatch: intended ${coordinator}, on-chain ${actualCoordinator}`);
@@ -244,7 +242,6 @@ export async function deployMaci(
   const pollFactory = normalizeHex(
     ops.field("response", ["call", "--contract-address", maci, "--function", "get_poll_factory"]),
   );
-  await onStep?.({ kind: "call", name: "get_poll_factory" });
 
   return {
     leanImt,
