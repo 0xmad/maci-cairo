@@ -235,12 +235,12 @@ describe("PostgresJobStore", () => {
     await expect(new PostgresJobStore(db).latest()).rejects.toThrow(/unknown job status interrupted/u);
   });
 
-  test("listMacis returns a page of address and network", async () => {
+  test("listMacis returns a page of address, network, and createdAtMs", async () => {
     const newer = { ...MACI_ROW, id: 2, maci: "0x22", jobId: "job-2" };
     const { db } = postgresDb({ maciRows: [MACI_ROW, newer] });
 
     await expect(new PostgresJobStore(db).listMacis({ page: 1, pageSize: 1 })).resolves.toEqual({
-      items: [{ address: "0x22", network: "starknet_local" }],
+      items: [{ address: "0x22", network: "starknet_local", createdAtMs: 1_000_100 }],
       total: 2,
     });
   });

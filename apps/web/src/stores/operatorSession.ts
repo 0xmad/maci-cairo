@@ -28,5 +28,5 @@ export function createOperatorSessionStore(persistence: JwtPersistence): UseBoun
   }));
 }
 
-/** Operator JWT shared across Connect and Deploy. Persistence stays in `storage`. */
+/** Operator JWT shared across Connect, Home, and Deploy. Persistence stays in `storage`. */
 export const useOperatorSession = createOperatorSessionStore(storage);

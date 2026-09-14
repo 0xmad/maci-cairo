@@ -13,6 +13,7 @@ export interface JobStep {
 export interface MaciListItem {
   address: string;
   network: MaciNetwork;
+  createdAtMs: number;
 }
 
 export interface MaciInstanceRecord extends DeployMaciResult {

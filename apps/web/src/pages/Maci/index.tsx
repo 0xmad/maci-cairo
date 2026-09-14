@@ -1,19 +1,39 @@
 import { type JSX } from "react";
 
-import { truncateAddress } from "../../utils/truncateAddress";
+import { type MaciInstance } from "../../services/ops";
+import { networkLabel } from "../../utils/networkLabel.js";
+import { truncateAddress } from "../../utils/truncateAddress.js";
 
-import { useMaciInstance } from "./useMaciInstance";
+import { useMaciInstance } from "./useMaciInstance.js";
 
-function networkLabel(network: "starknet_local" | "sepolia"): string {
-  return network === "sepolia" ? "Sepolia" : "Starknet Local";
+interface InstanceRow {
+  label: string;
+  value: string;
+  address: boolean;
+}
+
+function instanceRows(instance: MaciInstance): InstanceRow[] {
+  return [
+    { label: "MACI", value: instance.maci, address: true },
+    { label: "LeanIMT", value: instance.leanImt, address: true },
+    { label: "Circuit profile", value: instance.circuitProfile, address: false },
+    { label: "Policy", value: instance.policy, address: false },
+    { label: "Vote balance assigner", value: instance.voteBalanceAssigner, address: false },
+    { label: "Assigner", value: instance.assigner, address: true },
+    { label: "Poll factory", value: instance.pollFactory, address: true },
+    { label: "Poll class hash", value: instance.pollClassHash, address: true },
+    { label: "Poll factory class hash", value: instance.pollFactoryClassHash, address: true },
+    { label: "Coordinator", value: instance.coordinator, address: true },
+    { label: "Deployer", value: instance.deployer, address: true },
+    { label: "Network", value: networkLabel(instance.network), address: false },
+  ];
 }
 
 export const MaciPage = (): JSX.Element => {
   const { signedIn, instance, error } = useMaciInstance();
-  const hasMaci = instance !== undefined;
 
   return (
-    <section className="space-y-4">
+    <section className="mx-auto max-w-3xl space-y-4">
       <h1 className="text-2xl font-semibold">MACI</h1>
 
       {!signedIn ? <p>Sign in as Operator to view this MACI.</p> : null}
@@ -22,41 +42,17 @@ export const MaciPage = (): JSX.Element => {
 
       {instance !== undefined ? (
         <dl className="grid gap-2 text-sm">
-          {(
-            [
-              ["MACI", instance.maci],
-              ["LeanIMT", instance.leanImt],
-              ["Checker", instance.checker],
-              ["Enforcer", instance.enforcer],
-              ["Assigner", instance.assigner],
-              ["Poll factory", instance.pollFactory],
-              ["Poll class hash", instance.pollClassHash],
-              ["Poll factory class hash", instance.pollFactoryClassHash],
-              ["Coordinator", instance.coordinator],
-              ["Deployer", instance.deployer],
-              ["Network", networkLabel(instance.network)],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label} className="grid grid-cols-[minmax(8rem,12rem)_1fr] gap-3">
-              <dt className="text-zinc-400">{label}</dt>
+          {instanceRows(instance).map((row) => (
+            <div key={row.label} className="grid grid-cols-[minmax(8rem,12rem)_1fr] gap-3">
+              <dt className="text-zinc-400">{row.label}</dt>
 
-              <dd className="font-mono break-all" title={value}>
-                {label === "Network" ? value : truncateAddress(value)}
+              <dd className={row.address ? "font-mono break-all" : undefined} title={row.value}>
+                {row.address ? truncateAddress(row.value) : row.value}
               </dd>
             </div>
           ))}
         </dl>
       ) : null}
-
-      <button
-        className="rounded border border-zinc-600 px-3 py-1 text-sm disabled:opacity-50"
-        disabled={!hasMaci}
-        type="button"
-      >
-        Create Poll
-      </button>
-
-      {hasMaci ? <p className="text-sm text-zinc-400">Create Poll is not wired and sends no transaction.</p> : null}
     </section>
   );
 };

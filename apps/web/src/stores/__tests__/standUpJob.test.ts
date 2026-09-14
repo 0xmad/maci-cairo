@@ -82,15 +82,30 @@ describe("stand-up job store", () => {
     const startStandUp = vi.fn().mockResolvedValue("job-1");
     const readJob = vi.fn().mockResolvedValue(SNAPSHOT);
     const store = createStandUpJobStore({ startStandUp, readJob });
+    const intent = {
+      circuitProfile: "small",
+      policy: "Free for all",
+      assigner: "Constant vote balance",
+      voteBalance: 3,
+    };
 
-    await store.getState().startStandUp("jwt");
+    await store.getState().startStandUp("jwt", intent);
 
-    expect(startStandUp).toHaveBeenCalledWith("jwt");
-    expect(startStandUp.mock.calls[0]).toHaveLength(1);
+    expect(startStandUp).toHaveBeenCalledWith("jwt", intent);
     expect(store.getState().job).toEqual(SNAPSHOT);
     expect(store.getState().steps).toEqual(SNAPSHOT.steps);
     expect(store.getState().starting).toBe(false);
     expect(store.getState().streamId).toBe(1);
+  });
+
+  it("rejects start without a stand-up selection", async () => {
+    const startStandUp = vi.fn();
+    const store = createStandUpJobStore({ startStandUp, readJob: vi.fn() });
+
+    await store.getState().startStandUp("jwt");
+
+    expect(startStandUp).not.toHaveBeenCalled();
+    expect(store.getState().error).toBe("Choose a circuit profile, policy, and vote balance assigner");
   });
 
   it("starts stand-up when the job snapshot is not yet available", async () => {
@@ -99,7 +114,12 @@ describe("stand-up job store", () => {
       readJob: vi.fn().mockResolvedValue(undefined),
     });
 
-    await store.getState().startStandUp("jwt");
+    await store.getState().startStandUp("jwt", {
+      circuitProfile: "small",
+      policy: "Free for all",
+      assigner: "Constant vote balance",
+      voteBalance: 3,
+    });
 
     expect(store.getState().job).toBeUndefined();
     expect(store.getState().starting).toBe(false);
@@ -122,7 +142,12 @@ describe("stand-up job store", () => {
       readJob: vi.fn(),
     });
 
-    await store.getState().startStandUp("jwt");
+    await store.getState().startStandUp("jwt", {
+      circuitProfile: "small",
+      policy: "Free for all",
+      assigner: "Constant vote balance",
+      voteBalance: 3,
+    });
 
     expect(store.getState().error).toBe("busy");
     expect(store.getState().starting).toBe(false);
@@ -134,7 +159,12 @@ describe("stand-up job store", () => {
       readJob: vi.fn(),
     });
 
-    await store.getState().startStandUp("jwt");
+    await store.getState().startStandUp("jwt", {
+      circuitProfile: "small",
+      policy: "Free for all",
+      assigner: "Constant vote balance",
+      voteBalance: 3,
+    });
 
     expect(store.getState().error).toBe("stand-up failed");
     expect(store.getState().starting).toBe(false);

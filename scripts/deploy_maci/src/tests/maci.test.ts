@@ -198,8 +198,6 @@ describe("deployMaci", () => {
       { kind: "declare", name: "MACI" },
       { kind: "deploy", name: "maci" },
       { kind: "invoke", name: "set_target" },
-      { kind: "call", name: "coordinator" },
-      { kind: "call", name: "get_poll_factory" },
     ]);
   });
 
@@ -294,11 +292,7 @@ describe("deployMaci", () => {
       { kind: "declare", name: "FreeForAllEnforcer" },
       { kind: "declare", name: "ConstantInitialVoteBalance" },
     ]);
-    expect(steps.filter((step) => step.kind === "invoke" || step.kind === "call")).toEqual([
-      { kind: "invoke", name: "set_target" },
-      { kind: "call", name: "coordinator" },
-      { kind: "call", name: "get_poll_factory" },
-    ]);
+    expect(steps.filter((step) => step.kind === "invoke")).toEqual([{ kind: "invoke", name: "set_target" }]);
   });
 
   test("treats an empty checkpoint address as missing and still deploys", async () => {
@@ -321,9 +315,7 @@ describe("deployMaci", () => {
       }),
     ).rejects.toThrow(/coordinator mismatch/u);
 
-    expect(steps.at(-1)).toEqual({ kind: "call", name: "coordinator" });
-    expect(steps.some((step) => step.kind === "invoke")).toBe(true);
-    expect(steps.some((step) => step.kind === "call" && step.name === "get_poll_factory")).toBe(false);
+    expect(steps.at(-1)).toEqual({ kind: "invoke", name: "set_target" });
   });
 
   test("fails when on-chain coordinator does not match", async () => {

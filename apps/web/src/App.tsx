@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import { Shell } from "./layouts";
-import { DeployPage, MaciPage } from "./pages";
+import { DeployPage, HomePage, MaciPage } from "./pages";
 import { NetworkProvider } from "./providers/Network";
 
 export const App = (): JSX.Element => (
@@ -12,7 +12,9 @@ export const App = (): JSX.Element => (
 
     <Routes>
       <Route element={<Shell />}>
-        <Route element={<DeployPage />} path="/" />
+        <Route element={<HomePage />} path="/" />
+
+        <Route element={<DeployPage />} path="/deploy" />
 
         <Route element={<Navigate replace to="/" />} path="/maci" />
 

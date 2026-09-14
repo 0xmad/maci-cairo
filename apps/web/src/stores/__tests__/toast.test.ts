@@ -1,9 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createToastStore } from "../toast.js";
+import { createToastStore, useToasts } from "../toast.js";
 
 const declareLeanImt = { seq: 1, kind: "declare", name: "LeanIMT" };
 const deployLeanImt = { seq: 2, kind: "deploy", name: "leanImt" };
+
+const { toast } = vi.hoisted(() => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock("sonner", () => ({
+  toast,
+}));
 
 const errorToast = {
   id: "connect-wallet",
@@ -23,6 +31,9 @@ describe("toast store", () => {
 
   beforeEach(() => {
     toasts = host();
+    toast.success.mockReset();
+    toast.error.mockReset();
+    useToasts.getState().reset();
   });
 
   it("shows a wallet error when the Operator is unsigned", () => {
@@ -135,5 +146,22 @@ describe("toast store", () => {
     store.getState().showStandUp({ running: false, steps: [], error: "" });
 
     expect(toasts.error).not.toHaveBeenCalled();
+  });
+
+  it("forwards default-host stand-up toasts to sonner", () => {
+    useToasts.getState().showStandUp({ running: true, steps: [declareLeanImt] });
+
+    expect(toast.success).toHaveBeenCalledWith("declare LeanIMT", {
+      id: "maci-stand-up-step-1",
+      duration: Number.POSITIVE_INFINITY,
+    });
+
+    useToasts.getState().showStandUp({ running: false, steps: [], error: "busy" });
+
+    expect(toast.error).toHaveBeenCalledWith("busy", {
+      id: "maci-stand-up-error",
+      duration: Number.POSITIVE_INFINITY,
+      closeButton: true,
+    });
   });
 });

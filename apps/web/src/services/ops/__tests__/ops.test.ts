@@ -43,6 +43,52 @@ describe("OpsClient", () => {
     vi.unstubAllGlobals();
   });
 
+  it("reads the stand-up catalog with the Operator JWT", async () => {
+    const catalog = {
+      circuitProfiles: [{ id: "small", maxSignups: 32, maxVoteOptions: 5 }],
+      policies: [{ id: "Free for all" }],
+      assigners: [{ id: "Constant vote balance" }],
+    };
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      let url: string;
+
+      if (typeof input === "string") {
+        url = input;
+      } else if (input instanceof URL) {
+        url = input.href;
+      } else {
+        url = input.url;
+      }
+
+      expect(url).toBe("http://ops.test/standup");
+      expect(init?.method).toBeUndefined();
+      expect(init?.headers).toEqual({ authorization: "Bearer jwt" });
+
+      return new Response(JSON.stringify(catalog), { status: 200 });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(client.readStandUpCatalog("jwt")).resolves.toEqual(catalog);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("throws the API error body when catalog read fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 })),
+    );
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(client.readStandUpCatalog("jwt")).rejects.toThrow(/^unauthorized$/u);
+
+    vi.unstubAllGlobals();
+  });
+
   it("starts MACI stand-up with the Operator JWT and the small catalog body", async () => {
     const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
       let url: string;
@@ -66,6 +112,7 @@ describe("OpsClient", () => {
           circuitProfile: "small",
           policy: "Free for all",
           assigner: "Constant vote balance",
+          voteBalance: 3,
         }),
       );
 
@@ -76,7 +123,14 @@ describe("OpsClient", () => {
 
     const client = new OpsClient("http://ops.test");
 
-    await expect(client.startStandUp("jwt")).resolves.toBe("job-1");
+    await expect(
+      client.startStandUp("jwt", {
+        circuitProfile: "small",
+        policy: "Free for all",
+        assigner: "Constant vote balance",
+        voteBalance: 3,
+      }),
+    ).resolves.toBe("job-1");
 
     vi.unstubAllGlobals();
   });
@@ -86,7 +140,14 @@ describe("OpsClient", () => {
 
     const client = new OpsClient("http://ops.test");
 
-    await expect(client.startStandUp("jwt")).rejects.toThrow(/^busy$/u);
+    await expect(
+      client.startStandUp("jwt", {
+        circuitProfile: "small",
+        policy: "Free for all",
+        assigner: "Constant vote balance",
+        voteBalance: 3,
+      }),
+    ).rejects.toThrow(/^busy$/u);
 
     vi.unstubAllGlobals();
   });
@@ -188,7 +249,7 @@ describe("OpsClient", () => {
 
       return new Response(
         JSON.stringify({
-          items: [{ address: "0x7", network: "starknet_local" }],
+          items: [{ address: "0x7", network: "starknet_local", createdAtMs: 1_000_100 }],
           total: 11,
           page: 2,
           pageSize: 10,
@@ -202,7 +263,7 @@ describe("OpsClient", () => {
     const client = new OpsClient("http://ops.test");
 
     await expect(client.listMacis("jwt", 2, 10)).resolves.toEqual({
-      items: [{ address: "0x7", network: "starknet_local" }],
+      items: [{ address: "0x7", network: "starknet_local", createdAtMs: 1_000_100 }],
       total: 11,
       page: 2,
       pageSize: 10,

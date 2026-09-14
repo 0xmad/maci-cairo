@@ -1,10 +1,10 @@
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 
 import { opsBaseUrl } from "../config/ops";
-import { OpsClient, type JobEvent, type JobSnapshot, type JobStep } from "../services/ops";
+import { OpsClient, type JobEvent, type JobSnapshot, type JobStep, type StandUpBody } from "../services/ops";
 
 export interface StandUpJobApi {
-  startStandUp(token: string): Promise<string>;
+  startStandUp(token: string, intent: StandUpBody): Promise<string>;
   readJob(token: string): Promise<JobSnapshot | undefined>;
 }
 
@@ -17,7 +17,7 @@ export interface StandUpJobState {
   applySnapshot: (snapshot: JobSnapshot | undefined) => void;
   applyEvent: (event: JobEvent) => void;
   failWatch: (error: string) => void;
-  startStandUp: (token: string | undefined) => Promise<void>;
+  startStandUp: (token?: string, intent?: StandUpBody) => Promise<void>;
   reset: () => void;
 }
 
@@ -64,9 +64,15 @@ export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreAp
     failWatch: (error: string): void => {
       set({ error });
     },
-    startStandUp: async (token: string | undefined): Promise<void> => {
+    startStandUp: async (token: string | undefined, intent?: StandUpBody): Promise<void> => {
       if (token === undefined || token.length === 0) {
         set({ error: "Sign in as Operator first" });
+
+        return;
+      }
+
+      if (intent === undefined) {
+        set({ error: "Choose a circuit profile, policy, and vote balance assigner" });
 
         return;
       }
@@ -74,7 +80,7 @@ export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreAp
       set({ error: undefined, starting: true, steps: [] });
 
       try {
-        await api.startStandUp(token);
+        await api.startStandUp(token, intent);
         const snapshot = await api.readJob(token);
 
         set((state) => ({
@@ -97,7 +103,8 @@ export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreAp
 
 function defaultStandUpJobApi(): StandUpJobApi {
   return {
-    startStandUp: (token: string): Promise<string> => new OpsClient(opsBaseUrl()).startStandUp(token),
+    startStandUp: (token: string, intent: StandUpBody): Promise<string> =>
+      new OpsClient(opsBaseUrl()).startStandUp(token, intent),
     readJob: (token: string): Promise<JobSnapshot | undefined> => new OpsClient(opsBaseUrl()).readJob(token),
   };
 }

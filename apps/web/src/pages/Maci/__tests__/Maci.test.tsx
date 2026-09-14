@@ -35,17 +35,16 @@ describe("MaciPage", () => {
     });
   });
 
-  it("asks an unsigned-in visitor to sign in and keeps Create Poll disabled", () => {
+  it("asks an unsigned-in visitor to sign in as Operator", () => {
     render(<MaciPage />);
 
     expect(screen.getByRole("heading", { name: "MACI" })).toBeTruthy();
     expect(screen.getByText("Sign in as Operator to view this MACI.")).toBeTruthy();
     expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.getByRole("button", { name: "Create Poll" })).toHaveProperty("disabled", true);
-    expect(screen.queryByText("Create Poll is not wired and sends no transaction.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Create Poll" })).toBeNull();
   });
 
-  it("shows related contracts, the deployer, and enables Create Poll", () => {
+  it("shows Operator-facing stand-up choices and related contracts without Checker or Enforcer", () => {
     useMaciInstanceMock.mockReturnValue({
       address: "0x7",
       signedIn: true,
@@ -56,11 +55,21 @@ describe("MaciPage", () => {
 
     expect(screen.getByText("LeanIMT")).toBeTruthy();
     expect(screen.getByText("0x1")).toBeTruthy();
+    expect(screen.getByText("Circuit profile")).toBeTruthy();
+    expect(screen.getByText("small")).toBeTruthy();
+    expect(screen.getByText("Policy")).toBeTruthy();
+    expect(screen.getByText("Free for all")).toBeTruthy();
+    expect(screen.getByText("Vote balance assigner")).toBeTruthy();
+    expect(screen.getByText("Constant vote balance")).toBeTruthy();
     expect(screen.getByText("Deployer")).toBeTruthy();
     expect(screen.getByText("0xa")).toBeTruthy();
     expect(screen.getByText("Starknet Local")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Create Poll" })).toHaveProperty("disabled", false);
-    expect(screen.getByText("Create Poll is not wired and sends no transaction.")).toBeTruthy();
+    expect(screen.queryByText("Checker")).toBeNull();
+    expect(screen.queryByText("Enforcer")).toBeNull();
+    expect(screen.queryByText("0x2")).toBeNull();
+    expect(screen.queryByText("0x3")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Create Poll" })).toBeNull();
+    expect(screen.queryByText("Create Poll is not wired and sends no transaction.")).toBeNull();
   });
 
   it("labels a sepolia instance", () => {
@@ -85,6 +94,6 @@ describe("MaciPage", () => {
     render(<MaciPage />);
 
     expect(screen.getByText("maci not found")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Create Poll" })).toHaveProperty("disabled", true);
+    expect(screen.queryByRole("button", { name: "Create Poll" })).toBeNull();
   });
 });

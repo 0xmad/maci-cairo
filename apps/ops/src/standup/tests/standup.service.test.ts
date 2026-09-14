@@ -85,6 +85,7 @@ interface MaciRow extends DeployMaciResult {
   circuitProfile: string;
   policy: string;
   voteBalanceAssigner: string;
+  createdAtMs: number;
 }
 
 function postgresJobStore(): PostgresJobStore {
@@ -141,6 +142,7 @@ function postgresJobStore(): PostgresJobStore {
         policy: row.policy as string,
         voteBalanceAssigner: row.voteBalanceAssigner as string,
         network: row.network as MaciNetwork,
+        createdAtMs: row.createdAtMs as number,
       };
 
       return Promise.resolve();
@@ -323,6 +325,7 @@ describe("StandupService", () => {
     expect(listed.total).toBe(1);
     expect(listed.items[0]?.address).toMatch(/^0x/u);
     expect(listed.items[0]?.network).toBe("starknet_local");
+    expect(listed.items[0]?.createdAtMs).toBe(1_000_000);
     await expect(service.readMaci(listed.items[0]?.address ?? "")).resolves.toMatchObject({
       maci: listed.items[0]?.address,
       deployer: intendedCoordinator(undefined),
@@ -453,8 +456,8 @@ describe("StandupService", () => {
     await settle(service);
 
     const steps = events.filter((event) => event.type === "step");
-    expect(steps).toHaveLength(8);
-    expect(new Set(steps.map((event) => event.step.seq)).size).toBe(8);
+    expect(steps).toHaveLength(6);
+    expect(new Set(steps.map((event) => event.step.seq)).size).toBe(6);
     expect(events.at(-1)).toEqual({ type: "completed", status: "succeeded" });
   });
 
@@ -537,16 +540,7 @@ describe("StandupService", () => {
     await settle(service);
 
     const steps = events.filter((event) => event.type === "step");
-    expect(steps.map((event) => event.step.kind)).toEqual([
-      "deploy",
-      "deploy",
-      "deploy",
-      "deploy",
-      "deploy",
-      "invoke",
-      "call",
-      "call",
-    ]);
+    expect(steps.map((event) => event.step.kind)).toEqual(["deploy", "deploy", "deploy", "deploy", "deploy", "invoke"]);
     unsub();
   });
 
