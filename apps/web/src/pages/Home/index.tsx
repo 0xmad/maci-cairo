@@ -1,6 +1,7 @@
 import { type JSX } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Button } from "../../components/ui";
 import { formatCreatedAt } from "../../utils/formatCreatedAt";
 import { networkLabel } from "../../utils/networkLabel";
 import { truncateAddress } from "../../utils/truncateAddress";
@@ -77,25 +78,15 @@ export const HomePage = (): JSX.Element => {
                   <tr>
                     <td className="px-4 pt-3 sm:px-0" colSpan={3}>
                       <div className="flex items-center gap-3 whitespace-nowrap text-sm">
-                        <button
-                          className="rounded border border-zinc-600 px-3 py-1 disabled:opacity-50"
-                          disabled={page <= 1}
-                          type="button"
-                          onClick={prevPage}
-                        >
+                        <Button disabled={page <= 1} onClick={prevPage}>
                           Previous
-                        </button>
+                        </Button>
 
                         <p>{`Page ${String(page)} of ${String(pageCount)}`}</p>
 
-                        <button
-                          className="rounded border border-zinc-600 px-3 py-1 disabled:opacity-50"
-                          disabled={page >= pageCount}
-                          type="button"
-                          onClick={nextPage}
-                        >
+                        <Button disabled={page >= pageCount} onClick={nextPage}>
                           Next
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>

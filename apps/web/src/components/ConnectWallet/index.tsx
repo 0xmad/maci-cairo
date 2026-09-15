@@ -2,6 +2,7 @@ import { type JSX, useEffect } from "react";
 
 import { useToasts } from "../../stores/toast";
 import { truncateAddress } from "../../utils/truncateAddress";
+import { Button } from "../ui";
 
 import { useConnectWallet } from "./useConnectWallet";
 import { useOperatorLogin } from "./useOperatorLogin";
@@ -24,16 +25,14 @@ export const ConnectWallet = (): JSX.Element => {
           {truncateAddress(operator)}
         </span>
 
-        <button
-          className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-800"
-          type="button"
+        <Button
           onClick={() => {
             signOut();
             disconnect().catch(() => undefined);
           }}
         >
           Disconnect
-        </button>
+        </Button>
       </p>
     );
   }
@@ -51,22 +50,14 @@ export const ConnectWallet = (): JSX.Element => {
   }
 
   return address === undefined ? (
-    <button
-      className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-800"
-      type="button"
-      onClick={handleClick}
-    >
-      Connect
-    </button>
+    <Button onClick={handleClick}>Connect</Button>
   ) : (
-    <button
-      className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-800"
-      type="button"
+    <Button
       onClick={() => {
         signIn().catch(() => undefined);
       }}
     >
       Sign in as Operator
-    </button>
+    </Button>
   );
 };
