@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { jobs, jobSteps } from "../repositories/job.schema.js";
+import { jobs, jobSteps, standupCheckpoints, type StandupCheckpointRow } from "../repositories/job.schema.js";
 import { type JobStep, type MaciInstanceRecord } from "../repositories/job.store.js";
 import { PostgresJobStore } from "../repositories/postgresJob.store.js";
 
@@ -55,8 +55,10 @@ const MACI_ROW = {
 function postgresDb(
   options: {
     insertError?: Error;
+    updateError?: Error;
     jobRows?: (typeof JOB_ROW)[];
     stepRows?: { jobId: string; seq: number; kind: string; name: string }[];
+    checkpointRows?: StandupCheckpointRow[];
     maciRows?: (typeof MACI_ROW)[];
     countRows?: { total?: number }[];
   } = {},
@@ -70,6 +72,9 @@ function postgresDb(
   });
   const stepInsertValues = vi.fn((): Promise<void> => Promise.resolve());
   const maciInsertValues = vi.fn((): Promise<void> => Promise.resolve());
+  const checkpointInsertValues = vi.fn(() => ({
+    onConflictDoUpdate: vi.fn((): Promise<void> => Promise.resolve()),
+  }));
   const insert = vi.fn((table: unknown) => {
     if (table === jobs) {
       return { values: jobInsertValues };
@@ -79,9 +84,19 @@ function postgresDb(
       return { values: stepInsertValues };
     }
 
+    if (table === standupCheckpoints) {
+      return { values: checkpointInsertValues };
+    }
+
     return { values: maciInsertValues };
   });
-  const where = vi.fn((): Promise<void> => Promise.resolve());
+  const where = vi.fn((): Promise<void> => {
+    if (options.updateError !== undefined) {
+      return Promise.reject(options.updateError);
+    }
+
+    return Promise.resolve();
+  });
   const set = vi.fn(() => ({ where }));
   const update = vi.fn(() => ({ set }));
   const select = vi.fn(() => ({
@@ -99,6 +114,14 @@ function postgresDb(
           where: () => ({
             orderBy: (): Promise<{ jobId: string; seq: number; kind: string; name: string }[]> =>
               Promise.resolve(options.stepRows ?? []),
+          }),
+        };
+      }
+
+      if (table === standupCheckpoints) {
+        return {
+          where: () => ({
+            limit: (): Promise<StandupCheckpointRow[]> => Promise.resolve(options.checkpointRows ?? []),
           }),
         };
       }
@@ -121,19 +144,25 @@ function postgresDb(
       };
     },
   }));
-  const transaction = vi.fn(async (work: (tx: { insert: typeof insert; update: typeof update }) => Promise<void>) =>
-    work({ insert, update }),
+  const remove = vi.fn(() => ({ where: vi.fn((): Promise<void> => Promise.resolve()) }));
+  const transaction = vi.fn(
+    async (work: (tx: { insert: typeof insert; update: typeof update; delete: typeof remove }) => Promise<void>) =>
+      work({ insert, update, delete: remove }),
   );
 
   return {
-    db: { insert, update, select, transaction } as unknown as ConstructorParameters<typeof PostgresJobStore>[0],
+    db: { insert, update, select, delete: remove, transaction } as unknown as ConstructorParameters<
+      typeof PostgresJobStore
+    >[0],
     insert,
     jobInsertValues,
     stepInsertValues,
     maciInsertValues,
+    checkpointInsertValues,
     set,
     update,
     transaction,
+    remove,
   };
 }
 
@@ -227,12 +256,23 @@ describe("PostgresJobStore", () => {
     });
   });
 
-  test("latest rejects an unknown job status", async () => {
+  test("latest returns an interrupted job", async () => {
     const { db } = postgresDb({
       jobRows: [{ ...JOB_ROW, status: "interrupted" }],
     });
 
-    await expect(new PostgresJobStore(db).latest()).rejects.toThrow(/unknown job status interrupted/u);
+    await expect(new PostgresJobStore(db).latest()).resolves.toMatchObject({
+      id: "job-1",
+      status: "interrupted",
+    });
+  });
+
+  test("latest rejects an unknown job status", async () => {
+    const { db } = postgresDb({
+      jobRows: [{ ...JOB_ROW, status: "queued" }],
+    });
+
+    await expect(new PostgresJobStore(db).latest()).rejects.toThrow(/unknown job status queued/u);
   });
 
   test("listMacis returns a page of address, network, and createdAtMs", async () => {
@@ -276,5 +316,147 @@ describe("PostgresJobStore", () => {
     const { db } = postgresDb({ maciRows: [] });
 
     await expect(new PostgresJobStore(db).readMaci("0x7")).resolves.toBeUndefined();
+  });
+
+  test("interruptRunning marks the running job interrupted", async () => {
+    const { db, update, set } = postgresDb();
+
+    await new PostgresJobStore(db).interruptRunning(1_000_100, "interrupted");
+
+    expect(update).toHaveBeenCalledWith(jobs);
+    expect(set).toHaveBeenCalledWith({ status: "interrupted", completedAtMs: 1_000_100, error: "interrupted" });
+  });
+
+  test("readCheckpoint returns stored instance addresses", async () => {
+    const { db } = postgresDb({
+      checkpointRows: [
+        {
+          id: 1,
+          leanImt: "0xaaa",
+          checker: null,
+          enforcer: null,
+          assigner: null,
+          maci: null,
+        },
+      ],
+    });
+
+    await expect(new PostgresJobStore(db).readCheckpoint()).resolves.toEqual({ leanImt: "0xaaa" });
+  });
+
+  test("readCheckpoint is undefined when empty", async () => {
+    const { db } = postgresDb({ checkpointRows: [] });
+
+    await expect(new PostgresJobStore(db).readCheckpoint()).resolves.toBeUndefined();
+  });
+
+  test("readCheckpoint is undefined when every instance address is blank", async () => {
+    const { db } = postgresDb({
+      checkpointRows: [
+        {
+          id: 1,
+          leanImt: "",
+          checker: null,
+          enforcer: null,
+          assigner: null,
+          maci: null,
+        },
+      ],
+    });
+
+    await expect(new PostgresJobStore(db).readCheckpoint()).resolves.toBeUndefined();
+  });
+
+  test("tryResume reopens a failed job", async () => {
+    const { db, set } = postgresDb({
+      jobRows: [{ ...JOB_ROW, status: "failed" }],
+    });
+
+    await expect(new PostgresJobStore(db).tryResume("job-1")).resolves.toBe(true);
+    expect(set).toHaveBeenCalledWith({ status: "running", error: null, completedAtMs: null });
+  });
+
+  test("tryResume returns false for a succeeded job", async () => {
+    const { db } = postgresDb({ jobRows: [JOB_ROW] });
+
+    await expect(new PostgresJobStore(db).tryResume("job-1")).resolves.toBe(false);
+  });
+
+  test("tryResume returns false on a unique violation", async () => {
+    const { db } = postgresDb({
+      jobRows: [{ ...JOB_ROW, status: "failed" }],
+      updateError: Object.assign(new Error("duplicate"), { code: "23505" }),
+    });
+
+    await expect(new PostgresJobStore(db).tryResume("job-1")).resolves.toBe(false);
+  });
+
+  test("tryResume rethrows other update errors", async () => {
+    const { db } = postgresDb({
+      jobRows: [{ ...JOB_ROW, status: "interrupted" }],
+      updateError: new Error("db down"),
+    });
+
+    await expect(new PostgresJobStore(db).tryResume("job-1")).rejects.toThrow(/^db down$/u);
+  });
+
+  test("mergeCheckpoint upserts instance addresses", async () => {
+    const { db, insert, checkpointInsertValues } = postgresDb();
+
+    await new PostgresJobStore(db).mergeCheckpoint({ leanImt: "0xaaa" });
+
+    expect(insert).toHaveBeenCalledWith(standupCheckpoints);
+    expect(checkpointInsertValues).toHaveBeenCalledWith({
+      id: 1,
+      leanImt: "0xaaa",
+      checker: null,
+      enforcer: null,
+      assigner: null,
+      maci: null,
+    });
+  });
+
+  test("mergeCheckpoint writes nulls for omitted instance addresses", async () => {
+    const { db, checkpointInsertValues } = postgresDb();
+
+    await new PostgresJobStore(db).mergeCheckpoint({});
+
+    expect(checkpointInsertValues).toHaveBeenCalledWith({
+      id: 1,
+      leanImt: null,
+      checker: null,
+      enforcer: null,
+      assigner: null,
+      maci: null,
+    });
+  });
+
+  test("mergeCheckpoint writes every instance address", async () => {
+    const { db, checkpointInsertValues } = postgresDb();
+
+    await new PostgresJobStore(db).mergeCheckpoint({
+      leanImt: "0xaaa",
+      checker: "0xbbb",
+      enforcer: "0xccc",
+      assigner: "0xddd",
+      maci: "0xeee",
+    });
+
+    expect(checkpointInsertValues).toHaveBeenCalledWith({
+      id: 1,
+      leanImt: "0xaaa",
+      checker: "0xbbb",
+      enforcer: "0xccc",
+      assigner: "0xddd",
+      maci: "0xeee",
+    });
+  });
+
+  test("clearCheckpoint deletes the singleton row", async () => {
+    const { db, remove } = postgresDb();
+
+    await new PostgresJobStore(db).clearCheckpoint();
+
+    expect(remove).toHaveBeenCalledWith(standupCheckpoints);
   });
 });

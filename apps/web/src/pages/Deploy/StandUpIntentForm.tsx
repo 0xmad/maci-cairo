@@ -19,10 +19,21 @@ export interface StandUpIntentFormProps {
   catalog: StandUpCatalog;
   starting: boolean;
   running: boolean;
+  discarding: boolean;
+  incompleteStandUp: boolean;
   onStart: (intent: StandUpBody) => Promise<void>;
+  onDiscard: () => Promise<void>;
 }
 
-export const StandUpIntentForm = ({ catalog, starting, running, onStart }: StandUpIntentFormProps): JSX.Element => {
+export const StandUpIntentForm = ({
+  catalog,
+  starting,
+  running,
+  discarding,
+  incompleteStandUp,
+  onStart,
+  onDiscard,
+}: StandUpIntentFormProps): JSX.Element => {
   const {
     register,
     handleSubmit,
@@ -39,6 +50,8 @@ export const StandUpIntentForm = ({ catalog, starting, running, onStart }: Stand
   });
   const circuitProfile = watch("circuitProfile");
   const profile = catalog.circuitProfiles.find((item) => item.id === circuitProfile) ?? catalog.circuitProfiles[0];
+  const inFlight = starting || running;
+  const canRetry = incompleteStandUp && !inFlight;
 
   return (
     <form
@@ -105,9 +118,30 @@ export const StandUpIntentForm = ({ catalog, starting, running, onStart }: Stand
         <FieldError>{errors.voteBalance?.message}</FieldError>
       </Field>
 
-      <Button disabled={starting || running} size="field" type="submit">
-        Start MACI stand-up
-      </Button>
+      {canRetry ? (
+        <p className="text-base text-amber-200">
+          This stand-up did not finish. Retry continues the same job. Discard starts a new graph.
+        </p>
+      ) : null}
+
+      <div className="flex flex-col gap-4">
+        <Button disabled={inFlight} size="field" type="submit">
+          {canRetry ? "Retry MACI stand-up" : "Start MACI stand-up"}
+        </Button>
+
+        {canRetry ? (
+          <Button
+            disabled={discarding}
+            size="field"
+            type="button"
+            onClick={() => {
+              onDiscard().catch(() => undefined);
+            }}
+          >
+            Discard incomplete stand-up
+          </Button>
+        ) : null}
+      </div>
     </form>
   );
 };

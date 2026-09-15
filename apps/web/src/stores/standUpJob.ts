@@ -5,27 +5,33 @@ import { OpsClient, type JobEvent, type JobSnapshot, type JobStep, type StandUpB
 
 export interface StandUpJobApi {
   startStandUp(token: string, intent: StandUpBody): Promise<string>;
-  readJob(token: string): Promise<JobSnapshot | undefined>;
+  readJobState(token: string): Promise<{ job?: JobSnapshot; incompleteStandUp: boolean }>;
+  discardStandUp(token: string): Promise<void>;
 }
 
 export interface StandUpJobState {
   starting: boolean;
+  discarding: boolean;
   error?: string;
   job?: JobSnapshot;
+  incompleteStandUp: boolean;
   steps: JobStep[];
   streamId: number;
-  applySnapshot: (snapshot: JobSnapshot | undefined) => void;
+  applySnapshot: (snapshot: JobSnapshot | undefined, incompleteStandUp?: boolean) => void;
   applyEvent: (event: JobEvent) => void;
   failWatch: (error: string) => void;
   startStandUp: (token?: string, intent?: StandUpBody) => Promise<void>;
+  discardStandUp: (token?: string) => Promise<void>;
   reset: () => void;
 }
 
-const idleJob: Pick<StandUpJobState, "starting" | "error" | "job" | "steps"> = {
+const idleJob: Pick<StandUpJobState, "starting" | "discarding" | "error" | "job" | "steps" | "incompleteStandUp"> = {
   starting: false,
+  discarding: false,
   error: undefined,
   job: undefined,
   steps: [],
+  incompleteStandUp: false,
 };
 
 function stepsFor(snapshot: JobSnapshot): JobStep[] {
@@ -36,12 +42,20 @@ export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreAp
   return create<StandUpJobState>((set) => ({
     ...idleJob,
     streamId: 0,
-    applySnapshot: (snapshot: JobSnapshot | undefined): void => {
+    applySnapshot: (snapshot: JobSnapshot | undefined, incompleteStandUp?: boolean): void => {
       if (snapshot === undefined) {
+        if (incompleteStandUp !== undefined) {
+          set({ incompleteStandUp });
+        }
+
         return;
       }
 
-      set({ job: snapshot, steps: stepsFor(snapshot) });
+      set({
+        job: snapshot,
+        steps: stepsFor(snapshot),
+        ...(incompleteStandUp === undefined ? {} : { incompleteStandUp }),
+      });
     },
     applyEvent: (event: JobEvent): void => {
       if (event.type === "step") {
@@ -59,6 +73,9 @@ export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreAp
       set((state) => ({
         job: state.job === undefined ? state.job : { ...state.job, status: event.status, error: event.error },
         steps: [],
+        incompleteStandUp:
+          event.status !== "succeeded" &&
+          (state.incompleteStandUp || state.steps.some((step) => step.kind === "deploy")),
       }));
     },
     failWatch: (error: string): void => {
@@ -81,17 +98,44 @@ export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreAp
 
       try {
         await api.startStandUp(token, intent);
-        const snapshot = await api.readJob(token);
+        const state = await api.readJobState(token);
 
-        set((state) => ({
+        set((current) => ({
           starting: false,
-          streamId: state.streamId + 1,
-          ...(snapshot === undefined ? {} : { job: snapshot, steps: stepsFor(snapshot) }),
+          streamId: current.streamId + 1,
+          incompleteStandUp: state.incompleteStandUp,
+          ...(state.job === undefined ? {} : { job: state.job, steps: stepsFor(state.job) }),
         }));
       } catch (caught) {
         set({
           starting: false,
           error: caught instanceof Error ? caught.message : "stand-up failed",
+        });
+      }
+    },
+    discardStandUp: async (token: string | undefined): Promise<void> => {
+      if (token === undefined || token.length === 0) {
+        set({ error: "Sign in as Operator first" });
+
+        return;
+      }
+
+      set({ error: undefined, discarding: true });
+
+      try {
+        await api.discardStandUp(token);
+        const state = await api.readJobState(token);
+
+        set((current) => ({
+          discarding: false,
+          incompleteStandUp: state.incompleteStandUp,
+          streamId: current.streamId + 1,
+          ...(state.job === undefined ? {} : { job: state.job, steps: stepsFor(state.job) }),
+        }));
+      } catch (caught) {
+        set({
+          discarding: false,
+          error: caught instanceof Error ? caught.message : "discard failed",
         });
       }
     },
@@ -105,7 +149,9 @@ function defaultStandUpJobApi(): StandUpJobApi {
   return {
     startStandUp: (token: string, intent: StandUpBody): Promise<string> =>
       new OpsClient(opsBaseUrl()).startStandUp(token, intent),
-    readJob: (token: string): Promise<JobSnapshot | undefined> => new OpsClient(opsBaseUrl()).readJob(token),
+    readJobState: (token: string): Promise<{ job?: JobSnapshot; incompleteStandUp: boolean }> =>
+      new OpsClient(opsBaseUrl()).readJobState(token),
+    discardStandUp: (token: string): Promise<void> => new OpsClient(opsBaseUrl()).discardStandUp(token),
   };
 }
 

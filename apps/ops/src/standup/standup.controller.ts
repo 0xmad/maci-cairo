@@ -40,7 +40,7 @@ function isOperatorStandUpError(message: string): boolean {
   );
 }
 
-function httpErrorForStandUpStart(caught: unknown): Error {
+function httpErrorForStandUp(caught: unknown): Error {
   if (caught instanceof Error && caught.message === "busy") {
     return new ConflictException({ error: "busy" });
   }
@@ -73,8 +73,21 @@ export class StandupController {
     try {
       return await this.standupService.startStandUp(parseStartStandUpDto(body));
     } catch (caught) {
-      throw httpErrorForStandUpStart(caught);
+      throw httpErrorForStandUp(caught);
     }
+  }
+
+  @Post("standup/discard")
+  async discardStandUp(@Req() request: FastifyRequest): Promise<{ discarded: true }> {
+    await this.requireOperator(request);
+
+    try {
+      await this.standupService.discardStandUp();
+    } catch (caught) {
+      throw httpErrorForStandUp(caught);
+    }
+
+    return { discarded: true };
   }
 
   @Get("macis")
@@ -104,7 +117,10 @@ export class StandupController {
   async readCurrentJob(@Req() request: FastifyRequest): Promise<CurrentJobResponseDto> {
     await this.requireOperator(request);
 
-    return { job: (await this.standupService.currentJob()) ?? null };
+    return {
+      job: (await this.standupService.currentJob()) ?? null,
+      incompleteStandUp: await this.standupService.hasIncompleteStandUp(),
+    };
   }
 
   @Sse("job/events")

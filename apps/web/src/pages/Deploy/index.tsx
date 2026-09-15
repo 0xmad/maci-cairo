@@ -5,7 +5,8 @@ import { StandUpIntentForm } from "./StandUpIntentForm.js";
 import { useStandUpCatalog } from "./useStandUpCatalog.js";
 
 export const DeployPage = (): JSX.Element => {
-  const { catalog, error, signedIn, starting, running, startStandUp } = useStandUpCatalog();
+  const { catalog, error, signedIn, starting, discarding, running, incompleteStandUp, startStandUp, discardStandUp } =
+    useStandUpCatalog();
 
   return (
     <section className="mx-auto w-full max-w-md space-y-5">
@@ -24,7 +25,15 @@ export const DeployPage = (): JSX.Element => {
           {error !== undefined ? <p className="text-base text-red-400">{error}</p> : null}
 
           {catalog !== undefined ? (
-            <StandUpIntentForm catalog={catalog} running={running} starting={starting} onStart={startStandUp} />
+            <StandUpIntentForm
+              catalog={catalog}
+              discarding={discarding}
+              incompleteStandUp={incompleteStandUp}
+              running={running}
+              starting={starting}
+              onDiscard={discardStandUp}
+              onStart={startStandUp}
+            />
           ) : null}
         </div>
       ) : (

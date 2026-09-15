@@ -7,15 +7,23 @@ import { useOperatorSession } from "../../../stores/operatorSession";
 import { useStandUpJob } from "../../../stores/standUpJob";
 import { useMaciStandUp } from "../useMaciStandUp";
 
-const { readStoredJwtMock, storeJwtMock, clearStoredJwtMock, startStandUpMock, readJobMock, subscribeJobEventsMock } =
-  vi.hoisted(() => ({
-    readStoredJwtMock: vi.fn(),
-    storeJwtMock: vi.fn(),
-    clearStoredJwtMock: vi.fn(),
-    startStandUpMock: vi.fn(),
-    readJobMock: vi.fn(),
-    subscribeJobEventsMock: vi.fn(),
-  }));
+const {
+  readStoredJwtMock,
+  storeJwtMock,
+  clearStoredJwtMock,
+  startStandUpMock,
+  discardStandUpMock,
+  readJobStateMock,
+  subscribeJobEventsMock,
+} = vi.hoisted(() => ({
+  readStoredJwtMock: vi.fn(),
+  storeJwtMock: vi.fn(),
+  clearStoredJwtMock: vi.fn(),
+  startStandUpMock: vi.fn(),
+  discardStandUpMock: vi.fn(),
+  readJobStateMock: vi.fn(),
+  subscribeJobEventsMock: vi.fn(),
+}));
 
 vi.mock("../../../services/localStorage", () => ({
   storage: {
@@ -42,30 +50,37 @@ describe("useMaciStandUp", () => {
     storeJwtMock.mockReset();
     clearStoredJwtMock.mockReset();
     startStandUpMock.mockReset();
-    readJobMock.mockReset();
+    discardStandUpMock.mockReset();
+    readJobStateMock.mockReset();
     subscribeJobEventsMock.mockReset();
     readStoredJwtMock.mockReturnValue("jwt");
     useOperatorSession.setState({ token: "jwt" });
     useStandUpJob.setState({
       starting: false,
+      discarding: false,
       error: undefined,
       job: undefined,
+      incompleteStandUp: false,
       steps: [],
       streamId: 0,
     });
     startStandUpMock.mockResolvedValue("job-1");
-    readJobMock.mockResolvedValue({
+    discardStandUpMock.mockResolvedValue(undefined);
+    const runningJob = {
       id: "job-1",
-      kind: "standup",
-      status: "running",
-      steps: [],
-    });
+      kind: "standup" as const,
+      status: "running" as const,
+      steps: [] as [],
+    };
+    readJobStateMock.mockResolvedValue({ job: runningJob, incompleteStandUp: false });
     subscribeJobEventsMock.mockResolvedValue(undefined);
     OpsClientMock.mockImplementation(
       class {
         startStandUp = startStandUpMock;
 
-        readJob = readJobMock;
+        discardStandUp = discardStandUpMock;
+
+        readJobState = readJobStateMock;
 
         subscribeJobEvents = subscribeJobEventsMock;
       } as unknown as typeof OpsClient,
@@ -81,6 +96,16 @@ describe("useMaciStandUp", () => {
 
     expect(startStandUpMock).toHaveBeenCalledWith("jwt", SMALL_STAND_UP_BODY);
     expect(result.current.running).toBe(true);
+  });
+
+  it("discards an incomplete stand-up with the stored JWT", async () => {
+    const { result } = renderHook(() => useMaciStandUp());
+
+    await act(async () => {
+      await result.current.discardStandUp();
+    });
+
+    expect(discardStandUpMock).toHaveBeenCalledWith("jwt");
   });
 
   it("surfaces busy from the ops application", async () => {
@@ -119,17 +144,20 @@ describe("useMaciStandUp", () => {
   });
 
   it("does not keep steps from a finished job", async () => {
-    readJobMock.mockResolvedValue({
-      id: "job-1",
-      kind: "standup",
-      status: "succeeded",
-      steps: [{ seq: 1, kind: "declare", name: "LeanIMT" }],
+    readJobStateMock.mockResolvedValue({
+      job: {
+        id: "job-1",
+        kind: "standup",
+        status: "succeeded",
+        steps: [{ seq: 1, kind: "declare", name: "LeanIMT" }],
+      },
+      incompleteStandUp: false,
     });
 
     const { result } = renderHook(() => useMaciStandUp());
 
     await waitFor(() => {
-      expect(readJobMock).toHaveBeenCalled();
+      expect(readJobStateMock).toHaveBeenCalled();
     });
 
     expect(result.current.running).toBe(false);
@@ -137,11 +165,14 @@ describe("useMaciStandUp", () => {
   });
 
   it("shows steps already recorded for a running job", async () => {
-    readJobMock.mockResolvedValue({
-      id: "job-1",
-      kind: "standup",
-      status: "running",
-      steps: [{ seq: 1, kind: "declare", name: "LeanIMT" }],
+    readJobStateMock.mockResolvedValue({
+      job: {
+        id: "job-1",
+        kind: "standup",
+        status: "running",
+        steps: [{ seq: 1, kind: "declare", name: "LeanIMT" }],
+      },
+      incompleteStandUp: false,
     });
 
     const { result } = renderHook(() => useMaciStandUp());
@@ -154,12 +185,12 @@ describe("useMaciStandUp", () => {
   });
 
   it("ignores a failed job snapshot read", async () => {
-    readJobMock.mockRejectedValue(new Error("job failed"));
+    readJobStateMock.mockRejectedValue(new Error("job failed"));
 
     const { result } = renderHook(() => useMaciStandUp());
 
     await waitFor(() => {
-      expect(readJobMock).toHaveBeenCalled();
+      expect(readJobStateMock).toHaveBeenCalled();
     });
 
     expect(result.current.job).toBeUndefined();
@@ -251,10 +282,12 @@ describe("useMaciStandUp", () => {
   });
 
   it("does not apply a job snapshot after unmount", async () => {
-    let resolveJob: (snapshot: { id: string; kind: "standup"; status: "running"; steps: [] }) => void = (): void =>
-      undefined;
+    let resolveJob: (state: {
+      job: { id: string; kind: "standup"; status: "running"; steps: [] };
+      incompleteStandUp: boolean;
+    }) => void = (): void => undefined;
 
-    readJobMock.mockImplementation(
+    readJobStateMock.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveJob = resolve;
@@ -267,10 +300,13 @@ describe("useMaciStandUp", () => {
 
     await act(async () => {
       resolveJob({
-        id: "job-1",
-        kind: "standup",
-        status: "running",
-        steps: [],
+        job: {
+          id: "job-1",
+          kind: "standup",
+          status: "running",
+          steps: [],
+        },
+        incompleteStandUp: false,
       });
       await Promise.resolve();
     });

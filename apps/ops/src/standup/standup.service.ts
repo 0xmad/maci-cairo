@@ -28,7 +28,8 @@ export interface StandupServiceDeps {
 }
 
 export type JobEvent =
-  { type: "step"; step: JobStep } | { type: "completed"; status: "succeeded" | "failed"; error?: string };
+  | { type: "step"; step: JobStep }
+  | { type: "completed"; status: "succeeded" | "failed" | "interrupted"; error?: string };
 
 export interface StandUpCatalog {
   circuitProfiles: { id: string; maxSignups: number; maxVoteOptions: number }[];
@@ -65,11 +66,29 @@ export class StandupService {
   async startStandUp(intent: DeployMaciIntent): Promise<{ jobId: string }> {
     resolveStandupIntent(intent);
 
-    const jobId = this.#deps.randomId();
-    const began = await this.#deps.store.tryBegin({ id: jobId, kind: "standup", createdAtMs: this.#deps.nowMs() });
+    const latest = await this.#deps.store.latest();
+    const checkpoint = await this.#deps.store.readCheckpoint();
+    let jobId: string;
 
-    if (!began) {
-      throw new Error("busy");
+    if (
+      checkpoint !== undefined &&
+      latest !== undefined &&
+      (latest.status === "failed" || latest.status === "interrupted")
+    ) {
+      const resumed = await this.#deps.store.tryResume(latest.id);
+
+      if (!resumed) {
+        throw new Error("busy");
+      }
+
+      jobId = latest.id;
+    } else {
+      jobId = this.#deps.randomId();
+      const began = await this.#deps.store.tryBegin({ id: jobId, kind: "standup", createdAtMs: this.#deps.nowMs() });
+
+      if (!began) {
+        throw new Error("busy");
+      }
     }
 
     const schedule = this.#deps.scheduleWork ?? setImmediate;
@@ -81,6 +100,24 @@ export class StandupService {
     });
 
     return { jobId };
+  }
+
+  async recoverInterrupted(): Promise<void> {
+    await this.#deps.store.interruptRunning(this.#deps.nowMs(), "interrupted");
+  }
+
+  async hasIncompleteStandUp(): Promise<boolean> {
+    return (await this.#deps.store.readCheckpoint()) !== undefined;
+  }
+
+  async discardStandUp(): Promise<void> {
+    const job = await this.#deps.store.latest();
+
+    if (job?.status === "running") {
+      throw new Error("busy");
+    }
+
+    await this.#deps.store.clearCheckpoint();
   }
 
   currentJob(): Promise<JobSnapshot | undefined> {
@@ -104,7 +141,7 @@ export class StandupService {
         const completed: JobEvent =
           job.status === "succeeded"
             ? { type: "completed", status: "succeeded" }
-            : { type: "completed", status: "failed", error: job.error };
+            : { type: "completed", status: job.status, error: job.error };
 
         listener(completed);
 
@@ -137,11 +174,28 @@ export class StandupService {
   }
 
   private async run(jobId: string, intent: DeployMaciIntent): Promise<void> {
-    let seq = 0;
+    const existing = await this.#deps.store.latest();
+    let seq = existing?.id === jobId ? existing.steps.reduce((max, step) => Math.max(max, step.seq), 0) : 0;
+    let lastDeploy: string | undefined;
+    const sncast: SncastOps = {
+      declareClass: (contractName: string): string => this.#deps.sncast.declareClass(contractName),
+      field: (key: string, args: string[]): string => this.#deps.sncast.field(key, args),
+      deployUnique: (classHash: string, argumentsExpr?: string): string => {
+        lastDeploy = this.#deps.sncast.deployUnique(classHash, argumentsExpr);
+
+        return lastDeploy;
+      },
+    };
 
     try {
-      const result = await deployMaci(this.#deps.sncast, intent, {
+      const checkpoint = await this.#deps.store.readCheckpoint();
+      const result = await deployMaci(sncast, intent, {
+        checkpoint,
         onStep: async (step: DeployMaciStep): Promise<void> => {
+          if (step.kind === "deploy" && lastDeploy !== undefined) {
+            await this.#deps.store.mergeCheckpoint({ [step.name]: lastDeploy });
+          }
+
           if (step.kind === "declare") {
             return;
           }

@@ -142,7 +142,7 @@ export class OpsClient {
     return parsed.data.jobId;
   }
 
-  async readJob(token: string): Promise<JobSnapshot | undefined> {
+  async readJobState(token: string): Promise<{ job?: JobSnapshot; incompleteStandUp: boolean }> {
     const res = await fetch(`${this.#root}/job`, {
       headers: authHeaders(token),
     });
@@ -153,7 +153,23 @@ export class OpsClient {
       throw new Error(readError(body, "job failed"));
     }
 
-    return parsed.data.job ?? undefined;
+    return {
+      job: parsed.data.job ?? undefined,
+      incompleteStandUp: parsed.data.incompleteStandUp,
+    };
+  }
+
+  async discardStandUp(token: string): Promise<void> {
+    const res = await fetch(`${this.#root}/standup/discard`, {
+      method: "POST",
+      headers: authHeaders(token),
+    });
+
+    if (!res.ok) {
+      const body: unknown = await res.json().catch(() => undefined);
+
+      throw new Error(readError(body, "discard failed"));
+    }
   }
 
   async listMacis(token: string, page: number, pageSize: number): Promise<MaciListPage> {

@@ -8,11 +8,14 @@ import { useStandUpJob } from "../../stores/standUpJob";
 export interface UseMaciStandUpResult {
   signedIn: boolean;
   starting: boolean;
+  discarding: boolean;
   running: boolean;
+  incompleteStandUp: boolean;
   error?: string;
   job?: JobSnapshot;
   steps: JobStep[];
   startStandUp: (intent: StandUpBody) => Promise<void>;
+  discardStandUp: () => Promise<void>;
 }
 
 /** Wires Operator JWT and job SSE into the stand-up job store. */
@@ -21,8 +24,10 @@ export function useMaciStandUp(): UseMaciStandUpResult {
   const signedIn = token !== undefined;
   const {
     starting,
+    discarding,
     error,
     job,
+    incompleteStandUp,
     steps,
     streamId,
     applySnapshot,
@@ -30,6 +35,7 @@ export function useMaciStandUp(): UseMaciStandUpResult {
     failWatch,
     reset,
     startStandUp: startStoredJob,
+    discardStandUp: discardStoredJob,
   } = useStandUpJob();
 
   useEffect(() => {
@@ -44,10 +50,10 @@ export function useMaciStandUp(): UseMaciStandUpResult {
     let cancelled = false;
 
     client
-      .readJob(token)
-      .then((snapshot) => {
+      .readJobState(token)
+      .then((state) => {
         if (!cancelled) {
-          applySnapshot(snapshot);
+          applySnapshot(state.job, state.incompleteStandUp);
         }
       })
       .catch(() => undefined);
@@ -81,13 +87,20 @@ export function useMaciStandUp(): UseMaciStandUpResult {
     [startStoredJob, token],
   );
 
+  const discardStandUp = useCallback(async (): Promise<void> => {
+    await discardStoredJob(token);
+  }, [discardStoredJob, token]);
+
   return {
     signedIn,
     starting,
+    discarding,
     running: job?.status === "running",
+    incompleteStandUp,
     error,
     job,
     steps,
     startStandUp,
+    discardStandUp,
   };
 }

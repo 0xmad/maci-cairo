@@ -1,4 +1,14 @@
-import { literal, number, object, strictObject, string, union, type ZodType, type infer as ZodInfer } from "zod";
+import {
+  boolean,
+  literal,
+  number,
+  object,
+  strictObject,
+  string,
+  union,
+  type ZodType,
+  type infer as ZodInfer,
+} from "zod";
 
 export const errorBodySchema = object({ error: string() });
 export const nonceResponseSchema = strictObject({ nonce: string().min(1) });
@@ -46,7 +56,12 @@ export const jobStepSchema = strictObject({
   kind: string().min(1),
   name: string().min(1),
 });
-export const jobStatusSchema = union([literal("running"), literal("succeeded"), literal("failed")]);
+export const jobStatusSchema = union([
+  literal("running"),
+  literal("succeeded"),
+  literal("failed"),
+  literal("interrupted"),
+]);
 export const jobSnapshotSchema = strictObject({
   id: string().min(1),
   kind: literal("standup"),
@@ -54,7 +69,10 @@ export const jobSnapshotSchema = strictObject({
   error: string().optional(),
   steps: jobStepSchema.array(),
 });
-export const jobResponseSchema = strictObject({ job: jobSnapshotSchema.nullable() });
+export const jobResponseSchema = strictObject({
+  job: jobSnapshotSchema.nullable(),
+  incompleteStandUp: boolean(),
+});
 export const maciNetworkSchema = union([literal("starknet_local"), literal("sepolia")]);
 export const maciListItemSchema = strictObject({
   address: string().min(1),
@@ -97,7 +115,7 @@ export const jobEventSchema = union([
   strictObject({ type: literal("step"), step: jobStepSchema }),
   strictObject({
     type: literal("completed"),
-    status: union([literal("succeeded"), literal("failed")]),
+    status: union([literal("succeeded"), literal("failed"), literal("interrupted")]),
     error: string().optional(),
   }),
 ]);

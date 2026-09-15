@@ -1,8 +1,8 @@
-import { type DeployMaciResult, type MaciNetwork } from "maci-deploy/maci";
+import { type DeployMaciCheckpoint, type DeployMaciResult, type MaciNetwork } from "maci-deploy/maci";
 
 import { type Page, type Pagination } from "../../utils/pagination.js";
 
-export type JobStatus = "running" | "succeeded" | "failed";
+export type JobStatus = "running" | "succeeded" | "failed" | "interrupted";
 
 export interface JobStep {
   seq: number;
@@ -36,12 +36,17 @@ export interface NewJob {
   createdAtMs: number;
 }
 
-/** Durable MACI stand-up job, step log, and recorded instances. */
+/** Durable MACI stand-up job, step log, checkpoint, and recorded instances. */
 export interface JobStore {
   tryBegin: (job: NewJob) => Promise<boolean>;
   appendStep: (jobId: string, step: JobStep) => Promise<void>;
   succeed: (jobId: string, completedAtMs: number, maci: MaciInstanceRecord) => Promise<void>;
   fail: (jobId: string, completedAtMs: number, error: string) => Promise<void>;
+  interruptRunning: (completedAtMs: number, error: string) => Promise<void>;
+  tryResume: (jobId: string) => Promise<boolean>;
+  mergeCheckpoint: (patch: DeployMaciCheckpoint) => Promise<void>;
+  readCheckpoint: () => Promise<DeployMaciCheckpoint | undefined>;
+  clearCheckpoint: () => Promise<void>;
   latest: () => Promise<JobSnapshot | undefined>;
   listMacis: (pagination: Pagination) => Promise<Page<MaciListItem>>;
   readMaci: (address: string) => Promise<MaciInstanceRecord | undefined>;

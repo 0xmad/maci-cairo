@@ -20,6 +20,17 @@ export const jobSteps = pgTable(
   (table) => [primaryKey({ columns: [table.jobId, table.seq] })],
 );
 
+export const standupCheckpoints = pgTable("standup_checkpoints", {
+  id: integer("id").primaryKey(),
+  leanImt: text("lean_imt"),
+  checker: text("checker"),
+  enforcer: text("enforcer"),
+  assigner: text("assigner"),
+  maci: text("maci"),
+});
+
+export type StandupCheckpointRow = typeof standupCheckpoints.$inferSelect;
+
 export const maciInstances = pgTable("maci_instances", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   leanImt: text("lean_imt").notNull(),
