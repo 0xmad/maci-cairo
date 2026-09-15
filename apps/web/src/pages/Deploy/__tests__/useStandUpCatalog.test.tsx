@@ -67,9 +67,12 @@ const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
 const idleStandUp = {
   signedIn: true,
   starting: false,
+  discarding: false,
   running: false,
+  incompleteStandUp: false,
   steps: [] as [],
   startStandUp,
+  discardStandUp: vi.fn(),
 };
 
 describe("useStandUpCatalog", () => {

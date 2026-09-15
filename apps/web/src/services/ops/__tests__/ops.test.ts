@@ -317,21 +317,68 @@ describe("OpsClient", () => {
 
   it("reads the current job", async () => {
     const job = { id: "job-1", kind: "standup", status: "running", steps: [] };
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ job }), { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ job, incompleteStandUp: false }), { status: 200 })),
+    );
 
     const client = new OpsClient("http://ops.test");
 
-    await expect(client.readJob("jwt")).resolves.toEqual(job);
+    await expect(client.readJobState("jwt")).resolves.toEqual({ job, incompleteStandUp: false });
+
+    vi.unstubAllGlobals();
+  });
+
+  it("discards an incomplete stand-up", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ discarded: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(client.discardStandUp("jwt")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith("http://ops.test/standup/discard", {
+      method: "POST",
+      headers: { authorization: "Bearer jwt" },
+    });
+
+    vi.unstubAllGlobals();
+  });
+
+  it("throws the API error body when discard is rejected", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "busy" }), { status: 409 })));
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(client.discardStandUp("jwt")).rejects.toThrow(/^busy$/u);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("throws discard failed when the error body is not JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: (): Promise<unknown> => Promise.reject(new Error("not json")),
+      }),
+    );
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(client.discardStandUp("jwt")).rejects.toThrow(/^discard failed$/u);
 
     vi.unstubAllGlobals();
   });
 
   it("reads no current job", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ job: null }), { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ job: null, incompleteStandUp: false }), { status: 200 })),
+    );
 
     const client = new OpsClient("http://ops.test");
 
-    await expect(client.readJob("jwt")).resolves.toBeUndefined();
+    await expect(client.readJobState("jwt")).resolves.toEqual({ job: undefined, incompleteStandUp: false });
 
     vi.unstubAllGlobals();
   });
@@ -344,7 +391,7 @@ describe("OpsClient", () => {
 
     const client = new OpsClient("http://ops.test");
 
-    await expect(client.readJob("jwt")).rejects.toThrow(/^job failed$/u);
+    await expect(client.readJobState("jwt")).rejects.toThrow(/^job failed$/u);
 
     vi.unstubAllGlobals();
   });

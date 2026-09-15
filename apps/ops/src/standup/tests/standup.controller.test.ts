@@ -58,6 +58,8 @@ function harness(
   currentJob: ReturnType<typeof vi.fn>;
   listMacis: ReturnType<typeof vi.fn>;
   readMaci: ReturnType<typeof vi.fn>;
+  discardStandUp: ReturnType<typeof vi.fn>;
+  hasIncompleteStandUp: ReturnType<typeof vi.fn>;
   subscribe: ReturnType<typeof vi.fn>;
 } {
   const authenticate = vi.fn((): Promise<string> => Promise.resolve(OPERATOR));
@@ -70,6 +72,8 @@ function harness(
   const currentJob = vi.fn((): Promise<JobSnapshot | undefined> => Promise.resolve(undefined));
   const listMacis = vi.fn((): Promise<Page<MaciListItem>> => Promise.resolve({ items: [], total: 0 }));
   const readMaci = vi.fn((): Promise<MaciInstanceRecord | undefined> => Promise.resolve(undefined));
+  const discardStandUp = vi.fn((): Promise<void> => Promise.resolve());
+  const hasIncompleteStandUp = vi.fn((): Promise<boolean> => Promise.resolve(false));
   const subscribe = vi.fn((listener: (event: JobEvent) => void): Promise<() => void> => {
     listener({ type: "step", step: STEP });
     listener({ type: "completed", status: "succeeded" });
@@ -83,6 +87,8 @@ function harness(
     currentJob,
     listMacis,
     readMaci,
+    discardStandUp,
+    hasIncompleteStandUp,
     subscribe,
     ...standupOverrides,
   } as unknown as StandupService;
@@ -95,6 +101,8 @@ function harness(
     currentJob,
     listMacis,
     readMaci,
+    discardStandUp,
+    hasIncompleteStandUp,
     subscribe,
   };
 }
@@ -380,15 +388,47 @@ describe("StandupController", () => {
   test("readCurrentJob returns null when no job exists", async () => {
     const { standupController } = harness();
 
-    await expect(standupController.readCurrentJob(request("Bearer jwt-token"))).resolves.toEqual({ job: null });
+    await expect(standupController.readCurrentJob(request("Bearer jwt-token"))).resolves.toEqual({
+      job: null,
+      incompleteStandUp: false,
+    });
   });
 
-  test("readCurrentJob returns the latest job", async () => {
+  test("readCurrentJob returns the latest job and incomplete stand-up", async () => {
     const { standupController } = harness({
       currentJob: vi.fn((): Promise<JobSnapshot | undefined> => Promise.resolve(JOB)),
+      hasIncompleteStandUp: vi.fn((): Promise<boolean> => Promise.resolve(true)),
     });
 
-    await expect(standupController.readCurrentJob(request("Bearer jwt-token"))).resolves.toEqual({ job: JOB });
+    await expect(standupController.readCurrentJob(request("Bearer jwt-token"))).resolves.toEqual({
+      job: JOB,
+      incompleteStandUp: true,
+    });
+  });
+
+  test("discardStandUp discards for an authenticated Operator", async () => {
+    const { standupController, authenticate, discardStandUp } = harness();
+
+    await expect(standupController.discardStandUp(request("Bearer jwt-token"))).resolves.toEqual({ discarded: true });
+    expect(authenticate).toHaveBeenCalledWith("jwt-token");
+    expect(discardStandUp).toHaveBeenCalledOnce();
+  });
+
+  test("discardStandUp maps a running job to ConflictException", async () => {
+    const { standupController } = harness({
+      discardStandUp: vi.fn((): Promise<void> => Promise.reject(new Error("busy"))),
+    });
+
+    await expect(standupController.discardStandUp(request("Bearer jwt-token"))).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  test("discardStandUp rejects a request without a Bearer token", async () => {
+    const { standupController, discardStandUp } = harness();
+
+    await expect(standupController.discardStandUp(request())).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(discardStandUp).not.toHaveBeenCalled();
   });
 
   test("subscribe emits SSE events then completes", async () => {

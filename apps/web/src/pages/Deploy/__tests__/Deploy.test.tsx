@@ -13,6 +13,17 @@ vi.mock("../useStandUpCatalog", () => ({
 const useStandUpCatalogMock = vi.mocked(useStandUpCatalog);
 
 const startStandUp = vi.fn();
+const discardStandUp = vi.fn();
+
+const idleCatalog = {
+  signedIn: false,
+  starting: false,
+  discarding: false,
+  running: false,
+  incompleteStandUp: false,
+  startStandUp,
+  discardStandUp,
+};
 
 const CATALOG = {
   circuitProfiles: [{ id: "small", maxSignups: 32, maxVoteOptions: 5 }],
@@ -34,12 +45,9 @@ describe("Deploy page", () => {
   beforeEach(() => {
     startStandUp.mockReset();
     startStandUp.mockResolvedValue(undefined);
-    useStandUpCatalogMock.mockReturnValue({
-      signedIn: false,
-      starting: false,
-      running: false,
-      startStandUp,
-    });
+    discardStandUp.mockReset();
+    discardStandUp.mockResolvedValue(undefined);
+    useStandUpCatalogMock.mockReturnValue(idleCatalog);
   });
 
   it("asks an unsigned-in visitor to sign in as Operator", () => {
@@ -59,11 +67,9 @@ describe("Deploy page", () => {
 
   it("shows a catalog error to a signed-in Operator without the stand-up form", () => {
     useStandUpCatalogMock.mockReturnValue({
+      ...idleCatalog,
       signedIn: true,
-      starting: false,
-      running: false,
       error: "catalog failed",
-      startStandUp,
     });
 
     render(
@@ -79,10 +85,8 @@ describe("Deploy page", () => {
 
   it("does not show the stand-up form until the catalog is loaded", () => {
     useStandUpCatalogMock.mockReturnValue({
+      ...idleCatalog,
       signedIn: true,
-      starting: false,
-      running: false,
-      startStandUp,
     });
 
     render(
@@ -97,11 +101,9 @@ describe("Deploy page", () => {
 
   it("shows catalog selectors and read-only Max Signups and Max vote options", () => {
     useStandUpCatalogMock.mockReturnValue({
+      ...idleCatalog,
       signedIn: true,
-      starting: false,
-      running: false,
       catalog: CATALOG,
-      startStandUp,
     });
 
     render(
@@ -129,11 +131,9 @@ describe("Deploy page", () => {
 
   it("starts MACI stand-up with the selected catalog body and stays on Deploy while the job runs", async () => {
     useStandUpCatalogMock.mockReturnValue({
+      ...idleCatalog,
       signedIn: true,
-      starting: false,
-      running: false,
       catalog: CATALOG,
-      startStandUp,
     });
 
     render(<DeployApp />);
@@ -155,11 +155,9 @@ describe("Deploy page", () => {
 
   it("does not start stand-up when the constant amount is not a positive integer", async () => {
     useStandUpCatalogMock.mockReturnValue({
+      ...idleCatalog,
       signedIn: true,
-      starting: false,
-      running: false,
       catalog: CATALOG,
-      startStandUp,
     });
 
     render(

@@ -13,15 +13,29 @@ export interface UseStandUpCatalogResult {
   error?: string;
   signedIn: boolean;
   starting: boolean;
+  discarding: boolean;
   running: boolean;
+  incompleteStandUp: boolean;
   startStandUp: (intent: StandUpBody) => Promise<void>;
+  discardStandUp: () => Promise<void>;
 }
 
 /** Wires Operator JWT into the catalog store, stand-up toasts, and Home on success. */
 export function useStandUpCatalog(): UseStandUpCatalogResult {
   const token = useOperatorSession((session) => session.token);
   const { catalog, error, load, reset } = useStandUpCatalogStore();
-  const { signedIn, starting, running, error: jobError, job, steps, startStandUp } = useMaciStandUp();
+  const {
+    signedIn,
+    starting,
+    discarding,
+    running,
+    incompleteStandUp,
+    error: jobError,
+    job,
+    steps,
+    startStandUp,
+    discardStandUp,
+  } = useMaciStandUp();
   const navigate = useNavigate();
   const showStandUp = useToasts((state) => state.showStandUp);
   const sawRunning = useRef(false);
@@ -50,5 +64,15 @@ export function useStandUpCatalog(): UseStandUpCatalogResult {
     }
   }, [running, job?.status, navigate]);
 
-  return { catalog, error, signedIn, starting, running, startStandUp };
+  return {
+    catalog,
+    error,
+    signedIn,
+    starting,
+    discarding,
+    running,
+    incompleteStandUp,
+    startStandUp,
+    discardStandUp,
+  };
 }

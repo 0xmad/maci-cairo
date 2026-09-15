@@ -3,7 +3,7 @@ import { SMALL_STANDUP_INTENT } from "maci-deploy/intent";
 import { type DeployMaciResult, type MaciNetwork, type SncastOps } from "maci-deploy/maci";
 import { describe, expect, test, vi } from "vitest";
 
-import { jobs, jobSteps } from "../repositories/job.schema.js";
+import { jobs, jobSteps, standupCheckpoints, type StandupCheckpointRow } from "../repositories/job.schema.js";
 import { type JobStore } from "../repositories/job.store.js";
 import { PostgresJobStore } from "../repositories/postgresJob.store.js";
 import { StandupService, type JobEvent } from "../standup.service.js";
@@ -13,18 +13,37 @@ function padIndex(index: number): string {
 }
 
 function recordingOps(
-  options: { failOn?: "set_target" | "coordinator"; coordinatorOnChain?: string } = {},
-): SncastOps & { fieldCalls: string[][]; maciCoordinatorArg?: string; assignerArg?: string } {
+  options: { failOn?: "set_target" | "coordinator"; failOnDeploy?: number; coordinatorOnChain?: string } = {},
+): SncastOps & {
+  fieldCalls: string[][];
+  deploys: string[];
+  declares: string[];
+  maciCoordinatorArg?: string;
+  assignerArg?: string;
+} {
   let next = 1;
   const fieldCalls: string[][] = [];
-  const ops: SncastOps & { fieldCalls: string[][]; maciCoordinatorArg?: string; assignerArg?: string } = {
+  const ops: SncastOps & {
+    fieldCalls: string[][];
+    deploys: string[];
+    declares: string[];
+    maciCoordinatorArg?: string;
+    assignerArg?: string;
+  } = {
     fieldCalls,
-    declareClass(): string {
+    deploys: [],
+    declares: [],
+    declareClass(contractName: string): string {
+      ops.declares.push(contractName);
       const classHash = padIndex(next);
       next += 1;
       return classHash;
     },
     deployUnique(_classHash: string, argumentsExpr?: string): string {
+      if (options.failOnDeploy === ops.deploys.length + 1) {
+        throw new Error("deploy failed");
+      }
+
       const coordinator = argumentsExpr?.match(/coordinator: (0x[0-9a-f]+)/u)?.[1];
 
       if (coordinator !== undefined) {
@@ -35,6 +54,8 @@ function recordingOps(
 
       const address = padIndex(next);
       next += 1;
+      ops.deploys.push(address);
+
       return address;
     },
     field(_key: string, args: string[]): string {
@@ -92,6 +113,7 @@ function postgresJobStore(): PostgresJobStore {
   const jobRows: JobRow[] = [];
   const stepRows: StepRow[] = [];
   let maciRow: MaciRow | undefined;
+  let checkpointRow: StandupCheckpointRow | undefined;
 
   const insert = (table: unknown): { values: (row: Record<string, unknown>) => unknown } => ({
     values: (row: Record<string, unknown>): unknown => {
@@ -123,6 +145,21 @@ function postgresJobStore(): PostgresJobStore {
         return Promise.resolve();
       }
 
+      if (table === standupCheckpoints) {
+        checkpointRow = {
+          id: 1,
+          leanImt: (row.leanImt as string | null | undefined) ?? null,
+          checker: (row.checker as string | null | undefined) ?? null,
+          enforcer: (row.enforcer as string | null | undefined) ?? null,
+          assigner: (row.assigner as string | null | undefined) ?? null,
+          maci: (row.maci as string | null | undefined) ?? null,
+        };
+
+        return {
+          onConflictDoUpdate: (): Promise<void> => Promise.resolve(),
+        };
+      }
+
       const previous = maciRow;
 
       maciRow = {
@@ -151,7 +188,9 @@ function postgresJobStore(): PostgresJobStore {
   const update = (): { set: (patch: Record<string, unknown>) => { where: () => Promise<void> } } => ({
     set: (patch: Record<string, unknown>): { where: () => Promise<void> } => ({
       where: (): Promise<void> => {
-        const target = jobRows.find((job) => job.status === "running");
+        const running = jobRows.find((job) => job.status === "running");
+        const latest = [...jobRows].sort((left, right) => right.createdAtMs - left.createdAtMs).at(0);
+        const target = running ?? latest;
 
         if (target !== undefined) {
           Object.assign(target, patch);
@@ -160,6 +199,13 @@ function postgresJobStore(): PostgresJobStore {
         return Promise.resolve();
       },
     }),
+  });
+  const remove = (): { where: () => Promise<void> } => ({
+    where: (): Promise<void> => {
+      checkpointRow = undefined;
+
+      return Promise.resolve();
+    },
   });
   const select = (): { from: (table: unknown) => unknown } => ({
     from: (table: unknown): unknown => {
@@ -182,6 +228,15 @@ function postgresJobStore(): PostgresJobStore {
                 stepRows.filter((step) => step.jobId === latest.id).sort((left, right) => left.seq - right.seq),
               );
             },
+          }),
+        };
+      }
+
+      if (table === standupCheckpoints) {
+        return {
+          where: (): { limit: () => Promise<NonNullable<typeof checkpointRow>[]> } => ({
+            limit: (): Promise<NonNullable<typeof checkpointRow>[]> =>
+              Promise.resolve(checkpointRow === undefined ? [] : [checkpointRow]),
           }),
         };
       }
@@ -213,21 +268,41 @@ function postgresJobStore(): PostgresJobStore {
     insert,
     update,
     select,
-    transaction: (work: (tx: { insert: typeof insert; update: typeof update }) => Promise<void>) =>
-      work({ insert, update }),
+    delete: remove,
+    transaction: (
+      work: (tx: { insert: typeof insert; update: typeof update; delete: typeof remove }) => Promise<void>,
+    ) => work({ insert, update, delete: remove }),
   } as unknown as ConstructorParameters<typeof PostgresJobStore>[0]);
 }
 
-function harness(ops: SncastOps = recordingOps(), store: JobStore = postgresJobStore()) {
+function jobClock(): { nowMs: () => number; randomId: () => string } {
   let n = 0;
+  let nowMs = 1_000_000;
+
+  return {
+    nowMs: (): number => {
+      nowMs += 1;
+
+      return nowMs;
+    },
+    randomId: (): string => {
+      n += 1;
+
+      return `job-${n}`;
+    },
+  };
+}
+
+function harness(
+  ops: SncastOps = recordingOps(),
+  store: JobStore = postgresJobStore(),
+  clock: { nowMs: () => number; randomId: () => string } = jobClock(),
+) {
   const service = new StandupService({
     store,
     sncast: ops,
-    nowMs: (): number => 1_000_000,
-    randomId: (): string => {
-      n += 1;
-      return `job-${n}`;
-    },
+    nowMs: clock.nowMs,
+    randomId: clock.randomId,
   });
 
   return { service };
@@ -325,7 +400,7 @@ describe("StandupService", () => {
     expect(listed.total).toBe(1);
     expect(listed.items[0]?.address).toMatch(/^0x/u);
     expect(listed.items[0]?.network).toBe("starknet_local");
-    expect(listed.items[0]?.createdAtMs).toBe(1_000_000);
+    expect(listed.items[0]?.createdAtMs).toBeGreaterThan(1_000_000);
     await expect(service.readMaci(listed.items[0]?.address ?? "")).resolves.toMatchObject({
       maci: listed.items[0]?.address,
       deployer: intendedCoordinator(undefined),
@@ -359,6 +434,181 @@ describe("StandupService", () => {
     expect(ops.assignerArg).toBe("7");
   });
 
+  test("failing deploy N then starting again skips earlier deploys and records no MACI until completion", async () => {
+    const store = postgresJobStore();
+    const clock = jobClock();
+    const firstOps = recordingOps({ failOnDeploy: 2 });
+    const { service } = harness(firstOps, store, clock);
+
+    await service.startStandUp(SMALL_STANDUP_INTENT);
+    await settle(service);
+
+    const failed = await service.currentJob();
+    const leanImt = firstOps.deploys[0];
+
+    expect(failed?.status).toBe("failed");
+    expect(failed?.error).toBe("deploy failed");
+    expect(failed?.steps.some((step) => step.name === "leanImt")).toBe(true);
+    await expect(service.hasIncompleteStandUp()).resolves.toBe(true);
+    await expect(service.listMacis({ page: 1, pageSize: 10 })).resolves.toEqual({ items: [], total: 0 });
+
+    const resumeOps = recordingOps();
+    const { service: resume } = harness(resumeOps, store, clock);
+
+    await expect(resume.startStandUp(SMALL_STANDUP_INTENT)).resolves.toEqual({ jobId: failed?.id });
+    await settle(resume);
+
+    expect(resumeOps.deploys).toHaveLength(4);
+    expect(resumeOps.deploys).not.toContain(leanImt);
+    expect(resumeOps.declares).toEqual([
+      "LeanIMT",
+      "FreeForAllChecker",
+      "FreeForAllEnforcer",
+      "ConstantInitialVoteBalance",
+      "Poll",
+      "PollFactory",
+      "MACI",
+    ]);
+    expect((await resume.currentJob())?.status).toBe("succeeded");
+    await expect(resume.hasIncompleteStandUp()).resolves.toBe(false);
+    await expect(resume.listMacis({ page: 1, pageSize: 10 })).resolves.toMatchObject({ total: 1 });
+  });
+
+  test("discard when idle drops the checkpoint so the next start deploys from the beginning", async () => {
+    const store = postgresJobStore();
+    const clock = jobClock();
+    const { service } = harness(recordingOps({ failOnDeploy: 2 }), store, clock);
+
+    await service.startStandUp(SMALL_STANDUP_INTENT);
+    await settle(service);
+
+    await expect(service.hasIncompleteStandUp()).resolves.toBe(true);
+    await service.discardStandUp();
+    await expect(service.hasIncompleteStandUp()).resolves.toBe(false);
+    await expect(service.listMacis({ page: 1, pageSize: 10 })).resolves.toEqual({ items: [], total: 0 });
+
+    const freshOps = recordingOps();
+    const { service: fresh } = harness(freshOps, store, clock);
+
+    await fresh.startStandUp(SMALL_STANDUP_INTENT);
+    await settle(fresh);
+
+    expect(freshOps.deploys).toHaveLength(5);
+    expect((await fresh.currentJob())?.id).not.toBe("job-1");
+    expect((await fresh.currentJob())?.status).toBe("succeeded");
+  });
+
+  test("discard while a job is running is rejected and does not clear the in-flight attempt", async () => {
+    const store = postgresJobStore();
+    const service = new StandupService({
+      store,
+      sncast: recordingOps(),
+      nowMs: (): number => 1_000_000,
+      randomId: (): string => "job-1",
+      scheduleWork: (): void => undefined,
+    });
+
+    await service.startStandUp(SMALL_STANDUP_INTENT);
+
+    await expect(service.discardStandUp()).rejects.toThrow(/^busy$/u);
+    await expect(service.currentJob()).resolves.toMatchObject({ id: "job-1", status: "running" });
+  });
+
+  test("start is busy when a checkpointed failed job cannot be reopened", async () => {
+    const store: JobStore = {
+      tryBegin: () => Promise.resolve(true),
+      appendStep: () => Promise.resolve(),
+      succeed: () => Promise.resolve(),
+      fail: () => Promise.resolve(),
+      latest: () =>
+        Promise.resolve({
+          id: "job-1",
+          kind: "standup",
+          status: "failed",
+          error: "deploy failed",
+          steps: [{ seq: 1, kind: "deploy", name: "leanImt" }],
+        }),
+      listMacis: () => Promise.resolve({ items: [], total: 0 }),
+      readMaci: () => Promise.resolve(undefined),
+      interruptRunning: () => Promise.resolve(),
+      tryResume: () => Promise.resolve(false),
+      mergeCheckpoint: () => Promise.resolve(),
+      readCheckpoint: () => Promise.resolve({ leanImt: "0xaaa" }),
+      clearCheckpoint: () => Promise.resolve(),
+    };
+    const { service } = harness(recordingOps(), store);
+
+    await expect(service.startStandUp(SMALL_STANDUP_INTENT)).rejects.toThrow(/^busy$/u);
+  });
+
+  test("a new job numbers steps from 1 when latest is a different job", async () => {
+    const recorded: { seq: number; name: string }[] = [];
+    let succeeded = false;
+    const store: JobStore = {
+      tryBegin: () => Promise.resolve(true),
+      appendStep: (_jobId, step) => {
+        recorded.push({ seq: step.seq, name: step.name });
+
+        return Promise.resolve();
+      },
+      succeed: () => {
+        succeeded = true;
+
+        return Promise.resolve();
+      },
+      fail: () => Promise.resolve(),
+      latest: () =>
+        Promise.resolve({
+          id: "job-old",
+          kind: "standup",
+          status: "succeeded",
+          steps: [{ seq: 40, kind: "invoke", name: "set_target" }],
+        }),
+      listMacis: () => Promise.resolve({ items: [], total: 0 }),
+      readMaci: () => Promise.resolve(undefined),
+      interruptRunning: () => Promise.resolve(),
+      tryResume: () => Promise.resolve(false),
+      mergeCheckpoint: () => Promise.resolve(),
+      readCheckpoint: () => Promise.resolve(undefined),
+      clearCheckpoint: () => Promise.resolve(),
+    };
+    const { service } = harness(recordingOps(), store);
+
+    await service.startStandUp(SMALL_STANDUP_INTENT);
+    await vi.waitFor(() => {
+      expect(succeeded).toBe(true);
+    });
+
+    expect(recorded[0]).toEqual({ seq: 1, name: "leanImt" });
+  });
+
+  test("recover marks a running job interrupted so start can resume", async () => {
+    const store = postgresJobStore();
+    const clock = jobClock();
+    const { service } = harness(recordingOps(), store, clock);
+
+    await store.tryBegin({ id: "job-1", kind: "standup", createdAtMs: 1_000_001 });
+    await store.mergeCheckpoint({ leanImt: "0xaaa" });
+    await store.appendStep("job-1", { seq: 1, kind: "deploy", name: "leanImt" });
+
+    await expect(service.currentJob()).resolves.toMatchObject({ id: "job-1", status: "running" });
+    await expect(service.hasIncompleteStandUp()).resolves.toBe(true);
+
+    await service.recoverInterrupted();
+
+    await expect(service.currentJob()).resolves.toMatchObject({ status: "interrupted", error: "interrupted" });
+
+    const resumeOps = recordingOps();
+    const { service: resume } = harness(resumeOps, store, clock);
+
+    await expect(resume.startStandUp(SMALL_STANDUP_INTENT)).resolves.toEqual({ jobId: "job-1" });
+    await settle(resume);
+
+    expect(resumeOps.deploys).toHaveLength(4);
+    expect(resumeOps.deploys).not.toContain("0xaaa");
+    expect((await resume.currentJob())?.status).toBe("succeeded");
+  });
+
   test("no instance is recorded when set_target fails", async () => {
     const { service } = harness(recordingOps({ failOn: "set_target" }));
 
@@ -370,7 +620,27 @@ describe("StandupService", () => {
     expect(job?.status).toBe("failed");
     expect(job?.error).toBe("set_target failed");
     expect(job?.steps.some((step) => step.name === "set_target")).toBe(false);
+    await expect(service.hasIncompleteStandUp()).resolves.toBe(true);
     await expect(service.listMacis({ page: 1, pageSize: 10 })).resolves.toEqual({ items: [], total: 0 });
+  });
+
+  test("failed set_target then start skips every deployUnique", async () => {
+    const store = postgresJobStore();
+    const clock = jobClock();
+    const { service } = harness(recordingOps({ failOn: "set_target" }), store, clock);
+
+    await service.startStandUp(SMALL_STANDUP_INTENT);
+    await settle(service);
+
+    const resumeOps = recordingOps();
+    const { service: resume } = harness(resumeOps, store, clock);
+
+    await resume.startStandUp(SMALL_STANDUP_INTENT);
+    await settle(resume);
+
+    expect(resumeOps.deploys).toHaveLength(0);
+    expect((await resume.currentJob())?.status).toBe("succeeded");
+    await expect(resume.hasIncompleteStandUp()).resolves.toBe(false);
   });
 
   test("no instance is recorded when the coordinator check fails", async () => {
@@ -517,6 +787,11 @@ describe("StandupService", () => {
         }),
       listMacis: () => Promise.resolve({ items: [], total: 0 }),
       readMaci: () => Promise.resolve(undefined),
+      interruptRunning: () => Promise.resolve(),
+      tryResume: () => Promise.resolve(false),
+      mergeCheckpoint: () => Promise.resolve(),
+      readCheckpoint: () => Promise.resolve(undefined),
+      clearCheckpoint: () => Promise.resolve(),
     };
     const { service } = harness(recordingOps(), store);
     const events: JobEvent[] = [];
@@ -542,6 +817,22 @@ describe("StandupService", () => {
     const steps = events.filter((event) => event.type === "step");
     expect(steps.map((event) => event.step.kind)).toEqual(["deploy", "deploy", "deploy", "deploy", "deploy", "invoke"]);
     unsub();
+  });
+
+  test("subscribe replays an interrupted job's completion", async () => {
+    const store = postgresJobStore();
+    const { service } = harness(recordingOps(), store);
+
+    await store.tryBegin({ id: "job-1", kind: "standup", createdAtMs: 1_000_001 });
+    await service.recoverInterrupted();
+
+    const events: JobEvent[] = [];
+
+    await service.subscribe((event) => {
+      events.push(event);
+    });
+
+    expect(events).toEqual([{ type: "completed", status: "interrupted", error: "interrupted" }]);
   });
 
   test("subscribe replays a failed job's completion", async () => {

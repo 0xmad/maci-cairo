@@ -1,10 +1,10 @@
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { type NodePgDatabase } from "drizzle-orm/node-postgres";
-import { type MaciNetwork } from "maci-deploy/maci";
+import { type DeployMaciCheckpoint, type MaciNetwork } from "maci-deploy/maci";
 
 import { type Page, type Pagination } from "../../utils/pagination.js";
 
-import { jobs, jobSteps, maciInstances } from "./job.schema.js";
+import { jobs, jobSteps, maciInstances, standupCheckpoints, type StandupCheckpointRow } from "./job.schema.js";
 import {
   type JobSnapshot,
   type JobStatus,
@@ -19,16 +19,43 @@ type JobDatabase = NodePgDatabase<{
   jobs: typeof jobs;
   jobSteps: typeof jobSteps;
   maciInstances: typeof maciInstances;
+  standupCheckpoints: typeof standupCheckpoints;
 }>;
 
-type MaciInstanceRow = typeof maciInstances.$inferSelect;
+const CHECKPOINT_ID = 1;
+const CHECKPOINT_FIELDS = ["leanImt", "checker", "enforcer", "assigner", "maci"] as const;
+
+function asCheckpoint(row: StandupCheckpointRow): DeployMaciCheckpoint | undefined {
+  const checkpoint: DeployMaciCheckpoint = {};
+
+  CHECKPOINT_FIELDS.forEach((field) => {
+    const value = row[field];
+
+    if (value !== null && value.length > 0) {
+      checkpoint[field] = value;
+    }
+  });
+
+  return Object.keys(checkpoint).length === 0 ? undefined : checkpoint;
+}
+
+function checkpointRow(checkpoint: DeployMaciCheckpoint): StandupCheckpointRow {
+  return {
+    id: CHECKPOINT_ID,
+    leanImt: checkpoint.leanImt ?? null,
+    checker: checkpoint.checker ?? null,
+    enforcer: checkpoint.enforcer ?? null,
+    assigner: checkpoint.assigner ?? null,
+    maci: checkpoint.maci ?? null,
+  };
+}
 
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
 }
 
 function asStatus(value: string): JobStatus {
-  if (value === "running" || value === "succeeded" || value === "failed") {
+  if (value === "running" || value === "succeeded" || value === "failed" || value === "interrupted") {
     return value;
   }
 
@@ -50,6 +77,8 @@ function asNetwork(value: string): MaciNetwork {
 
   throw new Error(`unknown MACI network ${value}`);
 }
+
+type MaciInstanceRow = typeof maciInstances.$inferSelect;
 
 function asMaci(row: MaciInstanceRow): MaciInstanceRecord {
   return {
@@ -127,11 +156,76 @@ export class PostgresJobStore implements JobStore {
         network: maci.network,
         createdAtMs: completedAtMs,
       });
+      await tx.delete(standupCheckpoints).where(eq(standupCheckpoints.id, CHECKPOINT_ID));
     });
   }
 
   async fail(jobId: string, completedAtMs: number, error: string): Promise<void> {
     await this.#db.update(jobs).set({ status: "failed", completedAtMs, error }).where(eq(jobs.id, jobId));
+  }
+
+  async interruptRunning(completedAtMs: number, error: string): Promise<void> {
+    await this.#db.update(jobs).set({ status: "interrupted", completedAtMs, error }).where(eq(jobs.status, "running"));
+  }
+
+  async tryResume(jobId: string): Promise<boolean> {
+    const latest = await this.latest();
+
+    if (latest?.id !== jobId || (latest.status !== "failed" && latest.status !== "interrupted")) {
+      return false;
+    }
+
+    try {
+      await this.#db
+        .update(jobs)
+        .set({ status: "running", error: null, completedAtMs: null })
+        .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["failed", "interrupted"])));
+
+      return true;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  async mergeCheckpoint(patch: DeployMaciCheckpoint): Promise<void> {
+    const merged = { ...(await this.readCheckpoint()), ...patch };
+    const row = checkpointRow(merged);
+
+    await this.#db
+      .insert(standupCheckpoints)
+      .values(row)
+      .onConflictDoUpdate({
+        target: standupCheckpoints.id,
+        set: {
+          leanImt: row.leanImt,
+          checker: row.checker,
+          enforcer: row.enforcer,
+          assigner: row.assigner,
+          maci: row.maci,
+        },
+      });
+  }
+
+  async readCheckpoint(): Promise<DeployMaciCheckpoint | undefined> {
+    const rows = await this.#db
+      .select()
+      .from(standupCheckpoints)
+      .where(eq(standupCheckpoints.id, CHECKPOINT_ID))
+      .limit(1);
+
+    if (rows.length === 0) {
+      return undefined;
+    }
+
+    return asCheckpoint(rows[0]);
+  }
+
+  async clearCheckpoint(): Promise<void> {
+    await this.#db.delete(standupCheckpoints).where(eq(standupCheckpoints.id, CHECKPOINT_ID));
   }
 
   async latest(): Promise<JobSnapshot | undefined> {

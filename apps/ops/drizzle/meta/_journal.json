@@ -43,6 +43,13 @@
       "when": 6,
       "tag": "0005_maci_standup_choices",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 7,
+      "tag": "0006_standup_checkpoints",
+      "breakpoints": true
     }
   ]
 }
