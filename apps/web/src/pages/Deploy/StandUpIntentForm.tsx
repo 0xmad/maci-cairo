@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type JSX } from "react";
 import { useForm } from "react-hook-form";
 
+import { Button, Field, FieldError, Input, Label, Select } from "../../components/ui";
 import {
   DEFAULT_CONSTANT_VOTE_BALANCE,
   standUpIntentSchema,
@@ -10,14 +11,9 @@ import {
   type StandUpIntent,
 } from "../../services/ops";
 
-import styles from "./StandUpIntentForm.module.css";
-
 function firstId(choices: { id: string }[]): string {
   return choices[0]?.id ?? "";
 }
-
-const fieldClass = "mt-1.5 block h-11 w-full rounded border border-zinc-600 bg-zinc-950 px-3 text-base leading-none";
-const selectClass = `${styles.select} mt-1.5 block h-11 w-full rounded border border-zinc-600 bg-zinc-950 pl-3 text-base leading-none`;
 
 export interface StandUpIntentFormProps {
   catalog: StandUpCatalog;
@@ -51,16 +47,17 @@ export const StandUpIntentForm = ({ catalog, starting, running, onStart }: Stand
         onStart(intent).catch(() => undefined);
       })}
     >
-      <label className="block text-base">
-        Circuit profile
-        <select className={selectClass} {...register("circuitProfile")}>
+      <Field>
+        <Label>Circuit profile</Label>
+
+        <Select {...register("circuitProfile")}>
           {catalog.circuitProfiles.map((item) => (
             <option key={item.id} value={item.id}>
               {item.id}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </Field>
 
       <dl className="grid grid-cols-2 gap-3 text-base">
         <div>
@@ -76,46 +73,41 @@ export const StandUpIntentForm = ({ catalog, starting, running, onStart }: Stand
         </div>
       </dl>
 
-      <label className="block text-base">
-        Policy
-        <select className={selectClass} {...register("policy")}>
+      <Field>
+        <Label>Policy</Label>
+
+        <Select {...register("policy")}>
           {catalog.policies.map((item) => (
             <option key={item.id} value={item.id}>
               {item.id}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </Field>
 
-      <label className="block text-base">
-        Vote balance assigner
-        <select className={selectClass} {...register("assigner")}>
+      <Field>
+        <Label>Vote balance assigner</Label>
+
+        <Select {...register("assigner")}>
           {catalog.assigners.map((item) => (
             <option key={item.id} value={item.id}>
               {item.id}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </Field>
 
-      <label className="block text-base">
-        Constant amount
-        <input className={fieldClass} {...register("voteBalance", { valueAsNumber: true })} />
-      </label>
+      <Field>
+        <Label>Constant amount</Label>
 
-      {errors.voteBalance?.message !== undefined ? (
-        <p className="text-base text-red-400" role="alert">
-          {errors.voteBalance.message}
-        </p>
-      ) : null}
+        <Input {...register("voteBalance", { valueAsNumber: true })} />
 
-      <button
-        className="rounded border border-zinc-600 px-4 py-2.5 text-base hover:bg-zinc-800 disabled:opacity-50"
-        disabled={starting || running}
-        type="submit"
-      >
+        <FieldError>{errors.voteBalance?.message}</FieldError>
+      </Field>
+
+      <Button disabled={starting || running} size="field" type="submit">
         Start MACI stand-up
-      </button>
+      </Button>
     </form>
   );
 };
