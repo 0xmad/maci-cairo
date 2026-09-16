@@ -85,7 +85,7 @@ describe("toast store", () => {
   it("stacks a toast for each stand-up step while a job is running", () => {
     const store = createToastStore(toasts);
 
-    store.getState().showStandUp({ running: true, steps: [declareLeanImt, deployLeanImt] });
+    store.getState().showJob({ running: true, steps: [declareLeanImt, deployLeanImt] });
 
     expect(toasts.success).toHaveBeenCalledWith("declare LeanIMT", {
       id: "maci-stand-up-step-1",
@@ -100,7 +100,7 @@ describe("toast store", () => {
   it("does not toast previous steps while stand-up is not running", () => {
     const store = createToastStore(toasts);
 
-    store.getState().showStandUp({ running: false, steps: [declareLeanImt] });
+    store.getState().showJob({ running: false, steps: [declareLeanImt] });
 
     expect(toasts.success).not.toHaveBeenCalled();
   });
@@ -108,17 +108,17 @@ describe("toast store", () => {
   it("does not toast while a job is running with no steps yet", () => {
     const store = createToastStore(toasts);
 
-    store.getState().showStandUp({ running: true, steps: [] });
+    store.getState().showJob({ running: true, steps: [] });
 
     expect(toasts.success).not.toHaveBeenCalled();
   });
 
   it("keeps the last step visible for a timeout after the job stops", () => {
     const store = createToastStore(toasts);
-    store.getState().showStandUp({ running: true, steps: [deployLeanImt] });
+    store.getState().showJob({ running: true, steps: [deployLeanImt] });
     toasts.success.mockClear();
 
-    store.getState().showStandUp({ running: false, steps: [] });
+    store.getState().showJob({ running: false, steps: [] });
 
     expect(toasts.success).toHaveBeenCalledWith("deploy leanImt", {
       id: "maci-stand-up-step-2",
@@ -129,7 +129,7 @@ describe("toast store", () => {
   it("shows a stand-up error that only the close button can dismiss", () => {
     const store = createToastStore(toasts);
 
-    store.getState().showStandUp({ running: false, steps: [], error: "busy" });
+    store.getState().showJob({ running: false, steps: [], error: "busy" });
 
     expect(toasts.error).toHaveBeenCalledWith("busy", {
       id: "maci-stand-up-error",
@@ -140,23 +140,23 @@ describe("toast store", () => {
 
   it("does not dismiss a stand-up error toast when the error clears", () => {
     const store = createToastStore(toasts);
-    store.getState().showStandUp({ running: false, steps: [], error: "busy" });
+    store.getState().showJob({ running: false, steps: [], error: "busy" });
     toasts.error.mockClear();
 
-    store.getState().showStandUp({ running: false, steps: [], error: "" });
+    store.getState().showJob({ running: false, steps: [], error: "" });
 
     expect(toasts.error).not.toHaveBeenCalled();
   });
 
   it("forwards default-host stand-up toasts to sonner", () => {
-    useToasts.getState().showStandUp({ running: true, steps: [declareLeanImt] });
+    useToasts.getState().showJob({ running: true, steps: [declareLeanImt] });
 
     expect(toast.success).toHaveBeenCalledWith("declare LeanIMT", {
       id: "maci-stand-up-step-1",
       duration: Number.POSITIVE_INFINITY,
     });
 
-    useToasts.getState().showStandUp({ running: false, steps: [], error: "busy" });
+    useToasts.getState().showJob({ running: false, steps: [], error: "busy" });
 
     expect(toast.error).toHaveBeenCalledWith("busy", {
       id: "maci-stand-up-error",

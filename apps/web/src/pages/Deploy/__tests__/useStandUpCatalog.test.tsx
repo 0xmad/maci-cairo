@@ -70,6 +70,7 @@ const idleStandUp = {
   discarding: false,
   running: false,
   incompleteStandUp: false,
+  currentMaci: null,
   steps: [] as [],
   startStandUp,
   discardStandUp: vi.fn(),

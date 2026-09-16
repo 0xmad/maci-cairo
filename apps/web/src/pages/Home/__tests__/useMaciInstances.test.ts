@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OpsClient } from "../../../services/ops";
+import { useMaciInstancesStore } from "../../../stores/maciInstances";
 import { useOperatorSession } from "../../../stores/operatorSession";
 import { MACI_LIST_PAGE_SIZE, useMaciInstances } from "../useMaciInstances";
 
@@ -27,6 +28,7 @@ vi.mock("../../../services/ops", () => ({
 }));
 
 const OpsClientMock = vi.mocked(OpsClient);
+const originalLoad = useMaciInstancesStore.getState().load;
 
 describe("useMaciInstances", () => {
   beforeEach(() => {
@@ -35,6 +37,8 @@ describe("useMaciInstances", () => {
     listMacisMock.mockReset();
     readStoredJwtMock.mockReturnValue("jwt");
     useOperatorSession.setState({ token: "jwt" });
+    useMaciInstancesStore.setState({ load: originalLoad });
+    useMaciInstancesStore.getState().reset();
     listMacisMock.mockResolvedValue({
       items: [
         {
@@ -220,5 +224,20 @@ describe("useMaciInstances", () => {
 
     expect(result.current.page).toBe(1);
     expect(listMacisMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the list idle when load rejects", async () => {
+    const load = vi.fn().mockRejectedValue(new Error("down"));
+
+    useMaciInstancesStore.setState({ load });
+
+    const { result } = renderHook(() => useMaciInstances());
+
+    await waitFor(() => {
+      expect(load).toHaveBeenCalledWith("jwt", 1);
+    });
+
+    expect(result.current.items).toEqual([]);
+    expect(result.current.error).toBeUndefined();
   });
 });

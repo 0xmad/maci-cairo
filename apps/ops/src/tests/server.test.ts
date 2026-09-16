@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import { type JobEvents } from "../jobs/job.events.js";
+import { type JobStore } from "../jobs/job.store.js";
 import { type LoginService } from "../login/services/login.service.js";
+import { type PollService } from "../poll/poll.service.js";
 import { createServer, listenPort, type RunningServer } from "../server.js";
 import { type StandupService } from "../standup/standup.service.js";
 
@@ -20,8 +23,14 @@ function standupService(): StandupService {
   } as unknown as StandupService;
 }
 
-function deps(): { loginService: LoginService; standupService: StandupService } {
-  return { loginService: loginService(), standupService: standupService() };
+function deps() {
+  return {
+    loginService: loginService(),
+    standupService: standupService(),
+    pollService: {} as PollService,
+    jobs: {} as JobStore,
+    events: {} as JobEvents,
+  };
 }
 
 describe("listenPort", () => {

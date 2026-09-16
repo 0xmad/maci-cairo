@@ -29,6 +29,7 @@ function recordingOps(
     nextPollIdOnChain?: string;
     poll?: string;
     pollId?: string;
+    pollExists?: boolean;
   } = {},
 ): CreatePollOps & { fields: { key: string; args: string[] }[] } {
   const fields: { key: string; args: string[] }[] = [];
@@ -53,7 +54,7 @@ function recordingOps(
       }
 
       if (args[0] === "call" && args.includes("get_poll")) {
-        if (created) {
+        if (created || options.pollExists === true) {
           return options.poll ?? "0xaa";
         }
 
@@ -156,10 +157,10 @@ describe("parseCreatePollConfig", () => {
 });
 
 describe("createPoll", () => {
-  test("preflights coordinator then invokes create_poll without Circuit-profile fields", () => {
+  test("preflights coordinator then invokes create_poll without Circuit-profile fields", async () => {
     const ops = recordingOps({ poll: "0xbb", pollId: "0x0" });
     const config = parseCreatePollConfig(VALID_JSON);
-    const result = createPoll(ops, config);
+    const result = await createPoll(ops, config);
 
     expect(ops.fields[0]?.args).toEqual(["call", "--contract-address", config.maci, "--function", "coordinator"]);
     expect(ops.fields[1]?.args).toEqual(["call", "--contract-address", config.maci, "--function", "next_poll_id"]);
@@ -192,11 +193,11 @@ describe("createPoll", () => {
     });
   });
 
-  test("reports preflight, invoke, and get_poll steps when onStep is set", () => {
+  test("reports preflight, invoke, and get_poll steps when onStep is set", async () => {
     const ops = recordingOps({ poll: "0xbb", pollId: "0x0" });
     const steps: CreatePollStep[] = [];
 
-    createPoll(ops, parseCreatePollConfig(VALID_JSON), {
+    await createPoll(ops, parseCreatePollConfig(VALID_JSON), {
       onStep: (step) => {
         steps.push(step);
       },
@@ -210,49 +211,55 @@ describe("createPoll", () => {
     ]);
   });
 
-  test("fails when on-chain coordinator is not seed-0 devnet-1", () => {
+  test("accepts an intended coordinator that matches on-chain", async () => {
+    const ops = recordingOps({ coordinatorOnChain: "0x2", poll: "0xbb", pollId: "0x0" });
+
+    await expect(
+      createPoll(ops, parseCreatePollConfig(VALID_JSON), { intendedCoordinator: "0x2" }),
+    ).resolves.toMatchObject({ pollId: "0" });
+  });
+
+  test("fails when on-chain coordinator is not seed-0 devnet-1", async () => {
     const ops = recordingOps({ coordinatorOnChain: "0x2" });
     const steps: CreatePollStep[] = [];
 
-    expect(() => {
+    await expect(
       createPoll(ops, parseCreatePollConfig(VALID_JSON), {
         onStep: (step) => {
           steps.push(step);
         },
-      });
-    }).toThrow(/coordinator mismatch/u);
+      }),
+    ).rejects.toThrow(/coordinator mismatch/u);
 
     expect(steps).toEqual([{ kind: "call", name: "coordinator" }]);
   });
 
-  test("does not call state_tree_depth", () => {
+  test("does not call state_tree_depth", async () => {
     const ops = recordingOps({ poll: "0xbb", pollId: "0x0" });
 
-    createPoll(ops, parseCreatePollConfig(VALID_JSON));
+    await createPoll(ops, parseCreatePollConfig(VALID_JSON));
 
     expect(ops.fields.some((field) => field.args.includes("state_tree_depth"))).toBe(false);
   });
 
-  test("reads decimal sncast felts for next_poll_id and poll_id", () => {
+  test("reads decimal sncast felts for next_poll_id and poll_id", async () => {
     const ops = recordingOps({ nextPollIdOnChain: "1", poll: "0xcc", pollId: "1" });
-    const result = createPoll(ops, parseCreatePollConfig(VALID_JSON));
+    const result = await createPoll(ops, parseCreatePollConfig(VALID_JSON));
 
     expect(ops.fields[3]?.args.at(-1)).toBe("1");
     expect(result.pollId).toBe("1");
   });
 
-  test("fails when sncast next_poll_id is not an integer felt", () => {
+  test("fails when sncast next_poll_id is not an integer felt", async () => {
     const ops = recordingOps({ nextPollIdOnChain: "nope" });
 
-    expect(() => {
-      createPoll(ops, parseCreatePollConfig(VALID_JSON));
-    }).toThrow(/invalid integer: nope/u);
+    await expect(createPoll(ops, parseCreatePollConfig(VALID_JSON))).rejects.toThrow(/invalid integer: nope/u);
   });
 
-  test("looks up the Poll at the on-chain next_poll_id", () => {
+  test("looks up the Poll at the on-chain next_poll_id", async () => {
     const config = parseCreatePollConfig(VALID_JSON);
     const ops = recordingOps({ nextPollIdOnChain: "0x1", poll: "0xcc", pollId: "0x1" });
-    const result = createPoll(ops, config);
+    const result = await createPoll(ops, config);
 
     expect(ops.fields[3]?.args.at(-1)).toBe("1");
     expect(result).toEqual({
@@ -262,17 +269,73 @@ describe("createPoll", () => {
     });
   });
 
-  test("fails when get_poll is still zero after create_poll", () => {
+  test("skips invoke when a frozen poll id already has a nonzero get_poll", async () => {
+    const ops = recordingOps({ poll: "0xbb", pollId: "0x1", pollExists: true });
+    const config = parseCreatePollConfig(VALID_JSON);
+    const result = await createPoll(ops, config, { frozenPollId: 1n });
+
+    expect(ops.fields.some((field) => field.args[0] === "invoke")).toBe(false);
+    expect(ops.fields.some((field) => field.args.includes("next_poll_id"))).toBe(false);
+    expect(ops.fields[0]?.args).toEqual(["call", "--contract-address", config.maci, "--function", "coordinator"]);
+    expect(ops.fields[1]?.args).toEqual([
+      "call",
+      "--contract-address",
+      config.maci,
+      "--function",
+      "get_poll",
+      "--arguments",
+      "1",
+    ]);
+    expect(result).toEqual({
+      maci: config.maci,
+      poll: normalizeHex("0xbb"),
+      pollId: "1",
+    });
+  });
+
+  test("fails skip-invoke when on-chain coordinator does not match", async () => {
+    const ops = recordingOps({ poll: "0xbb", pollId: "0x1", pollExists: true, coordinatorOnChain: "0x2" });
+
+    await expect(createPoll(ops, parseCreatePollConfig(VALID_JSON), { frozenPollId: 1n })).rejects.toThrow(
+      /coordinator mismatch/u,
+    );
+    expect(ops.fields.some((field) => field.args[0] === "invoke")).toBe(false);
+  });
+
+  test("invokes once when a frozen poll id still has a zero get_poll", async () => {
+    const ops = recordingOps({ poll: "0xcc", pollId: "0x2" });
+    const config = parseCreatePollConfig(VALID_JSON);
+    const steps: CreatePollStep[] = [];
+    const result = await createPoll(ops, config, {
+      frozenPollId: 2n,
+      onStep: (step) => {
+        steps.push(step);
+      },
+    });
+
+    expect(ops.fields.filter((field) => field.args[0] === "invoke")).toHaveLength(1);
+    expect(ops.fields.some((field) => field.args.includes("next_poll_id"))).toBe(false);
+    expect(steps).toEqual([
+      { kind: "call", name: "coordinator" },
+      { kind: "call", name: "get_poll" },
+      { kind: "invoke", name: "create_poll" },
+      { kind: "call", name: "get_poll" },
+    ]);
+    expect(result.poll).toBe(normalizeHex("0xcc"));
+    expect(result.pollId).toBe("2");
+  });
+
+  test("fails when get_poll is still zero after create_poll", async () => {
     const ops = recordingOps({ poll: "0x0" });
     const steps: CreatePollStep[] = [];
 
-    expect(() => {
+    await expect(
       createPoll(ops, parseCreatePollConfig(VALID_JSON), {
         onStep: (step) => {
           steps.push(step);
         },
-      });
-    }).toThrow(/did not record a Poll at id 0/u);
+      }),
+    ).rejects.toThrow(/did not record a Poll at id 0/u);
 
     expect(steps).toEqual([
       { kind: "call", name: "coordinator" },

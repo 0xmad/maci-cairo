@@ -1,7 +1,7 @@
 import { IsString, MinLength } from "class-validator";
 import { type MaciNetwork } from "maci-deploy/maci";
 
-import { parseDto } from "./parseDto.js";
+import { parseDto } from "../../utils/parseDto.js";
 
 /** Path params for `GET /macis/:address`. */
 export class ReadMaciParamsDto {

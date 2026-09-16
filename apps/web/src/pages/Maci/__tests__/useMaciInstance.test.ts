@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OpsClient } from "../../../services/ops";
+import { useMaciInstanceStore } from "../../../stores/maciInstance";
 import { useOperatorSession } from "../../../stores/operatorSession";
 import { useMaciInstance } from "../useMaciInstance";
 
@@ -55,6 +56,7 @@ vi.mock("../../../services/ops", () => ({
 
 const useParamsMock = vi.mocked(useParams);
 const OpsClientMock = vi.mocked(OpsClient);
+const originalLoad = useMaciInstanceStore.getState().load;
 
 describe("useMaciInstance", () => {
   beforeEach(() => {
@@ -63,6 +65,8 @@ describe("useMaciInstance", () => {
     readMaciMock.mockReset();
     readStoredJwtMock.mockReturnValue("jwt");
     useOperatorSession.setState({ token: "jwt" });
+    useMaciInstanceStore.setState({ load: originalLoad });
+    useMaciInstanceStore.getState().reset();
     useParamsMock.mockReturnValue({ address: "0x7" });
     readMaciMock.mockResolvedValue(INSTANCE);
     OpsClientMock.mockImplementation(
@@ -159,6 +163,21 @@ describe("useMaciInstance", () => {
       await Promise.resolve();
     });
 
+    expect(result.current.error).toBeUndefined();
+  });
+
+  it("keeps the instance idle when load rejects", async () => {
+    const load = vi.fn().mockRejectedValue(new Error("down"));
+
+    useMaciInstanceStore.setState({ load });
+
+    const { result } = renderHook(() => useMaciInstance());
+
+    await waitFor(() => {
+      expect(load).toHaveBeenCalledWith("jwt", "0x7");
+    });
+
+    expect(result.current.instance).toBeUndefined();
     expect(result.current.error).toBeUndefined();
   });
 });

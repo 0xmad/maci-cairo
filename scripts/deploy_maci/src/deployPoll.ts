@@ -12,6 +12,6 @@ import { sncastField } from "./sncast.js";
 const configPath = parseCreatePollArgv(process.argv.slice(2));
 
 const config = parseCreatePollConfig(readFileSync(configPath, "utf8"));
-const result = createPoll({ field: sncastField }, config);
+const result = await createPoll({ field: sncastField }, config);
 
 process.stdout.write(`${formatCreatePoll(result)}\n`);

@@ -37,7 +37,7 @@ export function useStandUpCatalog(): UseStandUpCatalogResult {
     discardStandUp,
   } = useMaciStandUp();
   const navigate = useNavigate();
-  const showStandUp = useToasts((state) => state.showStandUp);
+  const showJob = useToasts((state) => state.showJob);
   const sawRunning = useRef(false);
 
   useEffect(() => {
@@ -51,8 +51,8 @@ export function useStandUpCatalog(): UseStandUpCatalogResult {
   }, [token, load, reset]);
 
   useEffect(() => {
-    showStandUp({ running, steps, error: jobError ?? job?.error });
-  }, [showStandUp, running, steps, jobError, job?.error]);
+    showJob({ running, steps, error: jobError ?? job?.error });
+  }, [showJob, running, steps, jobError, job?.error]);
 
   useEffect(() => {
     if (running) {

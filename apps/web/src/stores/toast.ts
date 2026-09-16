@@ -18,16 +18,16 @@ export interface ShowConnectErrorArgs {
   loginError?: string;
 }
 
-export interface ShowStandUpArgs {
+export interface ShowJobArgs {
   running: boolean;
   steps: JobStep[];
   error?: string;
 }
 
 export interface ToastState {
-  lastStandUpStep?: { seq: number; message: string };
+  lastJobStep?: { seq: number; message: string };
   showConnectError: (args: ShowConnectErrorArgs) => void;
-  showStandUp: (args: ShowStandUpArgs) => void;
+  showJob: (args: ShowJobArgs) => void;
   reset: () => void;
 }
 
@@ -37,7 +37,7 @@ function stepToastId(seq: number): string {
 
 export function createToastStore(host: ToastHost): UseBoundStore<StoreApi<ToastState>> {
   return create<ToastState>((set, get) => ({
-    lastStandUpStep: undefined,
+    lastJobStep: undefined,
     showConnectError: ({ operator, walletError, loginError }: ShowConnectErrorArgs): void => {
       if (operator !== undefined) {
         return;
@@ -55,7 +55,7 @@ export function createToastStore(host: ToastHost): UseBoundStore<StoreApi<ToastS
         closeButton: true,
       });
     },
-    showStandUp: ({ running, steps, error }: ShowStandUpArgs): void => {
+    showJob: ({ running, steps, error }: ShowJobArgs): void => {
       if (error !== undefined && error.length > 0) {
         host.error(error, {
           id: STAND_UP_ERROR_TOAST,
@@ -67,11 +67,11 @@ export function createToastStore(host: ToastHost): UseBoundStore<StoreApi<ToastS
       const current = steps.at(-1);
 
       if (!running || current === undefined) {
-        const last = get().lastStandUpStep;
+        const last = get().lastJobStep;
 
         if (last !== undefined) {
           host.success(last.message, { id: stepToastId(last.seq), duration: STEP_TOAST_DURATION_MS });
-          set({ lastStandUpStep: undefined });
+          set({ lastJobStep: undefined });
         }
 
         return;
@@ -85,10 +85,10 @@ export function createToastStore(host: ToastHost): UseBoundStore<StoreApi<ToastS
         });
       });
 
-      set({ lastStandUpStep: { seq: current.seq, message: `${current.kind} ${current.name}` } });
+      set({ lastJobStep: { seq: current.seq, message: `${current.kind} ${current.name}` } });
     },
     reset: (): void => {
-      set({ lastStandUpStep: undefined });
+      set({ lastJobStep: undefined });
     },
   }));
 }

@@ -77,6 +77,12 @@ describe("Shell", () => {
     expect(screen.getByRole("link", { name: "Home" }).getAttribute("aria-current")).toBeNull();
   });
 
+  it("shows the network banner on a Create Poll page", () => {
+    renderShell("/maci/0xabc/poll");
+
+    expect(screen.getByText("Showing this MACI on local. Contract addresses are network-specific.")).toBeTruthy();
+  });
+
   it("shows the network banner on a MACI instance page", () => {
     renderShell("/maci/0xabc");
 

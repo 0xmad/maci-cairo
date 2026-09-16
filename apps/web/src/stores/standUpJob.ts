@@ -1,12 +1,21 @@
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 
 import { opsBaseUrl } from "../config/ops";
-import { OpsClient, type JobEvent, type JobSnapshot, type JobStep, type StandUpBody } from "../services/ops";
+import {
+  OpsClient,
+  type CreatePollBody,
+  type JobEvent,
+  type JobSnapshot,
+  type JobStep,
+  type StandUpBody,
+} from "../services/ops";
 
 export interface StandUpJobApi {
   startStandUp(token: string, intent: StandUpBody): Promise<string>;
-  readJobState(token: string): Promise<{ job?: JobSnapshot; incompleteStandUp: boolean }>;
+  startCreatePoll(token: string, maci: string, intent: CreatePollBody): Promise<string>;
+  readJobState(token: string): Promise<{ job?: JobSnapshot; incompleteStandUp: boolean; currentMaci: string | null }>;
   discardStandUp(token: string): Promise<void>;
+  subscribeJobEvents(token: string, onEvent: (event: JobEvent) => void, signal?: AbortSignal): Promise<void>;
 }
 
 export interface StandUpJobState {
@@ -15,38 +24,64 @@ export interface StandUpJobState {
   error?: string;
   job?: JobSnapshot;
   incompleteStandUp: boolean;
+  currentMaci: string | null;
   steps: JobStep[];
   streamId: number;
-  applySnapshot: (snapshot: JobSnapshot | undefined, incompleteStandUp?: boolean) => void;
+  applySnapshot: (snapshot: JobSnapshot | undefined, incompleteStandUp?: boolean, currentMaci?: string | null) => void;
   applyEvent: (event: JobEvent) => void;
   failWatch: (error: string) => void;
   startStandUp: (token?: string, intent?: StandUpBody) => Promise<void>;
+  startCreatePoll: (token?: string, maci?: string, intent?: CreatePollBody) => Promise<void>;
   discardStandUp: (token?: string) => Promise<void>;
+  watch: (token: string | undefined, signal?: AbortSignal) => Promise<void>;
   reset: () => void;
 }
 
-const idleJob: Pick<StandUpJobState, "starting" | "discarding" | "error" | "job" | "steps" | "incompleteStandUp"> = {
+const idleJob: Pick<
+  StandUpJobState,
+  "starting" | "discarding" | "error" | "job" | "steps" | "incompleteStandUp" | "currentMaci"
+> = {
   starting: false,
   discarding: false,
   error: undefined,
   job: undefined,
   steps: [],
   incompleteStandUp: false,
+  currentMaci: null,
 };
 
 function stepsFor(snapshot: JobSnapshot): JobStep[] {
   return snapshot.status === "running" ? snapshot.steps : [];
 }
 
+function hydrateFromJobState(
+  streamId: number,
+  state: { job?: JobSnapshot; incompleteStandUp: boolean; currentMaci: string | null },
+  extra: Partial<StandUpJobState>,
+): Partial<StandUpJobState> {
+  return {
+    ...extra,
+    streamId: streamId + 1,
+    incompleteStandUp: state.incompleteStandUp,
+    currentMaci: state.currentMaci,
+    ...(state.job === undefined ? {} : { job: state.job, steps: stepsFor(state.job) }),
+  };
+}
+
 export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreApi<StandUpJobState>> {
-  return create<StandUpJobState>((set) => ({
+  return create<StandUpJobState>((set, get) => ({
     ...idleJob,
     streamId: 0,
-    applySnapshot: (snapshot: JobSnapshot | undefined, incompleteStandUp?: boolean): void => {
+    applySnapshot: (
+      snapshot: JobSnapshot | undefined,
+      incompleteStandUp?: boolean,
+      currentMaci?: string | null,
+    ): void => {
       if (snapshot === undefined) {
-        if (incompleteStandUp !== undefined) {
-          set({ incompleteStandUp });
-        }
+        set({
+          ...(incompleteStandUp === undefined ? {} : { incompleteStandUp }),
+          ...(currentMaci === undefined ? {} : { currentMaci }),
+        });
 
         return;
       }
@@ -55,6 +90,7 @@ export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreAp
         job: snapshot,
         steps: stepsFor(snapshot),
         ...(incompleteStandUp === undefined ? {} : { incompleteStandUp }),
+        ...(currentMaci === undefined ? {} : { currentMaci }),
       });
     },
     applyEvent: (event: JobEvent): void => {
@@ -100,16 +136,44 @@ export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreAp
         await api.startStandUp(token, intent);
         const state = await api.readJobState(token);
 
-        set((current) => ({
-          starting: false,
-          streamId: current.streamId + 1,
-          incompleteStandUp: state.incompleteStandUp,
-          ...(state.job === undefined ? {} : { job: state.job, steps: stepsFor(state.job) }),
-        }));
+        set((current) => hydrateFromJobState(current.streamId, state, { starting: false }));
       } catch (caught) {
         set({
           starting: false,
           error: caught instanceof Error ? caught.message : "stand-up failed",
+        });
+      }
+    },
+    startCreatePoll: async (token?: string, maci?: string, intent?: CreatePollBody): Promise<void> => {
+      if (token === undefined || token.length === 0) {
+        set({ error: "Sign in as Operator first" });
+
+        return;
+      }
+
+      if (maci === undefined || maci.length === 0) {
+        set({ error: "MACI address required" });
+
+        return;
+      }
+
+      if (intent === undefined) {
+        set({ error: "Choose a schedule and Poll public key" });
+
+        return;
+      }
+
+      set({ error: undefined, starting: true, steps: [] });
+
+      try {
+        await api.startCreatePoll(token, maci, intent);
+        const state = await api.readJobState(token);
+
+        set((current) => hydrateFromJobState(current.streamId, state, { starting: false }));
+      } catch (caught) {
+        set({
+          starting: false,
+          error: caught instanceof Error ? caught.message : "Create Poll failed",
         });
       }
     },
@@ -126,17 +190,49 @@ export function createStandUpJobStore(api: StandUpJobApi): UseBoundStore<StoreAp
         await api.discardStandUp(token);
         const state = await api.readJobState(token);
 
-        set((current) => ({
-          discarding: false,
-          incompleteStandUp: state.incompleteStandUp,
-          streamId: current.streamId + 1,
-          ...(state.job === undefined ? {} : { job: state.job, steps: stepsFor(state.job) }),
-        }));
+        set((current) => hydrateFromJobState(current.streamId, state, { discarding: false }));
       } catch (caught) {
         set({
           discarding: false,
           error: caught instanceof Error ? caught.message : "discard failed",
         });
+      }
+    },
+    watch: async (token: string | undefined, signal?: AbortSignal): Promise<void> => {
+      if (token === undefined || token.length === 0) {
+        get().reset();
+
+        return;
+      }
+
+      try {
+        const state = await api.readJobState(token);
+
+        if (!signal?.aborted) {
+          get().applySnapshot(state.job, state.incompleteStandUp, state.currentMaci);
+        }
+      } catch {
+        /* snapshot hydrate is best-effort; the event stream is the live source */
+      }
+
+      try {
+        await api.subscribeJobEvents(
+          token,
+          (event) => {
+            if (!signal?.aborted) {
+              get().applyEvent(event);
+            }
+          },
+          signal,
+        );
+      } catch (caught) {
+        if (signal?.aborted) {
+          return;
+        }
+
+        if (caught instanceof Error && caught.name !== "AbortError") {
+          get().failWatch(caught.message);
+        }
       }
     },
     reset: (): void => {
@@ -149,11 +245,17 @@ function defaultStandUpJobApi(): StandUpJobApi {
   return {
     startStandUp: (token: string, intent: StandUpBody): Promise<string> =>
       new OpsClient(opsBaseUrl()).startStandUp(token, intent),
-    readJobState: (token: string): Promise<{ job?: JobSnapshot; incompleteStandUp: boolean }> =>
+    startCreatePoll: (token: string, maci: string, intent: CreatePollBody): Promise<string> =>
+      new OpsClient(opsBaseUrl()).startCreatePoll(token, maci, intent),
+    readJobState: (
+      token: string,
+    ): Promise<{ job?: JobSnapshot; incompleteStandUp: boolean; currentMaci: string | null }> =>
       new OpsClient(opsBaseUrl()).readJobState(token),
     discardStandUp: (token: string): Promise<void> => new OpsClient(opsBaseUrl()).discardStandUp(token),
+    subscribeJobEvents: (token: string, onEvent: (event: JobEvent) => void, signal?: AbortSignal): Promise<void> =>
+      new OpsClient(opsBaseUrl()).subscribeJobEvents(token, onEvent, signal),
   };
 }
 
-/** Live MACI stand-up job and step log. SSE subscription stays in `useMaciStandUp`. */
+/** Live ops job and step log. Aborting the watch stays in `useOpsJob`. */
 export const useStandUpJob = createStandUpJobStore(defaultStandUpJobApi());

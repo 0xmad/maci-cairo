@@ -135,6 +135,36 @@ describe("OpsClient", () => {
     vi.unstubAllGlobals();
   });
 
+  it("starts Create Poll against the MACI in the path", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      let url: string;
+
+      if (typeof input === "string") {
+        url = input;
+      } else if (input instanceof URL) {
+        url = input.href;
+      } else {
+        url = input.url;
+      }
+
+      expect(url).toBe("http://ops.test/macis/0x7/poll");
+      expect(init?.method).toBe("POST");
+      expect(init?.body).toBe(JSON.stringify({ startDate: 0, endDate: 1000, pollPublicKey: ["0", "1"] }));
+
+      return new Response(JSON.stringify({ jobId: "job-2" }), { status: 201 });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(
+      client.startCreatePoll("jwt", "0x7", { startDate: 0, endDate: 1000, pollPublicKey: ["0", "1"] }),
+    ).resolves.toBe("job-2");
+
+    vi.unstubAllGlobals();
+  });
+
   it("throws busy when a second stand-up is rejected", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "busy" }), { status: 409 })));
 
@@ -147,6 +177,18 @@ describe("OpsClient", () => {
         assigner: "Constant vote balance",
         voteBalance: 3,
       }),
+    ).rejects.toThrow(/^busy$/u);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("throws busy when Create Poll is rejected", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "busy" }), { status: 409 })));
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(
+      client.startCreatePoll("jwt", "0x7", { startDate: 0, endDate: 1000, pollPublicKey: ["0", "1"] }),
     ).rejects.toThrow(/^busy$/u);
 
     vi.unstubAllGlobals();
@@ -272,6 +314,74 @@ describe("OpsClient", () => {
     vi.unstubAllGlobals();
   });
 
+  it("lists Polls for a MACI with page query params", async () => {
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      let url: string;
+
+      if (typeof input === "string") {
+        url = input;
+      } else if (input instanceof URL) {
+        url = input.href;
+      } else {
+        url = input.url;
+      }
+
+      expect(url).toBe("http://ops.test/macis/0x7/polls?page=1&pageSize=10");
+      expect(init?.headers).toEqual({ authorization: "Bearer jwt" });
+
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              address: "0xaa",
+              pollId: "2",
+              startDate: "0",
+              endDate: "1000",
+              pollPublicKey: ["0", "1"],
+              createdAtMs: 1_000_200,
+            },
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 10,
+        }),
+        { status: 200 },
+      );
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(client.listPolls("jwt", "0x7", 1, 10)).resolves.toEqual({
+      items: [
+        {
+          address: "0xaa",
+          pollId: "2",
+          startDate: "0",
+          endDate: "1000",
+          pollPublicKey: ["0", "1"],
+          createdAtMs: 1_000_200,
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+    });
+
+    vi.unstubAllGlobals();
+  });
+
+  it("throws when the Poll list body is invalid", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 })));
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(client.listPolls("jwt", "0x7", 1, 10)).rejects.toThrow(/^Poll list failed$/u);
+
+    vi.unstubAllGlobals();
+  });
+
   it("reads a MACI instance by address", async () => {
     const instance = {
       leanImt: "0x1",
@@ -319,12 +429,16 @@ describe("OpsClient", () => {
     const job = { id: "job-1", kind: "standup", status: "running", steps: [] };
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ job, incompleteStandUp: false }), { status: 200 })),
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ job, incompleteStandUp: false, currentMaci: null }), { status: 200 }),
+        ),
     );
 
     const client = new OpsClient("http://ops.test");
 
-    await expect(client.readJobState("jwt")).resolves.toEqual({ job, incompleteStandUp: false });
+    await expect(client.readJobState("jwt")).resolves.toEqual({ job, incompleteStandUp: false, currentMaci: null });
 
     vi.unstubAllGlobals();
   });
@@ -373,12 +487,20 @@ describe("OpsClient", () => {
   it("reads no current job", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ job: null, incompleteStandUp: false }), { status: 200 })),
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ job: null, incompleteStandUp: false, currentMaci: null }), { status: 200 }),
+        ),
     );
 
     const client = new OpsClient("http://ops.test");
 
-    await expect(client.readJobState("jwt")).resolves.toEqual({ job: undefined, incompleteStandUp: false });
+    await expect(client.readJobState("jwt")).resolves.toEqual({
+      job: undefined,
+      incompleteStandUp: false,
+      currentMaci: null,
+    });
 
     vi.unstubAllGlobals();
   });

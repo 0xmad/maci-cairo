@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { opsBaseUrl } from "../../config/ops";
-import { OpsClient, type MaciListItem } from "../../services/ops";
+import { type MaciListItem } from "../../services/ops";
+import { MACI_LIST_PAGE_SIZE, useMaciInstancesStore } from "../../stores/maciInstances";
 import { useOperatorSession } from "../../stores/operatorSession";
 
-export const MACI_LIST_PAGE_SIZE = 10;
+export { MACI_LIST_PAGE_SIZE };
 
 export interface UseMaciInstancesResult {
   signedIn: boolean;
@@ -19,44 +19,18 @@ export interface UseMaciInstancesResult {
 export function useMaciInstances(refreshKey?: string): UseMaciInstancesResult {
   const token = useOperatorSession((session) => session.token);
   const signedIn = token !== undefined;
+  const { items, pageCount, error, load, reset } = useMaciInstancesStore();
   const [page, setPage] = useState(1);
-  const [items, setItems] = useState<MaciListItem[]>([]);
-  const [pageCount, setPageCount] = useState(0);
-  const [error, setError] = useState<string>();
 
   useEffect(() => {
     if (token === undefined) {
-      setItems([]);
-      setPageCount(0);
-      setError(undefined);
+      reset();
 
-      return undefined;
+      return;
     }
 
-    const client = new OpsClient(opsBaseUrl());
-    let cancelled = false;
-
-    client
-      .listMacis(token, page, MACI_LIST_PAGE_SIZE)
-      .then((result) => {
-        if (cancelled) {
-          return;
-        }
-
-        setItems(result.items);
-        setPageCount(result.total === 0 ? 0 : Math.ceil(result.total / result.pageSize));
-        setError(undefined);
-      })
-      .catch((caught: unknown) => {
-        if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : "MACI list failed");
-        }
-      });
-
-    return (): void => {
-      cancelled = true;
-    };
-  }, [token, page, refreshKey]);
+    load(token, page).catch(() => undefined);
+  }, [token, page, refreshKey, load, reset]);
 
   const nextPage = useCallback((): void => {
     setPage((current) => (pageCount === 0 ? current : Math.min(pageCount, current + 1)));

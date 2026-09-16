@@ -8,20 +8,25 @@ import {
   maciListResponseSchema,
   nonceResponseSchema,
   operatorSessionSchema,
+  pollListResponseSchema,
   sessionAddressSchema,
-  startStandUpSchema,
+  startJobSchema,
   standUpCatalogSchema,
+  type CreatePollBody,
   type JobEvent,
   type JobSnapshot,
   type MaciInstance,
   type MaciListPage,
   type OperatorSession,
+  type PollListPage,
   type StandUpBody,
   type StandUpCatalog,
 } from "./schema";
 
 export type {
   JobEvent,
+  CreatePollBody,
+  CreatePollIntent,
   JobSnapshot,
   JobStep,
   MaciInstance,
@@ -29,12 +34,19 @@ export type {
   MaciListPage,
   OperatorSession,
   Paginated,
+  PollListItem,
+  PollListPage,
   StandUpBody,
   StandUpCatalog,
   StandUpIntent,
 } from "./schema";
 
-export { DEFAULT_CONSTANT_VOTE_BALANCE, SMALL_STAND_UP_BODY, standUpIntentSchema } from "./schema";
+export {
+  DEFAULT_CONSTANT_VOTE_BALANCE,
+  SMALL_STAND_UP_BODY,
+  createPollIntentSchema,
+  standUpIntentSchema,
+} from "./schema";
 
 function readError(body: unknown, fallback: string): string {
   const parsed = errorBodySchema.safeParse(body);
@@ -133,7 +145,7 @@ export class OpsClient {
       body: JSON.stringify(intent),
     });
     const body: unknown = await res.json();
-    const parsed = startStandUpSchema.safeParse(body);
+    const parsed = startJobSchema.safeParse(body);
 
     if (!res.ok || !parsed.success) {
       throw new Error(readError(body, "stand-up failed"));
@@ -142,7 +154,25 @@ export class OpsClient {
     return parsed.data.jobId;
   }
 
-  async readJobState(token: string): Promise<{ job?: JobSnapshot; incompleteStandUp: boolean }> {
+  async startCreatePoll(token: string, maci: string, intent: CreatePollBody): Promise<string> {
+    const res = await fetch(`${this.#root}/macis/${encodeURIComponent(maci)}/poll`, {
+      method: "POST",
+      headers: { ...authHeaders(token), "content-type": "application/json" },
+      body: JSON.stringify(intent),
+    });
+    const body: unknown = await res.json();
+    const parsed = startJobSchema.safeParse(body);
+
+    if (!res.ok || !parsed.success) {
+      throw new Error(readError(body, "Create Poll failed"));
+    }
+
+    return parsed.data.jobId;
+  }
+
+  async readJobState(
+    token: string,
+  ): Promise<{ job?: JobSnapshot; incompleteStandUp: boolean; currentMaci: string | null }> {
     const res = await fetch(`${this.#root}/job`, {
       headers: authHeaders(token),
     });
@@ -156,6 +186,7 @@ export class OpsClient {
     return {
       job: parsed.data.job ?? undefined,
       incompleteStandUp: parsed.data.incompleteStandUp,
+      currentMaci: parsed.data.currentMaci,
     };
   }
 
@@ -181,6 +212,23 @@ export class OpsClient {
 
     if (!res.ok || !parsed.success) {
       throw new Error(readError(body, "MACI list failed"));
+    }
+
+    return parsed.data;
+  }
+
+  async listPolls(token: string, maci: string, page: number, pageSize: number): Promise<PollListPage> {
+    const res = await fetch(
+      `${this.#root}/macis/${encodeURIComponent(maci)}/polls?page=${String(page)}&pageSize=${String(pageSize)}`,
+      {
+        headers: authHeaders(token),
+      },
+    );
+    const body: unknown = await res.json();
+    const parsed = pollListResponseSchema.safeParse(body);
+
+    if (!res.ok || !parsed.success) {
+      throw new Error(readError(body, "Poll list failed"));
     }
 
     return parsed.data;

@@ -6,7 +6,7 @@ import { NetworkSwitcher } from "../../components/NetworkSwitcher";
 import { useNetwork } from "../../providers/Network";
 
 export const Shell = (): JSX.Element => {
-  const match = useMatch("/maci/:address");
+  const match = useMatch({ path: "/maci/:address", end: false });
   const address = match?.params.address;
   const { network } = useNetwork();
 

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OpsClient } from "../../../services/ops";
 import { operatorNonceMessage } from "../../../services/ops/nonceMessage";
+import { useOperatorLoginStore } from "../../../stores/operatorLogin";
 import { useOperatorSession } from "../../../stores/operatorSession";
 import { useOperatorLogin } from "../useOperatorLogin";
 
@@ -71,6 +72,7 @@ describe("useOperatorLogin", () => {
     signMock.mockReset();
     readStoredJwtMock.mockReturnValue(undefined);
     useOperatorSession.setState({ token: undefined });
+    useOperatorLoginStore.getState().reset();
     signMock.mockResolvedValue(["0x1", "0x2"]);
     issueNonceMock.mockResolvedValue("nonce-1");
     loginMock.mockResolvedValue({

@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 
 import { rpcUrlFor } from "../../config/network";
-import { opsBaseUrl } from "../../config/ops";
 import { useNetwork } from "../../providers/Network";
-import { OpsClient } from "../../services/ops";
 import { operatorNonceMessage } from "../../services/ops/nonceMessage";
 import { wallet } from "../../services/wallet";
+import { useOperatorLoginStore } from "../../stores/operatorLogin";
 import { useOperatorSession } from "../../stores/operatorSession";
 
 interface UseOperatorLoginResult {
@@ -18,69 +17,29 @@ interface UseOperatorLoginResult {
 
 export function useOperatorLogin(walletAddress?: string): UseOperatorLoginResult {
   const { network } = useNetwork();
-  const { token, setToken, clearToken } = useOperatorSession();
-  const [operator, setOperator] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [restoring, setRestoring] = useState(() => token !== undefined);
+  const { setToken, clearToken } = useOperatorSession();
+  const { operator, error, restoring, restore, signIn: signInOperator, reset } = useOperatorLoginStore();
 
   useEffect(() => {
-    const sessionToken = useOperatorSession.getState().token;
-
-    if (sessionToken === undefined) {
-      return undefined;
-    }
-
-    const client = new OpsClient(opsBaseUrl());
-    let cancelled = false;
-
-    client
-      .readSession(sessionToken)
-      .then((address) => {
-        if (!cancelled) {
-          setOperator(address);
-        }
-      })
-      .catch(() => {
-        clearToken();
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setRestoring(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [clearToken]);
+    restore(useOperatorSession.getState().token).catch(() => {
+      clearToken();
+    });
+  }, [restore, clearToken]);
 
   const signIn = useCallback(async (): Promise<void> => {
-    if (walletAddress === undefined) {
-      setError("Connect a wallet first");
+    const sessionToken = await signInOperator(walletAddress, (nonce) =>
+      wallet.signMessage(rpcUrlFor(network), operatorNonceMessage(nonce, "SN_SEPOLIA")),
+    );
 
-      return;
+    if (sessionToken !== undefined) {
+      setToken(sessionToken);
     }
-
-    setError(undefined);
-
-    try {
-      const client = new OpsClient(opsBaseUrl());
-      const nonce = await client.issueNonce();
-      const signature = await wallet.signMessage(rpcUrlFor(network), operatorNonceMessage(nonce, "SN_SEPOLIA"));
-      const session = await client.login(nonce, JSON.stringify({ address: walletAddress, signature }));
-      setToken(session.token);
-      setOperator(session.address);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Sign-in failed");
-    }
-  }, [network, setToken, walletAddress]);
+  }, [network, setToken, signInOperator, walletAddress]);
 
   const signOut = useCallback((): void => {
     clearToken();
-    setOperator(undefined);
-    setError(undefined);
-    setRestoring(false);
-  }, [clearToken]);
+    reset();
+  }, [clearToken, reset]);
 
   return { operator, error, restoring, signIn, signOut };
 }
