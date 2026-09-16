@@ -1,6 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { type FastifyRequest } from "fastify";
-import { type Observable } from "rxjs";
 import { describe, expect, test, vi } from "vitest";
 
 import { type LoginService } from "../../login/services/login.service.js";
@@ -8,9 +7,9 @@ import { type Page } from "../../utils/pagination.js";
 import { type ListMacisQueryDto } from "../dto/listMacis.dto.js";
 import { type ReadMaciParamsDto } from "../dto/readMaci.dto.js";
 import { type StartStandUpDto } from "../dto/startStandUp.dto.js";
-import { type JobSnapshot, type MaciInstanceRecord, type MaciListItem } from "../repositories/job.store.js";
 import { StandupController } from "../standup.controller.js";
-import { type JobEvent, type StandUpCatalog, type StandupService } from "../standup.service.js";
+import { type StandUpCatalog, type StandupService } from "../standup.service.js";
+import { type MaciInstanceRecord, type MaciListItem } from "../standup.store.js";
 
 const OPERATOR = "0x0000000000000000000000000000000000000000000000000000000000000001";
 
@@ -20,33 +19,6 @@ const STANDUP_BODY = {
   assigner: "Constant vote balance",
 };
 
-const STEP = { seq: 1, kind: "declare", name: "LeanIMT" };
-
-const JOB: JobSnapshot = {
-  id: "job-1",
-  kind: "standup",
-  status: "running",
-  steps: [STEP],
-};
-
-function collectSse(
-  observable: Observable<{ type?: string; data: JobEvent }>,
-): Promise<{ type?: string; data: JobEvent }[]> {
-  return new Promise((resolve, reject) => {
-    const events: { type?: string; data: JobEvent }[] = [];
-
-    observable.subscribe({
-      next: (event: { type?: string; data: JobEvent }): void => {
-        events.push(event);
-      },
-      error: reject,
-      complete: (): void => {
-        resolve(events);
-      },
-    });
-  });
-}
-
 function harness(
   standupOverrides: Partial<StandupService> = {},
   loginOverrides: Partial<LoginService> = {},
@@ -55,12 +27,9 @@ function harness(
   authenticate: ReturnType<typeof vi.fn>;
   startStandUp: ReturnType<typeof vi.fn>;
   readStandUpCatalog: ReturnType<typeof vi.fn>;
-  currentJob: ReturnType<typeof vi.fn>;
   listMacis: ReturnType<typeof vi.fn>;
   readMaci: ReturnType<typeof vi.fn>;
   discardStandUp: ReturnType<typeof vi.fn>;
-  hasIncompleteStandUp: ReturnType<typeof vi.fn>;
-  subscribe: ReturnType<typeof vi.fn>;
 } {
   const authenticate = vi.fn((): Promise<string> => Promise.resolve(OPERATOR));
   const startStandUp = vi.fn((): Promise<{ jobId: string }> => Promise.resolve({ jobId: "job-1" }));
@@ -69,27 +38,16 @@ function harness(
     policies: [{ id: "Free for all" }],
     assigners: [{ id: "Constant vote balance" }],
   }));
-  const currentJob = vi.fn((): Promise<JobSnapshot | undefined> => Promise.resolve(undefined));
   const listMacis = vi.fn((): Promise<Page<MaciListItem>> => Promise.resolve({ items: [], total: 0 }));
   const readMaci = vi.fn((): Promise<MaciInstanceRecord | undefined> => Promise.resolve(undefined));
   const discardStandUp = vi.fn((): Promise<void> => Promise.resolve());
-  const hasIncompleteStandUp = vi.fn((): Promise<boolean> => Promise.resolve(false));
-  const subscribe = vi.fn((listener: (event: JobEvent) => void): Promise<() => void> => {
-    listener({ type: "step", step: STEP });
-    listener({ type: "completed", status: "succeeded" });
-
-    return Promise.resolve((): void => undefined);
-  });
   const loginService = { authenticate, ...loginOverrides } as unknown as LoginService;
   const standupService = {
     startStandUp,
     readStandUpCatalog,
-    currentJob,
     listMacis,
     readMaci,
     discardStandUp,
-    hasIncompleteStandUp,
-    subscribe,
     ...standupOverrides,
   } as unknown as StandupService;
 
@@ -98,12 +56,9 @@ function harness(
     authenticate,
     startStandUp,
     readStandUpCatalog,
-    currentJob,
     listMacis,
     readMaci,
     discardStandUp,
-    hasIncompleteStandUp,
-    subscribe,
   };
 }
 
@@ -385,27 +340,6 @@ describe("StandupController", () => {
     expect(readMaci).not.toHaveBeenCalled();
   });
 
-  test("readCurrentJob returns null when no job exists", async () => {
-    const { standupController } = harness();
-
-    await expect(standupController.readCurrentJob(request("Bearer jwt-token"))).resolves.toEqual({
-      job: null,
-      incompleteStandUp: false,
-    });
-  });
-
-  test("readCurrentJob returns the latest job and incomplete stand-up", async () => {
-    const { standupController } = harness({
-      currentJob: vi.fn((): Promise<JobSnapshot | undefined> => Promise.resolve(JOB)),
-      hasIncompleteStandUp: vi.fn((): Promise<boolean> => Promise.resolve(true)),
-    });
-
-    await expect(standupController.readCurrentJob(request("Bearer jwt-token"))).resolves.toEqual({
-      job: JOB,
-      incompleteStandUp: true,
-    });
-  });
-
   test("discardStandUp discards for an authenticated Operator", async () => {
     const { standupController, authenticate, discardStandUp } = harness();
 
@@ -429,62 +363,5 @@ describe("StandupController", () => {
 
     await expect(standupController.discardStandUp(request())).rejects.toBeInstanceOf(UnauthorizedException);
     expect(discardStandUp).not.toHaveBeenCalled();
-  });
-
-  test("subscribe emits SSE events then completes", async () => {
-    const { standupController, subscribe } = harness();
-    const stream = await standupController.subscribe(request("Bearer jwt-token"));
-
-    await expect(collectSse(stream)).resolves.toEqual([
-      { type: "step", data: { type: "step", step: STEP } },
-      { type: "completed", data: { type: "completed", status: "succeeded" } },
-    ]);
-    expect(subscribe).toHaveBeenCalledOnce();
-  });
-
-  test("subscribe rejects a request without a Bearer token", async () => {
-    const { standupController, subscribe } = harness();
-
-    await expect(standupController.subscribe(request())).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(subscribe).not.toHaveBeenCalled();
-  });
-
-  test("subscribe ignores events after the stream completes", async () => {
-    const extra = { seq: 2, kind: "deploy", name: "leanImt" };
-    const { standupController } = harness({
-      subscribe: vi.fn((listener: (event: JobEvent) => void): Promise<() => void> => {
-        listener({ type: "step", step: STEP });
-        listener({ type: "completed", status: "succeeded" });
-        listener({ type: "step", step: extra });
-
-        return Promise.resolve((): void => undefined);
-      }),
-    });
-    const stream = await standupController.subscribe(request("Bearer jwt-token"));
-
-    await expect(collectSse(stream)).resolves.toEqual([
-      { type: "step", data: { type: "step", step: STEP } },
-      { type: "completed", data: { type: "completed", status: "succeeded" } },
-    ]);
-  });
-
-  test("subscribe teardown swallows a failed service subscribe", async () => {
-    let failSubscribe: ((error: Error) => void) | undefined;
-    const { standupController } = harness({
-      subscribe: vi.fn(
-        (): Promise<() => void> =>
-          new Promise((_resolve, reject) => {
-            failSubscribe = reject;
-          }),
-      ),
-    });
-    const stream = await standupController.subscribe(request("Bearer jwt-token"));
-    const subscription = stream.subscribe({
-      next: (): void => undefined,
-    });
-
-    subscription.unsubscribe();
-    failSubscribe?.(new Error("store down"));
-    await Promise.resolve();
   });
 });

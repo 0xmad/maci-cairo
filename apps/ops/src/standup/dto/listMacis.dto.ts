@@ -1,9 +1,8 @@
 import { IsOptional } from "class-validator";
 
 import { type Paginated, readPagination, type Pagination } from "../../utils/pagination.js";
-import { type MaciListItem } from "../repositories/job.store.js";
-
-import { parseDto } from "./parseDto.js";
+import { parseDto } from "../../utils/parseDto.js";
+import { type MaciListItem } from "../standup.store.js";
 
 /** Query for `GET /macis`. */
 export class ListMacisQueryDto {

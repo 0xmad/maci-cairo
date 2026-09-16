@@ -10,24 +10,19 @@ import {
   Post,
   Query,
   Req,
-  Sse,
   UnauthorizedException,
 } from "@nestjs/common";
 import { type FastifyRequest } from "fastify";
-import { Observable } from "rxjs";
 
 import { LOGIN_SERVICE } from "../login/login.controller.js";
 import { type LoginService } from "../login/services/login.service.js";
 import { readBearer } from "../login/utils/bearer.js";
 
-import { CurrentJobResponseDto } from "./dto/currentJob.dto.js";
 import { ListMacisQueryDto, MacisPageDto, parseListMacisQueryDto } from "./dto/listMacis.dto.js";
 import { MaciInstanceDto, parseReadMaciParamsDto, ReadMaciParamsDto } from "./dto/readMaci.dto.js";
 import { StandUpCatalogDto } from "./dto/standUpCatalog.dto.js";
 import { parseStartStandUpDto, StartStandUpDto, StartStandUpResponseDto } from "./dto/startStandUp.dto.js";
-import { type JobEvent, StandupService } from "./standup.service.js";
-
-export const STANDUP_SERVICE = "STANDUP_SERVICE";
+import { STANDUP_SERVICE, StandupService } from "./standup.service.js";
 
 const OPERATOR_STANDUP_ERRORS = new Set(["Zero vote balance", "Vote balance too large"]);
 
@@ -111,49 +106,6 @@ export class StandupController {
     }
 
     return maci;
-  }
-
-  @Get("job")
-  async readCurrentJob(@Req() request: FastifyRequest): Promise<CurrentJobResponseDto> {
-    await this.requireOperator(request);
-
-    return {
-      job: (await this.standupService.currentJob()) ?? null,
-      incompleteStandUp: await this.standupService.hasIncompleteStandUp(),
-    };
-  }
-
-  @Sse("job/events")
-  async subscribe(@Req() request: FastifyRequest): Promise<Observable<{ type?: string; data: JobEvent }>> {
-    await this.requireOperator(request);
-
-    return new Observable((subscriber) => {
-      let closed = false;
-
-      const unsubPromise = this.standupService.subscribe((event: JobEvent) => {
-        if (closed) {
-          return;
-        }
-
-        subscriber.next({ type: event.type, data: event });
-
-        if (event.type === "completed") {
-          closed = true;
-          subscriber.complete();
-        }
-      });
-
-      return (): void => {
-        closed = true;
-
-        unsubPromise.then(
-          (unsub) => {
-            unsub();
-          },
-          () => undefined,
-        );
-      };
-    });
   }
 
   private async requireOperator(request: FastifyRequest): Promise<void> {

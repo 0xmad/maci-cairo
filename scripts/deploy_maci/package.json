@@ -9,7 +9,8 @@
     "./config": "./src/config.ts",
     "./intent": "./src/intent.ts",
     "./sncast": "./src/sncast.ts",
-    "./hex": "./src/hex.ts"
+    "./hex": "./src/hex.ts",
+    "./createPoll": "./src/createPoll.ts"
   },
   "scripts": {
     "deploy:maci": "tsx src/deployMaci.ts",

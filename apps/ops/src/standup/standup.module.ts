@@ -3,8 +3,8 @@ import { type DynamicModule, Module } from "@nestjs/common";
 import { LOGIN_SERVICE } from "../login/login.controller.js";
 import { type LoginService } from "../login/services/login.service.js";
 
-import { STANDUP_SERVICE, StandupController } from "./standup.controller.js";
-import { StandupService } from "./standup.service.js";
+import { StandupController } from "./standup.controller.js";
+import { STANDUP_SERVICE, StandupService } from "./standup.service.js";
 
 /* eslint-disable @typescript-eslint/no-extraneous-class -- NestFactory needs a module class token */
 @Module({})

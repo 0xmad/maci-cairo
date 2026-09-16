@@ -50,6 +50,27 @@
       "when": 7,
       "tag": "0006_standup_checkpoints",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 8,
+      "tag": "0007_create_poll_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 9,
+      "tag": "0008_polls",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 10,
+      "tag": "0009_poll_schedule",
+      "breakpoints": true
     }
   ]
 }

@@ -177,6 +177,9 @@ importers:
       '@starknet-io/get-starknet':
         specifier: ^4.0.8
         version: 4.0.8
+      '@zk-kit/baby-jubjub':
+        specifier: ^1.0.3
+        version: 1.0.3
       classnames:
         specifier: ^2.5.1
         version: 2.5.1
@@ -1998,11 +2001,17 @@ packages:
     resolution: {integrity: sha512-aCWYmVeSCGViyEU5k7GMoW8zxE4Gs+C1s1Pp2XLesvSNlnZ4PMES9HUnTB3hl0b3RVj7C61yze3IWyrncqg4MA==}
     engines: {node: '>=22'}
 
+  '@zk-kit/baby-jubjub@1.0.3':
+    resolution: {integrity: sha512-Wl+QfV6XGOMk1yU2JTqHXeKWfJVXp83is0+dtqfj9wx4wsAPpb+qzYvwAxW5PBx5/Nu71Bh7jp/5vM+6QgHSwA==}
+
   '@zk-kit/binary-merkle-root.circom@2.0.0':
     resolution: {integrity: sha512-YaOmt1tq9mGwuQmk6ijlNbBRT71dxZciyuGOaNyL4eyosOeQbiM3u0WFDWbaHaKonpYupDn2Z5gUDHy0dtH0uQ==}
 
   '@zk-kit/lean-imt@2.2.5':
     resolution: {integrity: sha512-7pJIWiWp30wKz7OlbzV/+ATvHD+Emwy1aejU+9R4V+a1BkdY/yhGA/hFoVULxYyZ/RohiCfcJC/48cU2xI6Rtw==}
+
+  '@zk-kit/utils@1.2.1':
+    resolution: {integrity: sha512-H2nTsyWdicVOyvqC5AjgU7tsTgmR6PDrruFJNmlmdhKp7RxEia/E1B1swMZjaasYa2QMp4Zc6oB7cWchty7B2Q==}
 
   '@zk-kit/utils@1.4.1':
     resolution: {integrity: sha512-IoXzy3ElfkvRfC/s6uk3eFQO8uxkCdAOVxKlJlaEjM7pgckX5AK46Q+7n5yMQD/v/o6OL0mMtet065o5EpUocA==}
@@ -6412,6 +6421,10 @@ snapshots:
     dependencies:
       '@wallet-standard/base': 1.1.1
 
+  '@zk-kit/baby-jubjub@1.0.3':
+    dependencies:
+      '@zk-kit/utils': 1.2.1
+
   '@zk-kit/binary-merkle-root.circom@2.0.0':
     dependencies:
       circomlib: 2.0.5
@@ -6422,6 +6435,10 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@zk-kit/utils@1.2.1':
+    dependencies:
+      buffer: 6.0.3
 
   '@zk-kit/utils@1.4.1':
     dependencies:

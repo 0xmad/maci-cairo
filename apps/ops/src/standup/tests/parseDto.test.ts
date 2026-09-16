@@ -2,7 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { IsString, MinLength } from "class-validator";
 import { describe, expect, test } from "vitest";
 
-import { parseDto } from "../dto/parseDto.js";
+import { parseDto } from "../../utils/parseDto.js";
 
 class NameDto {
   @IsString()

@@ -6,7 +6,12 @@ import { fileURLToPath } from "node:url";
 loadEnv({ path: join(dirname(fileURLToPath(import.meta.url)), ".env") });
 
 export default {
-  schema: ["./src/login/repositories/nonce.schema.ts", "./src/standup/repositories/job.schema.ts"],
+  schema: [
+    "./src/login/repositories/nonce.schema.ts",
+    "./src/jobs/job.schema.ts",
+    "./src/standup/standup.schema.ts",
+    "./src/poll/poll.schema.ts",
+  ],
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {

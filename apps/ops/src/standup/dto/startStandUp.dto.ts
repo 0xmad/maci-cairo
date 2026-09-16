@@ -2,7 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { IsOptional, IsString, MinLength } from "class-validator";
 import { type DeployMaciIntent } from "maci-deploy/intent";
 
-import { parseDto } from "./parseDto.js";
+import { parseDto } from "../../utils/parseDto.js";
 
 const REQUIRED_BODY_ERROR = "circuitProfile, policy, and assigner required";
 

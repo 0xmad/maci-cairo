@@ -5,7 +5,7 @@
  */
 import { NEVER, number, strictObject, string, tuple, union, type infer as ZodInfer, type ZodError } from "zod";
 
-import { DEVNET_SEED0_DEVNET_1, normalizeHex } from "./hex.js";
+import { intendedCoordinator, normalizeHex } from "./hex.js";
 
 /** sncast `call` / `invoke` used by {@link createPoll}; tests inject a recorder. */
 export interface CreatePollOps {
@@ -24,7 +24,11 @@ export type CreatePollStep =
   { kind: "call"; name: "coordinator" | "next_poll_id" | "get_poll" } | { kind: "invoke"; name: "create_poll" };
 
 export interface CreatePollOptions {
-  onStep?: (step: CreatePollStep) => void;
+  onStep?: (step: CreatePollStep) => void | Promise<void>;
+  /** Skip `next_poll_id` and never double-invoke for this stored Poll id. */
+  frozenPollId?: bigint;
+  /** On-chain `coordinator()` must match this felt; defaults to seed-0 `devnet-1`. */
+  intendedCoordinator?: string;
 }
 
 const uintJson = union([
@@ -99,7 +103,7 @@ function formatCreatePollConfigError(error: ZodError): string {
 /**
  * Parse a felt/hex or decimal sncast `response` as a non-negative integer.
  */
-function integerFromFelt(value: string): bigint {
+export function integerFromFelt(value: string): bigint {
   const trimmed = value.trim();
 
   if (/^0x[0-9a-fA-F]+$/u.test(trimmed)) {
@@ -175,32 +179,78 @@ export function formatCreatePoll(result: CreatePollResult): string {
   return [`maci: ${result.maci}`, `poll: ${result.poll}`, `poll_id: ${result.pollId}`].join("\n");
 }
 
-/**
- * Create a Poll as seed-0 `devnet-1`. Does not stand up MACI.
- *
- * @throws If on-chain `coordinator()` is not `devnet-1` or `get_poll` is still zero after `create_poll`.
- */
-export function createPoll(
-  ops: CreatePollOps,
-  config: CreatePollConfig,
-  options: CreatePollOptions = {},
-): CreatePollResult {
-  const { onStep } = options;
-  const intended = normalizeHex(DEVNET_SEED0_DEVNET_1);
-  const actualCoordinator = normalizeHex(
-    ops.field("response", ["call", "--contract-address", config.maci, "--function", "coordinator"]),
+function callGetPoll(ops: CreatePollOps, maci: string, pollId: bigint): string {
+  return normalizeHex(
+    ops.field("response", [
+      "call",
+      "--contract-address",
+      maci,
+      "--function",
+      "get_poll",
+      "--arguments",
+      pollId.toString(),
+    ]),
   );
-  onStep?.({ kind: "call", name: "coordinator" });
+}
+
+async function assertCoordinator(
+  ops: CreatePollOps,
+  maci: string,
+  intended: string,
+  onStep: CreatePollOptions["onStep"],
+): Promise<void> {
+  const actualCoordinator = normalizeHex(
+    ops.field("response", ["call", "--contract-address", maci, "--function", "coordinator"]),
+  );
+  await onStep?.({ kind: "call", name: "coordinator" });
 
   if (actualCoordinator !== intended) {
     throw new Error(`coordinator mismatch: intended ${intended}, on-chain ${actualCoordinator}`);
   }
+}
 
+/**
+ * Create a Poll as the intended coordinator (seed-0 `devnet-1` unless overridden).
+ *
+ * Always preflights `coordinator()`. A frozen poll id is then read with `get_poll`:
+ * nonzero succeeds without invoke. Zero invokes once.
+ *
+ * @throws If on-chain `coordinator()` does not match, or `get_poll` is still zero after `create_poll`.
+ */
+export async function createPoll(
+  ops: CreatePollOps,
+  config: CreatePollConfig,
+  options: CreatePollOptions = {},
+): Promise<CreatePollResult> {
+  const { onStep } = options;
+  const intended = intendedCoordinator(options.intendedCoordinator);
   const zero = normalizeHex("0x0");
-  const nextPollId = integerFromFelt(
-    ops.field("response", ["call", "--contract-address", config.maci, "--function", "next_poll_id"]),
-  );
-  onStep?.({ kind: "call", name: "next_poll_id" });
+  let pollId: bigint;
+  let poll: string;
+
+  await assertCoordinator(ops, config.maci, intended, onStep);
+
+  if (options.frozenPollId !== undefined) {
+    pollId = options.frozenPollId;
+    poll = callGetPoll(ops, config.maci, pollId);
+    await onStep?.({ kind: "call", name: "get_poll" });
+
+    if (poll !== zero) {
+      return {
+        maci: config.maci,
+        poll,
+        pollId: integerFromFelt(
+          ops.field("response", ["call", "--contract-address", poll, "--function", "poll_id"]),
+        ).toString(),
+      };
+    }
+  } else {
+    pollId = integerFromFelt(
+      ops.field("response", ["call", "--contract-address", config.maci, "--function", "next_poll_id"]),
+    );
+    await onStep?.({ kind: "call", name: "next_poll_id" });
+    poll = zero;
+  }
 
   ops.field("transaction_hash", [
     "invoke",
@@ -211,28 +261,20 @@ export function createPoll(
     "--arguments",
     createPollArgumentsExpr(config),
   ]);
-  onStep?.({ kind: "invoke", name: "create_poll" });
+  await onStep?.({ kind: "invoke", name: "create_poll" });
 
-  const poll = normalizeHex(
-    ops.field("response", [
-      "call",
-      "--contract-address",
-      config.maci,
-      "--function",
-      "get_poll",
-      "--arguments",
-      nextPollId.toString(),
-    ]),
-  );
-  onStep?.({ kind: "call", name: "get_poll" });
+  poll = callGetPoll(ops, config.maci, pollId);
+  await onStep?.({ kind: "call", name: "get_poll" });
 
   if (poll === zero) {
-    throw new Error(`create_poll did not record a Poll at id ${nextPollId}`);
+    throw new Error(`create_poll did not record a Poll at id ${pollId}`);
   }
 
-  const pollId = integerFromFelt(
-    ops.field("response", ["call", "--contract-address", poll, "--function", "poll_id"]),
-  ).toString();
-
-  return { maci: config.maci, poll, pollId };
+  return {
+    maci: config.maci,
+    poll,
+    pollId: integerFromFelt(
+      ops.field("response", ["call", "--contract-address", poll, "--function", "poll_id"]),
+    ).toString(),
+  };
 }

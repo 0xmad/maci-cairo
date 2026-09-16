@@ -1,23 +1,15 @@
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { type DeployMaciCheckpoint, type MaciNetwork } from "maci-deploy/maci";
 
-import { type Page, type Pagination } from "../../utils/pagination.js";
+import { jobs } from "../jobs/job.schema.js";
+import { type Page, type Pagination } from "../utils/pagination.js";
 
-import { jobs, jobSteps, maciInstances, standupCheckpoints, type StandupCheckpointRow } from "./job.schema.js";
-import {
-  type JobSnapshot,
-  type JobStatus,
-  type JobStep,
-  type JobStore,
-  type MaciInstanceRecord,
-  type MaciListItem,
-  type NewJob,
-} from "./job.store.js";
+import { maciInstances, standupCheckpoints, type StandupCheckpointRow } from "./standup.schema.js";
+import { type MaciInstanceRecord, type MaciListItem, type StandupStore } from "./standup.store.js";
 
-type JobDatabase = NodePgDatabase<{
+type StandupDatabase = NodePgDatabase<{
   jobs: typeof jobs;
-  jobSteps: typeof jobSteps;
   maciInstances: typeof maciInstances;
   standupCheckpoints: typeof standupCheckpoints;
 }>;
@@ -48,22 +40,6 @@ function checkpointRow(checkpoint: DeployMaciCheckpoint): StandupCheckpointRow {
     assigner: checkpoint.assigner ?? null,
     maci: checkpoint.maci ?? null,
   };
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
-}
-
-function asStatus(value: string): JobStatus {
-  if (value === "running" || value === "succeeded" || value === "failed" || value === "interrupted") {
-    return value;
-  }
-
-  throw new Error(`unknown job status ${value}`);
-}
-
-function asStep(row: { seq: number; kind: string; name: string }): JobStep {
-  return { seq: row.seq, kind: row.kind, name: row.name };
 }
 
 function asNetwork(value: string): MaciNetwork {
@@ -99,40 +75,12 @@ function asMaci(row: MaciInstanceRow): MaciInstanceRecord {
   };
 }
 
-/** Postgres persistence for MACI stand-up jobs and recorded instances. */
-export class PostgresJobStore implements JobStore {
-  readonly #db: JobDatabase;
+/** Postgres persistence for stand-up checkpoints and recorded MACI instances. */
+export class PostgresStandupStore implements StandupStore {
+  readonly #db: StandupDatabase;
 
-  constructor(db: JobDatabase) {
+  constructor(db: StandupDatabase) {
     this.#db = db;
-  }
-
-  async tryBegin(job: NewJob): Promise<boolean> {
-    try {
-      await this.#db.insert(jobs).values({
-        id: job.id,
-        kind: job.kind,
-        status: "running",
-        createdAtMs: job.createdAtMs,
-      });
-
-      return true;
-    } catch (error) {
-      if (isUniqueViolation(error)) {
-        return false;
-      }
-
-      throw error;
-    }
-  }
-
-  async appendStep(jobId: string, step: JobStep): Promise<void> {
-    await this.#db.insert(jobSteps).values({
-      jobId,
-      seq: step.seq,
-      kind: step.kind,
-      name: step.name,
-    });
   }
 
   async succeed(jobId: string, completedAtMs: number, maci: MaciInstanceRecord): Promise<void> {
@@ -158,37 +106,6 @@ export class PostgresJobStore implements JobStore {
       });
       await tx.delete(standupCheckpoints).where(eq(standupCheckpoints.id, CHECKPOINT_ID));
     });
-  }
-
-  async fail(jobId: string, completedAtMs: number, error: string): Promise<void> {
-    await this.#db.update(jobs).set({ status: "failed", completedAtMs, error }).where(eq(jobs.id, jobId));
-  }
-
-  async interruptRunning(completedAtMs: number, error: string): Promise<void> {
-    await this.#db.update(jobs).set({ status: "interrupted", completedAtMs, error }).where(eq(jobs.status, "running"));
-  }
-
-  async tryResume(jobId: string): Promise<boolean> {
-    const latest = await this.latest();
-
-    if (latest?.id !== jobId || (latest.status !== "failed" && latest.status !== "interrupted")) {
-      return false;
-    }
-
-    try {
-      await this.#db
-        .update(jobs)
-        .set({ status: "running", error: null, completedAtMs: null })
-        .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["failed", "interrupted"])));
-
-      return true;
-    } catch (error) {
-      if (isUniqueViolation(error)) {
-        return false;
-      }
-
-      throw error;
-    }
   }
 
   async mergeCheckpoint(patch: DeployMaciCheckpoint): Promise<void> {
@@ -226,26 +143,6 @@ export class PostgresJobStore implements JobStore {
 
   async clearCheckpoint(): Promise<void> {
     await this.#db.delete(standupCheckpoints).where(eq(standupCheckpoints.id, CHECKPOINT_ID));
-  }
-
-  async latest(): Promise<JobSnapshot | undefined> {
-    const rows = await this.#db.select().from(jobs).orderBy(desc(jobs.createdAtMs)).limit(1);
-
-    if (rows.length === 0) {
-      return undefined;
-    }
-
-    const row = rows[0];
-
-    const steps = await this.#db.select().from(jobSteps).where(eq(jobSteps.jobId, row.id)).orderBy(jobSteps.seq);
-
-    return {
-      id: row.id,
-      kind: "standup",
-      status: asStatus(row.status),
-      error: row.error ?? undefined,
-      steps: steps.map((step) => asStep(step)),
-    };
   }
 
   async listMacis(pagination: Pagination): Promise<Page<MaciListItem>> {
