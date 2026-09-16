@@ -382,6 +382,52 @@ describe("OpsClient", () => {
     vi.unstubAllGlobals();
   });
 
+  it("reads a Poll by Poll address", async () => {
+    const instance = {
+      address: "0xaa",
+      pollId: "2",
+      startDate: "0",
+      endDate: "1000",
+      pollPublicKey: ["0", "1"],
+      createdAtMs: 1_000_200,
+      maci: "0x7",
+    };
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      let url: string;
+
+      if (typeof input === "string") {
+        url = input;
+      } else if (input instanceof URL) {
+        url = input.href;
+      } else {
+        url = input.url;
+      }
+
+      expect(url).toBe("http://ops.test/polls/0xaa");
+      expect(init?.headers).toEqual({ authorization: "Bearer jwt" });
+
+      return new Response(JSON.stringify(instance), { status: 200 });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(client.readPoll("jwt", "0xaa")).resolves.toEqual(instance);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("throws when the Poll body is invalid", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 })));
+
+    const client = new OpsClient("http://ops.test");
+
+    await expect(client.readPoll("jwt", "0xaa")).rejects.toThrow(/^Poll failed$/u);
+
+    vi.unstubAllGlobals();
+  });
+
   it("reads a MACI instance by address", async () => {
     const instance = {
       leanImt: "0x1",

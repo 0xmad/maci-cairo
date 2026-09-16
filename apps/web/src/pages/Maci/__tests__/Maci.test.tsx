@@ -79,6 +79,8 @@ const MaciApp = (): JSX.Element => (
       <Route element={<MaciPage />} path="/maci/:address" />
 
       <Route element={<p>create-poll</p>} path="/maci/:address/poll" />
+
+      <Route element={<p>poll-detail</p>} path="/poll/:address" />
     </Routes>
   </MemoryRouter>
 );
@@ -197,6 +199,38 @@ describe("MaciPage", () => {
     expect(screen.getByText("2026-09-16 10:00 UTC")).toBeTruthy();
     expect(screen.getByText("2026-09-16 22:30 UTC")).toBeTruthy();
     expect(screen.getByText("2026-09-16 12:00 UTC")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("0x0000…00aa"));
+
+    expect(screen.getByText("poll-detail")).toBeTruthy();
+  });
+
+  it("opens a Poll from the keyboard", () => {
+    useMaciInstanceMock.mockReturnValue({
+      address: "0x7",
+      signedIn: true,
+      instance: INSTANCE,
+    });
+    usePollsMock.mockReturnValue({
+      ...emptyPolls,
+      items: [POLL_ITEM],
+      pageCount: 1,
+    });
+
+    render(<MaciApp />);
+
+    const row = screen.getByText("0x0000…00aa").closest("tr");
+
+    expect(row).not.toBeNull();
+    if (row === null) {
+      throw new Error("missing poll row");
+    }
+
+    fireEvent.keyDown(row, { key: " " });
+    expect(screen.queryByText("poll-detail")).toBeNull();
+
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(screen.getByText("poll-detail")).toBeTruthy();
   });
 
   it("labels a sepolia instance", () => {

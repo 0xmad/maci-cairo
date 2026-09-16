@@ -1,4 +1,5 @@
 import { type JSX } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../components/ui";
 import { type PollListItem } from "../../services/ops";
@@ -17,6 +18,7 @@ export interface PollsTableProps {
 }
 
 export const PollsTable = ({ items, page, pageCount, error, nextPage, prevPage }: PollsTableProps): JSX.Element => {
+  const navigate = useNavigate();
   const emptyRowCount = Math.max(0, POLL_LIST_PAGE_SIZE - items.length);
 
   return (
@@ -46,7 +48,19 @@ export const PollsTable = ({ items, page, pageCount, error, nextPage, prevPage }
 
             <tbody>
               {items.map((item) => (
-                <tr key={item.address} className="border-b border-zinc-800">
+                <tr
+                  key={item.address}
+                  className="cursor-pointer border-b border-zinc-800 hover:bg-zinc-900"
+                  tabIndex={0}
+                  onClick={() => {
+                    navigate(`/poll/${item.address}`);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      navigate(`/poll/${item.address}`);
+                    }
+                  }}
+                >
                   <td className="px-4 py-3 font-mono whitespace-nowrap sm:px-0" title={item.address}>
                     {truncateAddress(item.address)}
                   </td>

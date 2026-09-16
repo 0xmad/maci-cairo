@@ -26,9 +26,15 @@ export interface PollListItem {
   createdAtMs: number;
 }
 
+/** Recorded Poll including its MACI. Address is unique across Polls. */
+export interface Poll extends PollListItem {
+  maci: string;
+}
+
 export interface PollStore {
   writeCreatePoll: (jobId: string, record: CreatePollJob) => Promise<void>;
   readCreatePoll: (jobId: string) => Promise<CreatePollJob | undefined>;
-  recordPoll: (record: PollListItem & { maci: string }) => Promise<void>;
+  recordPoll: (record: Poll) => Promise<void>;
   listPolls: (maci: string, pagination: Pagination) => Promise<Page<PollListItem>>;
+  readPoll: (address: string) => Promise<Poll | undefined>;
 }

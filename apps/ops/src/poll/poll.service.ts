@@ -6,7 +6,7 @@ import { type JobStore, type JobStep } from "../jobs/job.store.js";
 import { type StandupStore } from "../standup/standup.store.js";
 import { type Page, type Pagination } from "../utils/pagination.js";
 
-import { type CreatePollIntent, type PollListItem, type PollStore } from "./poll.store.js";
+import { type CreatePollIntent, type Poll, type PollListItem, type PollStore } from "./poll.store.js";
 
 export interface PollServiceDeps {
   jobs: JobStore;
@@ -47,6 +47,16 @@ export class PollService {
     }
 
     return this.#deps.polls.listPolls(maciAddress, pagination);
+  }
+
+  async readPoll(pollAddress: string): Promise<Poll> {
+    const poll = await this.#deps.polls.readPoll(pollAddress);
+
+    if (poll === undefined) {
+      throw new Error("poll not found");
+    }
+
+    return poll;
   }
 
   async startCreatePoll(maciAddress: string, intent: CreatePollIntent): Promise<{ jobId: string }> {

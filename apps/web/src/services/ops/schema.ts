@@ -162,6 +162,9 @@ export const pollListItemSchema = strictObject({
   pollPublicKey: tuple([string().min(1), string().min(1)]),
   createdAtMs: number().int().nonnegative(),
 });
+export const pollSchema = pollListItemSchema.extend({
+  maci: string().min(1),
+});
 export const pollListResponseSchema = paginatedSchema(pollListItemSchema);
 export const jobEventSchema = union([
   strictObject({ type: literal("step"), step: jobStepSchema }),
@@ -183,6 +186,7 @@ export type JobSnapshot = ZodInfer<typeof jobSnapshotSchema>;
 export type MaciListItem = ZodInfer<typeof maciListItemSchema>;
 export type MaciListPage = Paginated<MaciListItem>;
 export type PollListItem = ZodInfer<typeof pollListItemSchema>;
+export type Poll = ZodInfer<typeof pollSchema>;
 export type PollListPage = Paginated<PollListItem>;
 export type MaciInstance = ZodInfer<typeof maciInstanceSchema>;
 export type JobEvent = ZodInfer<typeof jobEventSchema>;

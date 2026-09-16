@@ -2,7 +2,7 @@ import { constants } from "starknet";
 import { StarkZap } from "starkzap";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createSdk, chainIdFor, defaultNetwork, isAppNetwork, rpcUrlFor } from "../network";
+import { createSdk, chainIdFor, defaultNetwork, isAppNetwork, mapNetworks, rpcUrlFor } from "../network";
 
 vi.mock("starkzap", () => ({
   StarkZap: vi.fn(),
@@ -19,6 +19,12 @@ describe("isAppNetwork", () => {
   it("rejects any other value", () => {
     expect(isAppNetwork("mainnet")).toBe(false);
     expect(isAppNetwork("")).toBe(false);
+  });
+});
+
+describe("mapNetworks", () => {
+  it("builds a value for every app network", () => {
+    expect(mapNetworks((network) => network)).toEqual({ local: "local", sepolia: "sepolia" });
   });
 });
 

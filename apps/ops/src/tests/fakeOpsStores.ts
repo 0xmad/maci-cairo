@@ -248,6 +248,7 @@ export function fakeOpsStores(): OpsStores {
                     Promise.resolve(listed.slice(skip, skip + take)),
                 }),
             }),
+            limit: (): Promise<(typeof pollRows)[number][]> => Promise.resolve(listed.slice(0, 1)),
           }),
         };
       }

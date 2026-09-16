@@ -74,7 +74,7 @@ export const MaciPage = (): JSX.Element => {
         </Button>
       ) : null}
 
-      {signedIn && instance !== undefined ? (
+      {signedIn && instance !== undefined && address !== undefined ? (
         <PollsTable
           error={listError}
           items={items}

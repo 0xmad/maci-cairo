@@ -163,6 +163,7 @@ function postgresDb(
                   offset: (skip: number): Promise<typeof listed> => Promise.resolve(listed.slice(skip, skip + take)),
                 }),
             }),
+            limit: (): Promise<typeof listed> => Promise.resolve(listed.slice(0, 1)),
           }),
         };
       }
@@ -395,5 +396,39 @@ describe("PostgresPollStore", () => {
         },
       ],
     });
+  });
+
+  test("readPoll returns the recorded Poll", async () => {
+    const { db } = postgresDb({
+      pollRows: [
+        {
+          id: 1,
+          maci: "0x7",
+          address: "0xaa",
+          pollId: "2",
+          startDate: "0",
+          endDate: "1000",
+          pollPublicKeyX: "0",
+          pollPublicKeyY: "1",
+          createdAtMs: 1_000_200,
+        },
+      ],
+    });
+
+    await expect(new PostgresPollStore(db).readPoll("0xaa")).resolves.toEqual({
+      address: "0xaa",
+      pollId: "2",
+      startDate: "0",
+      endDate: "1000",
+      pollPublicKey: ["0", "1"],
+      createdAtMs: 1_000_200,
+      maci: "0x7",
+    });
+  });
+
+  test("readPoll is undefined when no Poll matches", async () => {
+    const { db } = postgresDb();
+
+    await expect(new PostgresPollStore(db).readPoll("0xaa")).resolves.toBeUndefined();
   });
 });
