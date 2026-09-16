@@ -4,12 +4,34 @@ import { type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { type Page, type Pagination } from "../utils/pagination.js";
 
 import { createPollJobs, polls } from "./poll.schema.js";
-import { type CreatePollJob, type PollListItem, type PollStore } from "./poll.store.js";
+import { type CreatePollJob, type Poll, type PollListItem, type PollStore } from "./poll.store.js";
 
 type PollDatabase = NodePgDatabase<{
   createPollJobs: typeof createPollJobs;
   polls: typeof polls;
 }>;
+
+interface PollRow {
+  maci: string;
+  address: string;
+  pollId: string;
+  startDate: string;
+  endDate: string;
+  pollPublicKeyX: string;
+  pollPublicKeyY: string;
+  createdAtMs: number;
+}
+
+function pollListItem(row: PollRow): PollListItem {
+  return {
+    address: row.address,
+    pollId: row.pollId,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    pollPublicKey: [row.pollPublicKeyX, row.pollPublicKeyY],
+    createdAtMs: row.createdAtMs,
+  };
+}
 
 /** Postgres persistence for Create Poll attempts and recorded Polls. */
 export class PostgresPollStore implements PollStore {
@@ -91,15 +113,18 @@ export class PostgresPollStore implements PollStore {
     ]);
 
     return {
-      items: rows.map((row): PollListItem => ({
-        address: row.address,
-        pollId: row.pollId,
-        startDate: row.startDate,
-        endDate: row.endDate,
-        pollPublicKey: [row.pollPublicKeyX, row.pollPublicKeyY],
-        createdAtMs: row.createdAtMs,
-      })),
+      items: rows.map(pollListItem),
       total: totals[0]?.total ?? 0,
     };
+  }
+
+  async readPoll(address: string): Promise<Poll | undefined> {
+    const rows = await this.#db.select().from(polls).where(eq(polls.address, address)).limit(1);
+
+    if (rows.length === 0) {
+      return undefined;
+    }
+
+    return { ...pollListItem(rows[0]), maci: rows[0].maci };
   }
 }

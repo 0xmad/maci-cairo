@@ -1,5 +1,8 @@
-import { unpackPoint } from "@zk-kit/baby-jubjub";
+import { packPoint, unpackPoint } from "@zk-kit/baby-jubjub";
 import { NEVER, string } from "zod";
+
+/** Matches MACI `PublicKey.serialize` (`macipk.` + packed hex). */
+export const SERIALIZED_POLL_PUBLIC_KEY_PREFIX = "macipk.";
 
 const INVALID_POLL_PUBLIC_KEY = "Invalid Poll public key";
 
@@ -18,3 +21,13 @@ export const pollPublicKeySchema = string({ error: INVALID_POLL_PUBLIC_KEY })
 
     return [point[0].toString(), point[1].toString()];
   });
+
+export function serializePollPublicKey(point: readonly [string, string]): string {
+  const packed = packPoint([BigInt(point[0]), BigInt(point[1])]).toString(16);
+
+  if (packed.length % 2 !== 0) {
+    return `${SERIALIZED_POLL_PUBLIC_KEY_PREFIX}0${packed}`;
+  }
+
+  return `${SERIALIZED_POLL_PUBLIC_KEY_PREFIX}${packed}`;
+}

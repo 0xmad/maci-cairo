@@ -9,6 +9,7 @@ import {
   nonceResponseSchema,
   operatorSessionSchema,
   pollListResponseSchema,
+  pollSchema,
   sessionAddressSchema,
   startJobSchema,
   standUpCatalogSchema,
@@ -19,6 +20,7 @@ import {
   type MaciListPage,
   type OperatorSession,
   type PollListPage,
+  type Poll,
   type StandUpBody,
   type StandUpCatalog,
 } from "./schema";
@@ -35,6 +37,7 @@ export type {
   OperatorSession,
   Paginated,
   PollListItem,
+  Poll,
   PollListPage,
   StandUpBody,
   StandUpCatalog,
@@ -229,6 +232,20 @@ export class OpsClient {
 
     if (!res.ok || !parsed.success) {
       throw new Error(readError(body, "Poll list failed"));
+    }
+
+    return parsed.data;
+  }
+
+  async readPoll(token: string, pollAddress: string): Promise<Poll> {
+    const res = await fetch(`${this.#root}/polls/${encodeURIComponent(pollAddress)}`, {
+      headers: authHeaders(token),
+    });
+    const body: unknown = await res.json();
+    const parsed = pollSchema.safeParse(body);
+
+    if (!res.ok || !parsed.success) {
+      throw new Error(readError(body, "Poll failed"));
     }
 
     return parsed.data;

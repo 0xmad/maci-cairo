@@ -81,6 +81,45 @@ describe("PollService", () => {
     await expect(poll.listPolls("0xmissing", { page: 1, pageSize: 10 })).rejects.toThrow(/^maci not found$/u);
   });
 
+  test("read Poll returns recorded Poll fields including MACI", async () => {
+    const stores = fakeOpsStores();
+    const clock = jobClock();
+    const { service: stand } = standHarness(recordingOps(), stores, clock);
+
+    await stand.startStandUp(SMALL_STANDUP_INTENT);
+    await settle(stores.jobs);
+    const listed = await stores.standup.listMacis({ page: 1, pageSize: 1 });
+    const maci = listed.items[0]?.address ?? "0xmissing";
+
+    await stores.polls.recordPoll({
+      maci,
+      address: "0xaa",
+      pollId: "2",
+      startDate: "0",
+      endDate: "1000",
+      pollPublicKey: ["0", "1"],
+      createdAtMs: 1_000_200,
+    });
+
+    const { poll } = pollHarness(pollOps(), stores, clock);
+
+    await expect(poll.readPoll("0xaa")).resolves.toEqual({
+      address: "0xaa",
+      pollId: "2",
+      startDate: "0",
+      endDate: "1000",
+      pollPublicKey: ["0", "1"],
+      createdAtMs: 1_000_200,
+      maci,
+    });
+  });
+
+  test("read Poll is rejected when the Poll is not recorded", async () => {
+    const { poll } = pollHarness();
+
+    await expect(poll.readPoll("0xaa")).rejects.toThrow(/^poll not found$/u);
+  });
+
   test("Create Poll is rejected while an incomplete stand-up checkpoint exists", async () => {
     const stores = fakeOpsStores();
     const { service } = standHarness(recordingOps({ failOn: "set_target" }), stores);

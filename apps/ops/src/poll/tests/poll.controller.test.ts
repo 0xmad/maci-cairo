@@ -20,14 +20,16 @@ function harness(pollOverrides: Partial<PollService> = {}, loginOverrides: Parti
   const authenticate = vi.fn((): Promise<string> => Promise.resolve(OPERATOR));
   const startCreatePoll = vi.fn((): Promise<{ jobId: string }> => Promise.resolve({ jobId: "job-2" }));
   const listPolls = vi.fn((): Promise<{ items: never[]; total: number }> => Promise.resolve({ items: [], total: 0 }));
+  const readPoll = vi.fn();
   const loginService = { authenticate, ...loginOverrides } as unknown as LoginService;
-  const pollService = { startCreatePoll, listPolls, ...pollOverrides } as unknown as PollService;
+  const pollService = { startCreatePoll, listPolls, readPoll, ...pollOverrides } as unknown as PollService;
 
   return {
     pollController: new PollController(loginService, pollService),
     authenticate,
     startCreatePoll,
     listPolls,
+    readPoll,
   };
 }
 
@@ -178,5 +180,44 @@ describe("PollController", () => {
       UnauthorizedException,
     );
     expect(listPolls).not.toHaveBeenCalled();
+  });
+
+  test("readPoll returns the instance for an authenticated Operator", async () => {
+    const instance = {
+      address: "0xaa",
+      pollId: "2",
+      startDate: "0",
+      endDate: "1000",
+      pollPublicKey: ["0", "1"] as const,
+      createdAtMs: 1_000_200,
+      maci: MACI,
+    };
+    const readPoll = vi.fn((): Promise<typeof instance> => Promise.resolve(instance));
+    const { pollController, authenticate } = harness({ readPoll });
+
+    await expect(pollController.readPoll(request("Bearer jwt-token"), { pollAddress: "0xaa" })).resolves.toEqual(
+      instance,
+    );
+    expect(authenticate).toHaveBeenCalledWith("jwt-token");
+    expect(readPoll).toHaveBeenCalledWith("0xaa");
+  });
+
+  test("readPoll maps a missing Poll to NotFoundException", async () => {
+    const { pollController } = harness({
+      readPoll: vi.fn((): Promise<never> => Promise.reject(new Error("poll not found"))),
+    });
+
+    await expect(pollController.readPoll(request("Bearer jwt-token"), { pollAddress: "0xaa" })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  test("readPoll rejects a request without a Bearer token", async () => {
+    const { pollController, readPoll } = harness();
+
+    await expect(pollController.readPoll(request(), { pollAddress: "0xaa" })).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(readPoll).not.toHaveBeenCalled();
   });
 });

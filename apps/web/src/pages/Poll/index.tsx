@@ -1,81 +1,70 @@
 import { type JSX } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 
-import { CreatePollForm } from "./CreatePollForm.js";
-import { useCreatePoll } from "./useCreatePoll.js";
+import { type Poll } from "../../services/ops";
+import { formatCreatedAt, formatUnixSeconds } from "../../utils/formatCreatedAt.js";
+import { serializePollPublicKey } from "../../utils/pollPublicKey.js";
+import { truncateAddress } from "../../utils/truncateAddress.js";
 
-function createPollUnavailableReason(
-  running: boolean,
-  incompleteStandUp: boolean,
-  recordedMaci: boolean,
-  hasAddress: boolean,
-): string {
-  if (running) {
-    return "Create Poll is unavailable while a job is running.";
+import { usePoll } from "./usePoll.js";
+
+interface PollRow {
+  label: string;
+  value: string;
+  address: boolean;
+}
+
+function pollRows(poll: Poll, ballotCount?: string): PollRow[] {
+  const rows: PollRow[] = [
+    { label: "Poll", value: poll.address, address: true },
+    { label: "Poll id", value: poll.pollId, address: false },
+    { label: "MACI", value: poll.maci, address: true },
+    { label: "Start", value: formatUnixSeconds(poll.startDate), address: false },
+    { label: "End", value: formatUnixSeconds(poll.endDate), address: false },
+    {
+      label: "Poll public key",
+      value: serializePollPublicKey(poll.pollPublicKey),
+      address: false,
+    },
+    { label: "Created at", value: formatCreatedAt(poll.createdAtMs), address: false },
+  ];
+
+  if (ballotCount !== undefined) {
+    rows.push({ label: "Ballot count", value: ballotCount, address: false });
   }
 
-  if (incompleteStandUp) {
-    return "Create Poll is unavailable while an incomplete stand-up exists.";
-  }
-
-  if (!hasAddress) {
-    return "Create Poll needs a MACI address.";
-  }
-
-  if (!recordedMaci) {
-    return "Create Poll needs a recorded MACI.";
-  }
-
-  return "Create Poll is unavailable.";
+  return rows;
 }
 
 export const PollPage = (): JSX.Element => {
-  const { address } = useParams();
-  const {
-    signedIn,
-    starting,
-    running,
-    incompleteStandUp,
-    recordedMaci,
-    error: jobError,
-    startCreatePoll,
-  } = useCreatePoll();
-  const instancePath = address === undefined ? "/" : `/maci/${address}`;
-  const canCreatePoll = signedIn && recordedMaci && address !== undefined && !incompleteStandUp && !running;
-  const unavailableReason = createPollUnavailableReason(
-    running,
-    incompleteStandUp,
-    recordedMaci,
-    address !== undefined,
-  );
+  const { maci, signedIn, poll, ballotCount, error } = usePoll();
+  const backPath = maci === undefined ? "/" : `/maci/${maci}`;
 
   return (
-    <section className="mx-auto w-full max-w-md space-y-5">
-      <Link className="inline-block text-base text-zinc-400 hover:text-white" to={instancePath}>
+    <section className="mx-auto max-w-3xl space-y-4">
+      <Link className="inline-block text-base text-zinc-400 hover:text-white" to={backPath}>
         Back
       </Link>
 
-      <h1 className="text-3xl font-semibold">Create Poll</h1>
+      <h1 className="text-2xl font-semibold">Poll</h1>
 
-      <p className="text-base leading-relaxed">
-        Create a Poll on this MACI from this console. Your wallet is only used to sign in; the server submits it.
-      </p>
+      {!signedIn ? <p className="text-base">Sign in as Operator to view this Poll.</p> : null}
 
-      {signedIn ? (
-        <div className="space-y-3">
-          {jobError !== undefined ? <p className="text-base text-red-400">{jobError}</p> : null}
+      {error !== undefined ? <p className="text-base text-red-400">{error}</p> : null}
 
-          <CreatePollForm
-            available={canCreatePoll}
-            running={running}
-            starting={starting}
-            unavailableReason={unavailableReason}
-            onStart={startCreatePoll}
-          />
-        </div>
-      ) : (
-        <p className="text-base">Sign in as Operator to create a Poll.</p>
-      )}
+      {poll !== undefined ? (
+        <dl className="grid gap-2 text-base">
+          {pollRows(poll, ballotCount).map((row) => (
+            <div key={row.label} className="grid grid-cols-[minmax(8rem,12rem)_1fr] gap-3">
+              <dt className="text-zinc-400">{row.label}</dt>
+
+              <dd className={row.address ? "font-mono break-all" : "break-all"} title={row.value}>
+                {row.address ? truncateAddress(row.value) : row.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
     </section>
   );
 };

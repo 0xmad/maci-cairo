@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import { Shell } from "./layouts";
-import { DeployPage, HomePage, MaciPage, PollPage } from "./pages";
+import { CreatePollPage, DeployPage, HomePage, MaciPage, PollPage } from "./pages";
 import { NetworkProvider } from "./providers/Network";
 
 export const App = (): JSX.Element => (
@@ -20,7 +20,9 @@ export const App = (): JSX.Element => (
 
         <Route element={<MaciPage />} path="/maci/:address" />
 
-        <Route element={<PollPage />} path="/maci/:address/poll" />
+        <Route element={<CreatePollPage />} path="/maci/:address/poll" />
+
+        <Route element={<PollPage />} path="/poll/:address" />
       </Route>
     </Routes>
   </NetworkProvider>

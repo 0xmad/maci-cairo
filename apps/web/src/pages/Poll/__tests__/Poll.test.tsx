@@ -1,128 +1,120 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { type JSX } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PollPage } from "..";
-import { useCreatePoll } from "../useCreatePoll";
+import { usePoll } from "../usePoll";
 
-vi.mock("../useCreatePoll", () => ({
-  useCreatePoll: vi.fn(),
+vi.mock("../usePoll", () => ({
+  usePoll: vi.fn(),
 }));
 
-const useCreatePollMock = vi.mocked(useCreatePoll);
+const usePollMock = vi.mocked(usePoll);
 
-const startCreatePoll = vi.fn();
-
-const idleJob = {
-  signedIn: false,
-  starting: false,
-  discarding: false,
-  running: false,
-  incompleteStandUp: false,
-  currentMaci: null,
-  steps: [],
-  recordedMaci: false,
-  startCreatePoll,
+const POLL = {
+  address: "0x00000000000000000000000000000000000000000000000000000000000000aa",
+  pollId: "2",
+  startDate: String(Date.UTC(2026, 8, 16, 10, 0, 0) / 1000),
+  endDate: String(Date.UTC(2026, 8, 16, 22, 30, 0) / 1000),
+  pollPublicKey: ["0", "1"] as [string, string],
+  createdAtMs: Date.UTC(2026, 8, 16, 12, 0, 0),
+  maci: "0x7",
 };
 
 const PollApp = (): JSX.Element => (
-  <MemoryRouter initialEntries={["/maci/0x7/poll"]}>
+  <MemoryRouter initialEntries={["/poll/0xaa"]}>
     <Routes>
-      <Route element={<PollPage />} path="/maci/:address/poll" />
+      <Route element={<PollPage />} path="/poll/:address" />
+
+      <Route element={<p>home</p>} path="/" />
 
       <Route element={<p>maci-instance</p>} path="/maci/:address" />
     </Routes>
   </MemoryRouter>
 );
 
-describe("Poll page", () => {
+describe("PollPage", () => {
   beforeEach(() => {
-    startCreatePoll.mockReset();
-    startCreatePoll.mockResolvedValue(undefined);
-    useCreatePollMock.mockReturnValue(idleJob);
+    usePollMock.mockReturnValue({
+      maci: "0x7",
+      pollAddress: "0xaa",
+      signedIn: false,
+    });
   });
 
   it("asks an unsigned-in visitor to sign in as Operator", () => {
     render(<PollApp />);
 
-    expect(screen.getByText("Sign in as Operator to create a Poll.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Create Poll" })).toBeNull();
-    expect(screen.getByText(/Create a Poll on this MACI from this console/u)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Poll" })).toBeTruthy();
+    expect(screen.getByText("Sign in as Operator to view this Poll.")).toBeTruthy();
   });
 
-  it("offers Create Poll on this MACI", () => {
-    useCreatePollMock.mockReturnValue({ ...idleJob, signedIn: true, recordedMaci: true });
-
-    render(<PollApp />);
-
-    expect(screen.getByRole("button", { name: "Create Poll" })).toBeTruthy();
-  });
-
-  it("hides Create Poll while an incomplete stand-up exists", () => {
-    useCreatePollMock.mockReturnValue({
-      ...idleJob,
+  it("shows recorded Poll fields and on-chain ballot count", () => {
+    usePollMock.mockReturnValue({
+      maci: "0x7",
+      pollAddress: "0xaa",
       signedIn: true,
-      incompleteStandUp: true,
+      poll: POLL,
+      ballotCount: "4",
     });
 
     render(<PollApp />);
 
-    expect(screen.queryByRole("button", { name: "Create Poll" })).toBeNull();
-    expect(screen.getByText("Create Poll is unavailable while an incomplete stand-up exists.")).toBeTruthy();
+    expect(screen.getByText("Poll id")).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.getByText("MACI")).toBeTruthy();
+    expect(screen.getByText("0x7")).toBeTruthy();
+    expect(screen.getByText("Start")).toBeTruthy();
+    expect(screen.getByText("2026-09-16 10:00 UTC")).toBeTruthy();
+    expect(screen.getByText("End")).toBeTruthy();
+    expect(screen.getByText("2026-09-16 22:30 UTC")).toBeTruthy();
+    expect(screen.getByText("Poll public key")).toBeTruthy();
+    expect(screen.getByText("macipk.01")).toBeTruthy();
+    expect(screen.getByText("Created at")).toBeTruthy();
+    expect(screen.getByText("2026-09-16 12:00 UTC")).toBeTruthy();
+    expect(screen.getByText("Ballot count")).toBeTruthy();
+    expect(screen.getByText("4")).toBeTruthy();
   });
 
-  it("hides Create Poll when this MACI is not recorded", () => {
-    useCreatePollMock.mockReturnValue({
-      ...idleJob,
+  it("omits ballot count when contract data is missing", () => {
+    usePollMock.mockReturnValue({
+      maci: "0x7",
+      pollAddress: "0xaa",
       signedIn: true,
-      recordedMaci: false,
+      poll: POLL,
     });
 
     render(<PollApp />);
 
-    expect(screen.queryByRole("button", { name: "Create Poll" })).toBeNull();
-    expect(screen.getByText("Create Poll needs a recorded MACI.")).toBeTruthy();
+    expect(screen.getByText("Poll id")).toBeTruthy();
+    expect(screen.queryByText("Ballot count")).toBeNull();
   });
 
-  it("hides Create Poll while a job is running", () => {
-    useCreatePollMock.mockReturnValue({
-      ...idleJob,
+  it("shows a load error", () => {
+    usePollMock.mockReturnValue({
+      maci: "0x7",
+      pollAddress: "0xaa",
       signedIn: true,
-      running: true,
-      steps: [{ seq: 1, kind: "call", name: "next_poll_id" }],
+      error: "poll not found",
     });
 
     render(<PollApp />);
 
-    expect(screen.queryByRole("button", { name: "Create Poll" })).toBeNull();
-    expect(screen.getByText("Create Poll is unavailable while a job is running.")).toBeTruthy();
+    expect(screen.getByText("poll not found")).toBeTruthy();
   });
 
-  it("shows a job error", () => {
-    useCreatePollMock.mockReturnValue({
-      ...idleJob,
+  it("returns Home when the Poll has no MACI", () => {
+    usePollMock.mockReturnValue({
+      pollAddress: "0xaa",
       signedIn: true,
-      error: "busy",
     });
 
     render(<PollApp />);
 
-    expect(screen.getByText("busy")).toBeTruthy();
-  });
+    fireEvent.click(screen.getByRole("link", { name: "Back" }));
 
-  it("starts Create Poll and stays on the page while the job runs", async () => {
-    useCreatePollMock.mockReturnValue({ ...idleJob, signedIn: true, recordedMaci: true });
-
-    render(<PollApp />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Create Poll" }));
-
-    await waitFor(() => {
-      expect(startCreatePoll).toHaveBeenCalled();
-    });
-    expect(screen.queryByText("maci-instance")).toBeNull();
-    expect(screen.getByRole("button", { name: "Create Poll" })).toBeTruthy();
+    expect(screen.getByText("home")).toBeTruthy();
   });
 
   it("returns to the MACI instance when Back is used", () => {
@@ -131,21 +123,5 @@ describe("Poll page", () => {
     fireEvent.click(screen.getByRole("link", { name: "Back" }));
 
     expect(screen.getByText("maci-instance")).toBeTruthy();
-  });
-
-  it("returns Home when Create Poll has no MACI address", () => {
-    render(
-      <MemoryRouter initialEntries={["/poll"]}>
-        <Routes>
-          <Route element={<PollPage />} path="/poll" />
-
-          <Route element={<p>home</p>} path="/" />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole("link", { name: "Back" }));
-
-    expect(screen.getByText("home")).toBeTruthy();
   });
 });

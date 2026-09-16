@@ -1,14 +1,20 @@
 import { constants } from "starknet";
 import { StarkZap } from "starkzap";
 
-export type AppNetwork = "local" | "sepolia";
+export const APP_NETWORKS = ["local", "sepolia"] as const;
+
+export type AppNetwork = (typeof APP_NETWORKS)[number];
 
 const LOCAL_RPC_DEFAULT = "http://127.0.0.1:5050/";
 const LOCAL_DEV_PROXY = "/starknet-rpc";
 const SEPOLIA_RPC_DEFAULT = "https://starknet-sepolia.public.blastapi.io";
 
 export function isAppNetwork(value: string): value is AppNetwork {
-  return value === "local" || value === "sepolia";
+  return (APP_NETWORKS as readonly string[]).includes(value);
+}
+
+export function mapNetworks<T>(create: (network: AppNetwork) => T): Record<AppNetwork, T> {
+  return Object.fromEntries(APP_NETWORKS.map((network) => [network, create(network)])) as Record<AppNetwork, T>;
 }
 
 export function defaultNetwork(): AppNetwork {

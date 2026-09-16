@@ -20,6 +20,7 @@ import { readBearer } from "../login/utils/bearer.js";
 import { parseReadMaciParamsDto, ReadMaciParamsDto } from "../standup/dto/readMaci.dto.js";
 
 import { ListPollsQueryDto, parseListPollsQueryDto, PollsPageDto } from "./dto/listPolls.dto.js";
+import { parseReadPollParamsDto, PollDto, ReadPollParamsDto } from "./dto/readPoll.dto.js";
 import { parseStartCreatePollDto, StartCreatePollDto, StartCreatePollResponseDto } from "./dto/startCreatePoll.dto.js";
 import { PollService } from "./poll.service.js";
 
@@ -30,8 +31,8 @@ function httpErrorForPoll(caught: unknown): Error {
     return new ConflictException({ error: "busy" });
   }
 
-  if (caught instanceof Error && caught.message === "maci not found") {
-    return new NotFoundException({ error: "maci not found" });
+  if (caught instanceof Error && (caught.message === "maci not found" || caught.message === "poll not found")) {
+    return new NotFoundException({ error: caught.message });
   }
 
   if (caught instanceof Error && caught.message === "incomplete stand-up") {
@@ -47,6 +48,17 @@ export class PollController {
     @Inject(LOGIN_SERVICE) private readonly loginService: LoginService,
     @Inject(POLL_SERVICE) private readonly pollService: PollService,
   ) {}
+
+  @Get("polls/:pollAddress")
+  async readPoll(@Req() request: FastifyRequest, @Param() params: ReadPollParamsDto): Promise<PollDto> {
+    await this.requireOperator(request);
+
+    try {
+      return await this.pollService.readPoll(parseReadPollParamsDto(params));
+    } catch (caught) {
+      throw httpErrorForPoll(caught);
+    }
+  }
 
   @Get("macis/:address/polls")
   async listPolls(

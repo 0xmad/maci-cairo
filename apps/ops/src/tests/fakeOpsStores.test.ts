@@ -69,4 +69,28 @@ describe("fakeOpsStores", () => {
       ],
     });
   });
+
+  test("readPoll returns the matching recorded Poll", async () => {
+    const { polls } = fakeOpsStores();
+
+    await polls.recordPoll({
+      maci: "0x7",
+      address: "0xaa",
+      pollId: "1",
+      startDate: "0",
+      endDate: "1000",
+      pollPublicKey: ["0", "1"],
+      createdAtMs: 1_000_100,
+    });
+
+    await expect(polls.readPoll("0xaa")).resolves.toEqual({
+      address: "0xaa",
+      pollId: "1",
+      startDate: "0",
+      endDate: "1000",
+      pollPublicKey: ["0", "1"],
+      createdAtMs: 1_000_100,
+      maci: "0x7",
+    });
+  });
 });
