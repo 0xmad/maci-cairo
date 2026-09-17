@@ -12,3 +12,4 @@ circuits/circom/main/
 build/
 .keep/
 .pnpm-store/
+circuits/ptau/
