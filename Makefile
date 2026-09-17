@@ -1,4 +1,4 @@
-.PHONY: test test-contracts test-circuits test-web test-web-coverage test-fuzz test-fuzz-common test-fuzz-contracts test-deploy test-deploy-coverage test-ops types-ops ops-db ops-docker build coverage clean fmt fmt\:fix lint lint\:fix types-web deploy create-poll
+.PHONY: test test-contracts test-circuits test-web test-web-coverage test-fuzz test-fuzz-common test-fuzz-contracts test-deploy test-deploy-coverage test-ops test-mobile test-mobile-coverage types-ops types-mobile ops-db ops-docker build coverage clean fmt fmt\:fix lint lint\:fix types-web deploy create-poll
 
 fmt:
 	scarb fmt --check
@@ -32,7 +32,7 @@ create-poll:
 	@test -n "$(CONFIG)" || (echo "CONFIG=path is required (JSON intent file)" && exit 1)
 	pnpm --filter maci-deploy run deploy:poll -- --config "$(CONFIG)"
 
-test: test-common test-contracts test-circuits test-web test-deploy test-ops
+test: test-common test-contracts test-circuits test-web test-deploy test-ops test-mobile
 
 test-contracts:
 	cd contracts && rm -rf coverage
@@ -82,6 +82,15 @@ test-web-coverage:
 types-web:
 	cd apps/web && pnpm run types
 
+types-mobile:
+	pnpm --filter maci-mobile run types
+
+test-mobile:
+	pnpm --filter maci-mobile run test
+
+test-mobile-coverage:
+	pnpm --filter maci-mobile run test:coverage
+
 test-fuzz: test-fuzz-common test-fuzz-contracts
 
 test-fuzz-common:
@@ -94,4 +103,5 @@ clean:
 	rm -rf contracts/coverage
 	rm -rf common/coverage
 	rm -rf apps/web/coverage
+	rm -rf apps/mobile/coverage
 	rm -rf scripts/deploy_maci/coverage

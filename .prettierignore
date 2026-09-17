@@ -5,4 +5,6 @@ node_modules/
 snfoundry_trace/
 target/
 apps/web/dist/
+apps/mobile/.expo/
+apps/mobile/dist/
 pnpm-lock.yaml

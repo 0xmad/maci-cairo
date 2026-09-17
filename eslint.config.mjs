@@ -74,6 +74,126 @@ const parserOptions = {
   noWarnOnMultipleProjects: true,
 };
 
+const reactAppExtends = fixupConfigRules(
+  compat.extends("airbnb", "prettier", "plugin:import/recommended", ...typescriptExtends),
+);
+
+const reactAppPlugins = {
+  prettier,
+  "unused-imports": unusedImports,
+  "react-hooks": reactHooks,
+};
+
+const reactShadowAllow = [
+  "location",
+  "event",
+  "history",
+  "name",
+  "status",
+  "History",
+  "Selection",
+  "Text",
+  "Option",
+  "screen",
+];
+
+const reactAppRules = (extraDevDependencies, extraRules = {}) => ({
+  "react/jsx-filename-extension": ["error", { extensions: [".tsx", ".jsx", ".js"] }],
+  "react/jsx-sort-props": [
+    "error",
+    {
+      callbacksLast: true,
+      shorthandFirst: true,
+      ignoreCase: true,
+      reservedFirst: true,
+    },
+  ],
+  "react/sort-prop-types": ["error", { callbacksLast: true }],
+  "react/react-in-jsx-scope": "off",
+  "react/jsx-boolean-value": "error",
+  "react/jsx-handler-names": "error",
+  "react/prop-types": "off",
+  "react/require-default-props": "off",
+  "react/jsx-no-bind": "error",
+  "react-hooks/rules-of-hooks": "error",
+  "react/no-array-index-key": "warn",
+  "react/jsx-props-no-spreading": "off",
+  "react/forbid-prop-types": "off",
+  "react/state-in-constructor": "off",
+  "react/jsx-fragments": "off",
+  "react/static-property-placement": ["off"],
+  "react/jsx-newline": ["error", { prevent: false }],
+  "react/function-component-definition": ["error", { namedComponents: ["arrow-function"] }],
+  "jsx-a11y/label-has-associated-control": "off",
+  "jsx-a11y/label-has-for": "off",
+  "import/no-cycle": ["error"],
+  "unused-imports/no-unused-imports": "error",
+  "import/no-extraneous-dependencies": [
+    "error",
+    {
+      devDependencies: ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**", ...extraDevDependencies],
+    },
+  ],
+  "no-debugger": isProduction ? "error" : "off",
+  "no-console": isProduction ? "error" : "off",
+  "no-underscore-dangle": "error",
+  "no-redeclare": ["error", { builtinGlobals: true }],
+  "import/order": importOrderRule,
+  "prettier/prettier": ["error", prettierOptions],
+  "import/prefer-default-export": "off",
+  "import/extensions": ["error", "never"],
+  "class-methods-use-this": "off",
+  "prefer-promise-reject-errors": "off",
+  "max-classes-per-file": "off",
+  "no-use-before-define": ["off"],
+  "no-shadow": "off",
+  curly: ["error", "all"],
+  "no-return-await": "off",
+  ...typescriptRules,
+  "@typescript-eslint/no-shadow": [
+    "error",
+    {
+      builtinGlobals: true,
+      allow: reactShadowAllow,
+    },
+  ],
+  ...extraRules,
+});
+
+const reactAppConfig = ({ files, tsconfig, extraGlobals, extraDevDependencies, extraRules }) => ({
+  files,
+  extends: reactAppExtends,
+  plugins: reactAppPlugins,
+  settings: {
+    react: {
+      version: "detect",
+    },
+    "import/resolver": {
+      typescript: {
+        alwaysTryTypes: true,
+        noWarnOnMultipleProjects: true,
+        project: path.resolve(__dirname, tsconfig),
+      },
+      node: {
+        extensions: [".ts", ".tsx", ".js", ".jsx"],
+      },
+    },
+  },
+  languageOptions: {
+    globals: {
+      ...extraGlobals,
+      ...globals.es2022,
+    },
+    sourceType: "module",
+    parser: tseslint.parser,
+    parserOptions,
+  },
+  linterOptions: {
+    reportUnusedDisableDirectives: isProduction,
+  },
+  rules: reactAppRules(extraDevDependencies, extraRules),
+});
+
 export default defineConfig([
   globalIgnores([
     "target",
@@ -85,9 +205,11 @@ export default defineConfig([
     "circuits/circom/test/",
     "circuits/circom/main/",
     "**/build/",
+    "apps/mobile/.expo/",
+    "apps/mobile/dist/",
   ]),
   {
-    ignores: ["apps/web/**"],
+    ignores: ["apps/web/**", "apps/mobile/**"],
     extends: fixupConfigRules(
       compat.extends("airbnb-base", "prettier", "plugin:import/recommended", ...typescriptExtends),
     ),
@@ -179,105 +301,32 @@ export default defineConfig([
       "drizzle/enforce-update-with-where": "error",
     },
   },
-  {
+  reactAppConfig({
     files: ["apps/web/**/*.{ts,tsx}"],
-    extends: fixupConfigRules(compat.extends("airbnb", "prettier", "plugin:import/recommended", ...typescriptExtends)),
-    plugins: {
-      prettier,
-      "unused-imports": unusedImports,
-      "react-hooks": reactHooks,
+    tsconfig: "./apps/web/tsconfig.json",
+    extraGlobals: {
+      ...globals.browser,
+      ...globals.node,
     },
-    settings: {
-      react: {
-        version: "detect",
-      },
-      "import/resolver": {
-        typescript: {
-          alwaysTryTypes: true,
-          noWarnOnMultipleProjects: true,
-          project: path.resolve(__dirname, "./apps/web/tsconfig.json"),
-        },
-        node: {
-          extensions: [".ts", ".tsx", ".js", ".jsx"],
-        },
-      },
-    },
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-        ...globals.es2022,
-      },
-      sourceType: "module",
-      parser: tseslint.parser,
-      parserOptions,
-    },
-    linterOptions: {
-      reportUnusedDisableDirectives: isProduction,
-    },
-    rules: {
-      "react/jsx-filename-extension": ["error", { extensions: [".tsx", ".jsx", ".js"] }],
-      "react/jsx-sort-props": [
-        "error",
-        {
-          callbacksLast: true,
-          shorthandFirst: true,
-          ignoreCase: true,
-          reservedFirst: true,
-        },
-      ],
-      "react/sort-prop-types": ["error", { callbacksLast: true }],
-      "react/react-in-jsx-scope": "off",
-      "react/jsx-boolean-value": "error",
-      "react/jsx-handler-names": "error",
-      "react/prop-types": "off",
-      "react/require-default-props": "off",
-      "react/jsx-no-bind": "error",
-      "react-hooks/rules-of-hooks": "error",
-      "react/no-array-index-key": "warn",
+    extraDevDependencies: ["**/vite.config.ts"],
+    extraRules: {
       "jsx-a11y/no-static-element-interactions": "warn",
       "jsx-a11y/click-events-have-key-events": "warn",
       "jsx-a11y/anchor-is-valid": "warn",
-      "react/jsx-props-no-spreading": "off",
-      "react/forbid-prop-types": "off",
-      "react/state-in-constructor": "off",
-      "react/jsx-fragments": "off",
-      "react/static-property-placement": ["off"],
-      "react/jsx-newline": ["error", { prevent: false }],
-      "react/function-component-definition": ["error", { namedComponents: ["arrow-function"] }],
-      "jsx-a11y/label-has-associated-control": "off",
-      "jsx-a11y/label-has-for": "off",
-      "import/no-cycle": ["error"],
-      "unused-imports/no-unused-imports": "error",
-      "import/no-extraneous-dependencies": [
-        "error",
-        {
-          devDependencies: ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**", "**/vite.config.ts"],
-        },
-      ],
-      "no-debugger": isProduction ? "error" : "off",
-      "no-console": isProduction ? "error" : "off",
-      "no-underscore-dangle": "error",
-      "no-redeclare": ["error", { builtinGlobals: true }],
-      "import/order": importOrderRule,
-      "prettier/prettier": ["error", prettierOptions],
-      "import/prefer-default-export": "off",
-      "import/extensions": ["error", "never"],
-      "class-methods-use-this": "off",
-      "prefer-promise-reject-errors": "off",
-      "max-classes-per-file": "off",
-      "no-use-before-define": ["off"],
-      "no-shadow": "off",
-      curly: ["error", "all"],
-      "no-return-await": "off",
-      ...typescriptRules,
-      "@typescript-eslint/no-shadow": [
-        "error",
-        {
-          builtinGlobals: true,
-          allow: ["location", "event", "history", "name", "status", "History", "Selection", "Text", "Option", "screen"],
-        },
-      ],
+    },
+  }),
+  reactAppConfig({
+    files: ["apps/mobile/**/*.{ts,tsx}"],
+    tsconfig: "./apps/mobile/tsconfig.json",
+    extraGlobals: {},
+    extraDevDependencies: ["**/jest.config.cjs"],
+  }),
+  {
+    files: ["apps/mobile/**/*.test.{ts,tsx}"],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
     },
   },
 ]);

@@ -46,7 +46,11 @@ _Avoid_: User, caller (in the glossary)
 
 **User public key**:
 The BabyJubJub public key bound to a Signup.
-_Avoid_: Public key (bare), coordinator key
+_Avoid_: Public key (bare), coordinator key, chain account key
+
+**User private key**:
+The BabyJubJub scalar that derives the user public key and witnesses a Ballot. It is not the Subject's chain signer.
+_Avoid_: Wallet key, account key, AA signer, coordinator key
 
 **Evidence**:
 The payload passed at Signup into the Policy and the vote-balance assigner.
@@ -213,3 +217,13 @@ The vote-option count derived from the Circuit profile. The Poll stores
 that number exactly. It is shown read-only at stand-up. It is not chosen
 at Poll create.
 _Avoid_: Candidate count (as this limit)
+
+### Clients
+
+**Voter client**:
+The application that holds one user private key per MACI, one Subject per install, and submits Signup and Ballots. It does not stand up a MACI or create Polls. It does not reuse a user private key across MACIs. It finds MACIs through a MACI registry, not through ops.
+_Avoid_: ops, Operator console, wallet (as the name of this app)
+
+**MACI registry**:
+The on-chain list of MACI instances for one network. The voter client hardcodes that registry's address. Stand-up writes entries. It is a trust root, not a discovery server.
+_Avoid_: ops catalog, app link, QR (as this list)
