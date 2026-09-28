@@ -1,7 +1,8 @@
 # MACI voter client (`maci-mobile`)
 
 Expo **voter client** scaffold. This package is not the Operator console and
-does not call ops (ADR-0016). This slice has no chain SDK, Signup, or Ballot.
+does not call ops (ADR-0016). Keys can create an unbound **user private key**
+(ADR-0017). This slice has no chain SDK, on-chain Signup, or Ballot.
 
 ## Run
 
