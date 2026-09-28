@@ -11,5 +11,6 @@ describe("app routes", () => {
     });
 
     expect(await screen.findByText("Voter client")).toBeOnTheScreen();
+    expect(screen.getByText("Stub. Register and Ballot are not in this slice.")).toBeOnTheScreen();
   });
 });
