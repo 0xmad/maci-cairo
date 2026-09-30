@@ -3,6 +3,7 @@ import * as ExpoClipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
 
+import { defaultMaciBinding } from "../../../keys/defaultMaciBinding";
 import { defaultUnboundUserKeys } from "../../../keys/defaultUnboundUserKeys";
 import { fixedPublicKey, fixedRecord } from "../../../keys/testFixtures";
 import { serializeUserPublicKey, type UnboundUserKeyRecord } from "../../../keys/unboundUserKey";
@@ -13,6 +14,15 @@ jest.mock("../../../keys/defaultUnboundUserKeys", () => ({
   defaultUnboundUserKeys: {
     load: jest.fn(),
     create: jest.fn(),
+    clear: jest.fn(),
+  },
+}));
+
+jest.mock("../../../keys/defaultMaciBinding", () => ({
+  defaultMaciBinding: {
+    load: jest.fn(),
+    hasStoredBinding: jest.fn(),
+    bind: jest.fn(),
     clear: jest.fn(),
   },
 }));
@@ -37,6 +47,9 @@ jest.mock("react-native-toast-message", () => {
 const load = jest.mocked(defaultUnboundUserKeys.load);
 const create = jest.mocked(defaultUnboundUserKeys.create);
 const clear = jest.mocked(defaultUnboundUserKeys.clear);
+const loadBinding = jest.mocked(defaultMaciBinding.load);
+const hasStoredBinding = jest.mocked(defaultMaciBinding.hasStoredBinding);
+const clearBinding = jest.mocked(defaultMaciBinding.clear);
 const setStringAsync = jest.mocked(ExpoClipboard.setStringAsync);
 const showToast = jest.mocked(Toast.show);
 const useRouterMock = jest.mocked(useRouter);
@@ -48,6 +61,11 @@ describe("useKeys", () => {
     load.mockReset();
     create.mockReset();
     clear.mockReset();
+    loadBinding.mockReset();
+    hasStoredBinding.mockReset();
+    clearBinding.mockReset();
+    loadBinding.mockResolvedValue(null);
+    hasStoredBinding.mockResolvedValue(false);
     setStringAsync.mockReset();
     showToast.mockReset();
     replace.mockReset();
@@ -233,10 +251,64 @@ describe("useKeys", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.error).toBe("Could not clear unbound key.");
+      expect(result.current.error).toBe("Could not clear key.");
     });
     expect(result.current.record).toEqual(fixedRecord);
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("clears a key bound to a MACI and navigates home", async () => {
+    load.mockResolvedValue(null);
+    loadBinding.mockResolvedValue({
+      maciAddress: "0x0000000000000000000000000000000000000000000000001234567890abcdef",
+      publicKey: fixedPublicKey,
+    });
+    clearBinding.mockResolvedValue(undefined);
+    clear.mockResolvedValue(undefined);
+
+    const { result } = await renderHook(() => useKeys());
+
+    await waitFor(() => {
+      expect(result.current.ready).toBe(true);
+    });
+
+    await act(() => {
+      result.current.onClearBoundKey();
+    });
+
+    await waitFor(() => {
+      expect(result.current.bound).toBeNull();
+    });
+    expect(clearBinding).toHaveBeenCalled();
+    expect(clear).toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith("/");
+    expect(result.current.error).toBeNull();
+  });
+
+  it("surfaces a bound-key clear failure", async () => {
+    load.mockResolvedValue(null);
+    loadBinding.mockResolvedValue({
+      maciAddress: "0x0000000000000000000000000000000000000000000000001234567890abcdef",
+      publicKey: fixedPublicKey,
+    });
+    clearBinding.mockRejectedValue(new Error("secure store unavailable"));
+
+    const { result } = await renderHook(() => useKeys());
+
+    await waitFor(() => {
+      expect(result.current.ready).toBe(true);
+    });
+
+    await act(() => {
+      result.current.onClearBoundKey();
+    });
+
+    await waitFor(() => {
+      expect(result.current.error).toBe("Could not clear key.");
+    });
+    expect(clear).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+    expect(result.current.bound?.publicKey).toEqual(fixedPublicKey);
   });
 
   it("ignores load success after unmount", async () => {

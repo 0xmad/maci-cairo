@@ -1,6 +1,7 @@
 import { type ReactElement } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import { formatMaciAddressPreview } from "../../keys/maciAddress";
 import { formatUserPublicKeyPreview } from "../../keys/unboundUserKey";
 
 import { showKeysDebugControls } from "./showKeysDebugControls";
@@ -20,7 +21,7 @@ const infoStyle = {
   lineHeight: 22,
 } as const;
 
-const publicKeyStyle = {
+const previewStyle = {
   textAlign: "center",
   fontSize: 28,
   lineHeight: 34,
@@ -41,13 +42,74 @@ const debugButtonStyle = {
   opacity: 0.7,
 } as const;
 
+const ClearKeyButton = ({ onPress }: { onPress: () => void }): ReactElement | null => {
+  if (!showKeysDebugControls()) {
+    return null;
+  }
+
+  return (
+    <Pressable accessibilityLabel="Clear key" accessibilityRole="button" style={debugButtonStyle} onPress={onPress}>
+      <Text>Clear key</Text>
+    </Pressable>
+  );
+};
+
 export const KeysPage = (): ReactElement => {
-  const { ready, record, error, onCreate, onCopyPublicKey, onClearUnboundKey } = useKeys();
+  const {
+    ready,
+    record,
+    bound,
+    maciAddress,
+    hasStoredBinding,
+    error,
+    onCreate,
+    onCopyPublicKey,
+    onClearUnboundKey,
+    onClearBoundKey,
+    onBind,
+  } = useKeys();
 
   if (!ready) {
     return (
       <View style={containerStyle}>
         <Text>Loading keys…</Text>
+      </View>
+    );
+  }
+
+  if (bound !== null) {
+    return (
+      <View style={containerStyle}>
+        <Text style={infoStyle}>This key is bound to this MACI.</Text>
+
+        <Text style={previewStyle}>{formatMaciAddressPreview(bound.maciAddress)}</Text>
+
+        <Text style={previewStyle}>{formatUserPublicKeyPreview(bound.publicKey)}</Text>
+
+        <Pressable
+          accessibilityLabel="Copy public key"
+          accessibilityRole="button"
+          style={buttonStyle}
+          onPress={onCopyPublicKey}
+        >
+          <Text>Copy public key</Text>
+        </Pressable>
+
+        <ClearKeyButton onPress={onClearBoundKey} />
+
+        {error === null ? null : <Text>{error}</Text>}
+      </View>
+    );
+  }
+
+  if (hasStoredBinding) {
+    return (
+      <View style={containerStyle}>
+        <Text style={infoStyle}>A user private key is already bound to a MACI.</Text>
+
+        <ClearKeyButton onPress={onClearBoundKey} />
+
+        {error === null ? null : <Text>{error}</Text>}
       </View>
     );
   }
@@ -73,11 +135,23 @@ export const KeysPage = (): ReactElement => {
 
   return (
     <View style={containerStyle}>
+      {maciAddress === null ? (
+        <Text style={infoStyle}>No MACI is configured for this build.</Text>
+      ) : (
+        <Text style={previewStyle}>{formatMaciAddressPreview(maciAddress)}</Text>
+      )}
+
       <Text style={infoStyle}>
         Your public key is ready. It is not bound to a MACI yet - you will use it when you sign up.
       </Text>
 
-      <Text style={publicKeyStyle}>{formatUserPublicKeyPreview(record.publicKey)}</Text>
+      <Text style={previewStyle}>{formatUserPublicKeyPreview(record.publicKey)}</Text>
+
+      {maciAddress === null ? null : (
+        <Pressable accessibilityLabel="Use this MACI" accessibilityRole="button" style={buttonStyle} onPress={onBind}>
+          <Text>Use this MACI</Text>
+        </Pressable>
+      )}
 
       <Pressable
         accessibilityLabel="Copy public key"
@@ -88,16 +162,7 @@ export const KeysPage = (): ReactElement => {
         <Text>Copy public key</Text>
       </Pressable>
 
-      {showKeysDebugControls() ? (
-        <Pressable
-          accessibilityLabel="Clear unbound key"
-          accessibilityRole="button"
-          style={debugButtonStyle}
-          onPress={onClearUnboundKey}
-        >
-          <Text>Clear unbound key</Text>
-        </Pressable>
-      ) : null}
+      <ClearKeyButton onPress={onClearUnboundKey} />
 
       {error === null ? null : <Text>{error}</Text>}
     </View>

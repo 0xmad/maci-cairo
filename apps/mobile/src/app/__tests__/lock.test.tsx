@@ -20,6 +20,14 @@ jest.mock("../../keys/defaultUnboundUserKeys", () => ({
   },
 }));
 
+jest.mock("../../keys/defaultMaciBinding", () => ({
+  defaultMaciBinding: {
+    load: jest.fn(() => Promise.resolve(null)),
+    hasStoredBinding: jest.fn(() => Promise.resolve(false)),
+    bind: jest.fn(),
+  },
+}));
+
 describe("lock route", () => {
   it("shows none of the client when the device cannot authenticate", async () => {
     setLocalAuthenticationEnrolledLevel(0);

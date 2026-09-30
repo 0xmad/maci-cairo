@@ -2,7 +2,7 @@ import { Link, usePathname } from "expo-router";
 import { type ReactElement } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import { useHasUnboundKey } from "../../keys";
+import { useHasUserKey } from "../../keys";
 
 const containerStyle = {
   flex: 1,
@@ -23,7 +23,7 @@ const buttonStyle = {
 
 export const HomePage = (): ReactElement => {
   const pathname = usePathname();
-  const { ready, hasKey } = useHasUnboundKey(pathname);
+  const { ready, hasKey } = useHasUserKey(pathname);
 
   return (
     <View style={containerStyle}>

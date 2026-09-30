@@ -1,28 +1,13 @@
+import { createMemorySecureStore } from "../../test/memorySecureStore";
 import { fixedPublicKey } from "../testFixtures";
 import {
   createUnboundUserKeyService,
+  USER_PRIVATE_KEY_STORAGE_KEY,
+  USER_PUBLIC_KEY_STORAGE_KEY,
   type SecureStorePort,
   type UserKeyCrypto,
   type UserPublicKey,
 } from "../unboundUserKey";
-
-const createMemoryStore = (): SecureStorePort => {
-  const values = new Map<string, string>();
-
-  return {
-    getItem: (key: string): Promise<string | null> => Promise.resolve(values.get(key) ?? null),
-    setItem: (key: string, value: string): Promise<void> => {
-      values.set(key, value);
-
-      return Promise.resolve();
-    },
-    deleteItem: (key: string): Promise<void> => {
-      values.delete(key);
-
-      return Promise.resolve();
-    },
-  };
-};
 
 const createFixedCrypto = (privateKey = "42"): UserKeyCrypto => ({
   generatePrivateKey: (): string => privateKey,
@@ -36,17 +21,44 @@ const createFixedCrypto = (privateKey = "42"): UserKeyCrypto => ({
 });
 
 describe("unbound user key service", () => {
-  it("creates and stores a user private key when none exists", async () => {
+  it("stores the private key and returns only the public key", async () => {
+    const reads: string[] = [];
+    const writes: [string, string][] = [];
+    const values = new Map<string, string>();
+    const store: SecureStorePort = {
+      getItem: (key: string): Promise<string | null> => {
+        reads.push(key);
+
+        return Promise.resolve(values.get(key) ?? null);
+      },
+      setItem: (key: string, value: string): Promise<void> => {
+        writes.push([key, value]);
+        values.set(key, value);
+
+        return Promise.resolve();
+      },
+      deleteItem: (key: string): Promise<void> => {
+        values.delete(key);
+
+        return Promise.resolve();
+      },
+    };
     const service = createUnboundUserKeyService({
-      store: createMemoryStore(),
+      store,
       userKeyCrypto: createFixedCrypto("99"),
     });
 
     const record = await service.create();
 
-    expect(record.privateKey).toBe("99");
-    expect(record.publicKey).toEqual(fixedPublicKey);
+    expect(record).toEqual({ publicKey: fixedPublicKey });
+    expect(writes).toEqual([
+      [USER_PRIVATE_KEY_STORAGE_KEY, "99"],
+      [USER_PUBLIC_KEY_STORAGE_KEY, JSON.stringify(fixedPublicKey)],
+    ]);
+    reads.length = 0;
+
     expect(await service.load()).toEqual(record);
+    expect(reads).not.toContain(USER_PRIVATE_KEY_STORAGE_KEY);
   });
 
   it("returns the existing unbound key without generating again", async () => {
@@ -60,7 +72,7 @@ describe("unbound user key service", () => {
       publicKeyFromPrivate: (): UserPublicKey => fixedPublicKey,
     };
     const service = createUnboundUserKeyService({
-      store: createMemoryStore(),
+      store: createMemorySecureStore(),
       userKeyCrypto,
     });
 
@@ -73,7 +85,7 @@ describe("unbound user key service", () => {
 
   it("loads null when no unbound key is stored", async () => {
     const service = createUnboundUserKeyService({
-      store: createMemoryStore(),
+      store: createMemorySecureStore(),
       userKeyCrypto: createFixedCrypto(),
     });
 
@@ -82,7 +94,7 @@ describe("unbound user key service", () => {
 
   it("clears a stored unbound key", async () => {
     const service = createUnboundUserKeyService({
-      store: createMemoryStore(),
+      store: createMemorySecureStore(),
       userKeyCrypto: createFixedCrypto("99"),
     });
 
@@ -90,5 +102,61 @@ describe("unbound user key service", () => {
     await service.clear();
 
     expect(await service.load()).toBeNull();
+  });
+
+  it("rejects a stored public key that is not JSON", async () => {
+    const store = createMemorySecureStore();
+    const service = createUnboundUserKeyService({
+      store,
+      userKeyCrypto: createFixedCrypto(),
+    });
+    await store.setItem(USER_PUBLIC_KEY_STORAGE_KEY, "{");
+
+    await expect(service.load()).rejects.toThrow("Stored user public key is invalid.");
+  });
+
+  it("rejects a stored public key that is missing a coordinate", async () => {
+    const store = createMemorySecureStore();
+    const service = createUnboundUserKeyService({
+      store,
+      userKeyCrypto: createFixedCrypto(),
+    });
+    await store.setItem(USER_PUBLIC_KEY_STORAGE_KEY, JSON.stringify({ x: "1" }));
+
+    await expect(service.load()).rejects.toThrow("Stored user public key is invalid.");
+  });
+
+  it("backfills a public key from a legacy private key without returning it", async () => {
+    const reads: string[] = [];
+    const values = new Map<string, string>();
+    const store: SecureStorePort = {
+      getItem: (key: string): Promise<string | null> => {
+        reads.push(key);
+
+        return Promise.resolve(values.get(key) ?? null);
+      },
+      setItem: (key: string, value: string): Promise<void> => {
+        values.set(key, value);
+
+        return Promise.resolve();
+      },
+      deleteItem: (key: string): Promise<void> => {
+        values.delete(key);
+
+        return Promise.resolve();
+      },
+    };
+    values.set(USER_PRIVATE_KEY_STORAGE_KEY, "99");
+    const service = createUnboundUserKeyService({
+      store,
+      userKeyCrypto: createFixedCrypto("99"),
+    });
+
+    await expect(service.load()).resolves.toEqual({ publicKey: fixedPublicKey });
+    expect(values.get(USER_PUBLIC_KEY_STORAGE_KEY)).toBe(JSON.stringify(fixedPublicKey));
+
+    reads.length = 0;
+    await expect(service.load()).resolves.toEqual({ publicKey: fixedPublicKey });
+    expect(reads).toEqual([USER_PUBLIC_KEY_STORAGE_KEY]);
   });
 });

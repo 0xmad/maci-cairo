@@ -11,7 +11,6 @@ export const BASE8_TIMES_7: UserPublicKey = {
 export const fixedPublicKey = BASE8_TIMES_7;
 
 export const fixedRecord: UnboundUserKeyRecord = {
-  privateKey: "99",
   publicKey: fixedPublicKey,
 };
 

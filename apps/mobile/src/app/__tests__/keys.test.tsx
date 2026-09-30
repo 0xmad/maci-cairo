@@ -15,6 +15,14 @@ jest.mock("../../keys/defaultUnboundUserKeys", () => ({
   },
 }));
 
+jest.mock("../../keys/defaultMaciBinding", () => ({
+  defaultMaciBinding: {
+    load: jest.fn(() => Promise.resolve(null)),
+    hasStoredBinding: jest.fn(() => Promise.resolve(false)),
+    bind: jest.fn(),
+  },
+}));
+
 const load = jest.mocked(defaultUnboundUserKeys.load);
 
 describe("keys route", () => {

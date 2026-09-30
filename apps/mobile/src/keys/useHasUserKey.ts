@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
+import { defaultMaciBinding } from "./defaultMaciBinding";
 import { defaultUnboundUserKeys } from "./defaultUnboundUserKeys";
 
-export interface UseHasUnboundKeyResult {
+export interface UseHasUserKeyResult {
   ready: boolean;
   hasKey: boolean;
 }
@@ -11,18 +12,17 @@ export interface UseHasUnboundKeyResult {
  * @param recheckToken - Change this value to re-run the Secure Store check
  *   (for example the current pathname after navigation).
  */
-export const useHasUnboundKey = (recheckToken = ""): UseHasUnboundKeyResult => {
+export const useHasUserKey = (recheckToken = ""): UseHasUserKeyResult => {
   const [ready, setReady] = useState(false);
   const [hasKey, setHasKey] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    defaultUnboundUserKeys
-      .load()
-      .then((record) => {
+    Promise.all([defaultUnboundUserKeys.load(), defaultMaciBinding.hasStoredBinding()])
+      .then(([record, storedBinding]) => {
         if (!cancelled) {
-          setHasKey(record !== null);
+          setHasKey(record !== null || storedBinding);
           setReady(true);
         }
       })
