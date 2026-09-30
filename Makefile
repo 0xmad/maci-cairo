@@ -83,13 +83,13 @@ types-web:
 	cd apps/web && pnpm run types
 
 types-mobile:
-	pnpm --filter maci-mobile run types
+	pnpm --filter maci-voter run types
 
 test-mobile:
-	pnpm --filter maci-mobile run test
+	pnpm --filter maci-voter run test
 
 test-mobile-coverage:
-	pnpm --filter maci-mobile run test:coverage
+	pnpm --filter maci-voter run test:coverage
 
 test-fuzz: test-fuzz-common test-fuzz-contracts
 

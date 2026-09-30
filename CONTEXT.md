@@ -49,7 +49,9 @@ The BabyJubJub public key bound to a Signup.
 _Avoid_: Public key (bare), coordinator key, chain account key
 
 **User private key**:
-The BabyJubJub scalar that derives the user public key and witnesses a Ballot. It is not the Subject's chain signer.
+The BabyJubJub scalar that derives the user public key and witnesses a Ballot.
+The voter client keeps it on the device where it was created. It is not the
+Subject's chain signer.
 _Avoid_: Wallet key, account key, AA signer, coordinator key
 
 **Evidence**:
@@ -223,6 +225,12 @@ _Avoid_: Candidate count (as this limit)
 **Voter client**:
 The application that holds one user private key per MACI, one Subject per install, and submits Signup and Ballots. It does not stand up a MACI or create Polls. It does not reuse a user private key across MACIs. It finds MACIs through a MACI registry, not through ops.
 _Avoid_: ops, Operator console, wallet (as the name of this app)
+
+**App lock**:
+The voter client while it is refusing to show any of its screens, until the
+person holding the device authenticates for this foreground visit. It closes
+again when the app leaves the foreground.
+_Avoid_: Password screen, Face ID (as the name of this concept), key password, biometric binding of the user private key
 
 **MACI registry**:
 The on-chain list of MACI instances for one network. The voter client hardcodes that registry's address. Stand-up writes entries. It is a trust root, not a discovery server.

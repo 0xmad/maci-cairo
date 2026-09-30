@@ -4,6 +4,8 @@ import { View } from "react-native";
 import Toast from "react-native-toast-message";
 
 import { AppHeader } from "../components/AppHeader";
+import { LockGate } from "../lock/LockGate";
+import { useLock } from "../lock/useLock";
 
 const rootStyle = {
   flex: 1,
@@ -23,18 +25,24 @@ const toastHostStyle = {
   elevation: 100,
 } as const;
 
-export const RootLayout = (): ReactElement => (
-  <View style={rootStyle}>
-    <AppHeader />
+export const RootLayout = (): ReactElement => {
+  const { view, retry } = useLock();
 
-    <View style={stackStyle}>
-      <Stack screenOptions={{ headerShown: false }} />
-    </View>
+  return (
+    <LockGate view={view} onRetry={retry}>
+      <View style={rootStyle}>
+        <AppHeader />
 
-    <View pointerEvents="box-none" style={toastHostStyle}>
-      <Toast bottomOffset={40} position="bottom" />
-    </View>
-  </View>
-);
+        <View style={stackStyle}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </View>
+
+        <View pointerEvents="box-none" style={toastHostStyle}>
+          <Toast bottomOffset={40} position="bottom" />
+        </View>
+      </View>
+    </LockGate>
+  );
+};
 
 export default RootLayout;

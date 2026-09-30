@@ -1,4 +1,4 @@
-# MACI voter client (`maci-mobile`)
+# MACI voter client (`maci-voter`)
 
 Expo **voter client** scaffold. This package is not the Operator console and
 does not call ops (ADR-0016). Keys can create an unbound **user private key**
@@ -10,7 +10,7 @@ From the repository root:
 
 ```bash
 pnpm install
-pnpm --filter maci-mobile start
+pnpm --filter maci-voter start
 ```
 
 Typecheck and unit tests (no Expo cloud credentials):
