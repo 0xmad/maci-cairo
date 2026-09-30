@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 
 import { defaultUnboundUserKeys } from "../defaultUnboundUserKeys";
 import { BASE8_TIMES_7, bigintToBytes32 } from "../testFixtures";
-import { UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY } from "../unboundUserKey";
+import { USER_PRIVATE_KEY_STORAGE_KEY, USER_PUBLIC_KEY_STORAGE_KEY } from "../unboundUserKey";
 
 jest.mock("expo-secure-store", () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 1,
@@ -33,7 +33,10 @@ describe("defaultUnboundUserKeys", () => {
     getItemAsync.mockResolvedValue(null);
 
     await expect(defaultUnboundUserKeys.load()).resolves.toBeNull();
-    expect(getItemAsync).toHaveBeenCalledWith(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY, {
+    expect(getItemAsync).toHaveBeenCalledWith(USER_PUBLIC_KEY_STORAGE_KEY, {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+    expect(getItemAsync).toHaveBeenCalledWith(USER_PRIVATE_KEY_STORAGE_KEY, {
       keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     });
   });
@@ -45,27 +48,36 @@ describe("defaultUnboundUserKeys", () => {
 
     const record = await defaultUnboundUserKeys.create();
 
-    expect(record).toEqual({ privateKey: "7", publicKey: BASE8_TIMES_7 });
-    expect(setItemAsync).toHaveBeenCalledWith(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY, "7", {
+    expect(record).toEqual({ publicKey: BASE8_TIMES_7 });
+    expect(setItemAsync).toHaveBeenCalledWith(USER_PRIVATE_KEY_STORAGE_KEY, "7", {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+    expect(setItemAsync).toHaveBeenCalledWith(USER_PUBLIC_KEY_STORAGE_KEY, JSON.stringify(BASE8_TIMES_7), {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+    expect(getItemAsync).toHaveBeenCalledWith(USER_PRIVATE_KEY_STORAGE_KEY, {
       keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     });
   });
 
-  it("loads an existing unbound key from secure store", async () => {
-    getItemAsync.mockResolvedValue("7");
+  it("loads an existing public key from secure store", async () => {
+    getItemAsync.mockResolvedValue(JSON.stringify(BASE8_TIMES_7));
 
     await expect(defaultUnboundUserKeys.load()).resolves.toEqual({
-      privateKey: "7",
       publicKey: BASE8_TIMES_7,
     });
+    expect(getItemAsync).not.toHaveBeenCalledWith(USER_PRIVATE_KEY_STORAGE_KEY, expect.anything());
   });
 
-  it("clears the unbound key from secure store", async () => {
+  it("clears the private and public keys from secure store", async () => {
     deleteItemAsync.mockResolvedValue(undefined);
 
     await defaultUnboundUserKeys.clear();
 
-    expect(deleteItemAsync).toHaveBeenCalledWith(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY, {
+    expect(deleteItemAsync).toHaveBeenCalledWith(USER_PRIVATE_KEY_STORAGE_KEY, {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+    expect(deleteItemAsync).toHaveBeenCalledWith(USER_PUBLIC_KEY_STORAGE_KEY, {
       keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     });
   });

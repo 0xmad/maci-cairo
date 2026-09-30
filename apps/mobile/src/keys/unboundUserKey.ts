@@ -1,10 +1,13 @@
+import { object, string } from "zod";
+
+import { parseStoredJson } from "./parseStoredJson";
+
 export interface UserPublicKey {
   x: string;
   y: string;
 }
 
 export interface UnboundUserKeyRecord {
-  privateKey: string;
   publicKey: UserPublicKey;
 }
 
@@ -19,7 +22,20 @@ export interface UserKeyCrypto {
   publicKeyFromPrivate: (privateKey: string) => UserPublicKey;
 }
 
-export const UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY = "maci.unbound.userPrivateKey";
+/** Written at creation and deleted on clear. Callers must not read this entry except to backfill a missing public key. */
+export const USER_PRIVATE_KEY_STORAGE_KEY = "maci.unbound.userPrivateKey";
+
+export const USER_PUBLIC_KEY_STORAGE_KEY = "maci.userPublicKey";
+
+export const storedUserPublicKeySchema = object({
+  x: string().min(1),
+  y: string().min(1),
+});
+
+const STORED_PUBLIC_KEY_INVALID = "Stored user public key is invalid.";
+
+export const readStoredUserPublicKey = (raw: string): UserPublicKey =>
+  parseStoredJson(raw, storedUserPublicKeySchema, STORED_PUBLIC_KEY_INVALID);
 
 export interface UnboundUserKeyService {
   load: () => Promise<UnboundUserKeyRecord | null>;
@@ -37,16 +53,22 @@ export const createUnboundUserKeyService = ({
   userKeyCrypto,
 }: UnboundUserKeyServiceDeps): UnboundUserKeyService => {
   const load = async (): Promise<UnboundUserKeyRecord | null> => {
-    const privateKey = await store.getItem(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY);
+    const raw = await store.getItem(USER_PUBLIC_KEY_STORAGE_KEY);
+
+    if (raw !== null) {
+      return { publicKey: readStoredUserPublicKey(raw) };
+    }
+
+    const privateKey = await store.getItem(USER_PRIVATE_KEY_STORAGE_KEY);
 
     if (privateKey === null) {
       return null;
     }
 
-    return {
-      privateKey,
-      publicKey: userKeyCrypto.publicKeyFromPrivate(privateKey),
-    };
+    const publicKey = userKeyCrypto.publicKeyFromPrivate(privateKey);
+    await store.setItem(USER_PUBLIC_KEY_STORAGE_KEY, JSON.stringify(publicKey));
+
+    return { publicKey };
   };
 
   const create = async (): Promise<UnboundUserKeyRecord> => {
@@ -57,16 +79,16 @@ export const createUnboundUserKeyService = ({
     }
 
     const privateKey = userKeyCrypto.generatePrivateKey();
-    await store.setItem(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY, privateKey);
+    const publicKey = userKeyCrypto.publicKeyFromPrivate(privateKey);
+    await store.setItem(USER_PRIVATE_KEY_STORAGE_KEY, privateKey);
+    await store.setItem(USER_PUBLIC_KEY_STORAGE_KEY, JSON.stringify(publicKey));
 
-    return {
-      privateKey,
-      publicKey: userKeyCrypto.publicKeyFromPrivate(privateKey),
-    };
+    return { publicKey };
   };
 
   const clear = async (): Promise<void> => {
-    await store.deleteItem(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY);
+    await store.deleteItem(USER_PRIVATE_KEY_STORAGE_KEY);
+    await store.deleteItem(USER_PUBLIC_KEY_STORAGE_KEY);
   };
 
   return { load, create, clear };

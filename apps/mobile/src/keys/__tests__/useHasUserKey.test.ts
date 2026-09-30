@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 
+import { defaultMaciBinding } from "../defaultMaciBinding";
 import { defaultUnboundUserKeys } from "../defaultUnboundUserKeys";
-import { useHasUnboundKey } from "../useHasUnboundKey";
+import { useHasUserKey } from "../useHasUserKey";
 
 jest.mock("../defaultUnboundUserKeys", () => ({
   defaultUnboundUserKeys: {
@@ -11,17 +12,28 @@ jest.mock("../defaultUnboundUserKeys", () => ({
   },
 }));
 
-const load = jest.mocked(defaultUnboundUserKeys.load);
+jest.mock("../defaultMaciBinding", () => ({
+  defaultMaciBinding: {
+    load: jest.fn(),
+    hasStoredBinding: jest.fn(),
+    bind: jest.fn(),
+  },
+}));
 
-describe("useHasUnboundKey", () => {
+const load = jest.mocked(defaultUnboundUserKeys.load);
+const hasStoredBinding = jest.mocked(defaultMaciBinding.hasStoredBinding);
+
+describe("useHasUserKey", () => {
   beforeEach(() => {
     load.mockReset();
+    hasStoredBinding.mockReset();
+    hasStoredBinding.mockResolvedValue(false);
   });
 
-  it("reports no key when load returns null", async () => {
+  it("reports no key when nothing is stored", async () => {
     load.mockResolvedValue(null);
 
-    const { result } = await renderHook(() => useHasUnboundKey());
+    const { result } = await renderHook(() => useHasUserKey());
 
     await waitFor(() => {
       expect(result.current.ready).toBe(true);
@@ -30,13 +42,25 @@ describe("useHasUnboundKey", () => {
     expect(result.current.hasKey).toBe(false);
   });
 
-  it("reports a key when load returns a record", async () => {
+  it("reports a key when an unbound key is stored", async () => {
     load.mockResolvedValue({
-      privateKey: "99",
       publicKey: { x: "1", y: "2" },
     });
 
-    const { result } = await renderHook(() => useHasUnboundKey());
+    const { result } = await renderHook(() => useHasUserKey());
+
+    await waitFor(() => {
+      expect(result.current.ready).toBe(true);
+    });
+
+    expect(result.current.hasKey).toBe(true);
+  });
+
+  it("reports a key when a MACI binding is stored", async () => {
+    load.mockResolvedValue(null);
+    hasStoredBinding.mockResolvedValue(true);
+
+    const { result } = await renderHook(() => useHasUserKey());
 
     await waitFor(() => {
       expect(result.current.ready).toBe(true);
@@ -48,7 +72,7 @@ describe("useHasUnboundKey", () => {
   it("reports no key when load fails", async () => {
     load.mockRejectedValue(new Error("store unavailable"));
 
-    const { result } = await renderHook(() => useHasUnboundKey());
+    const { result } = await renderHook(() => useHasUserKey());
 
     await waitFor(() => {
       expect(result.current.ready).toBe(true);
@@ -64,7 +88,7 @@ describe("useHasUnboundKey", () => {
     });
     load.mockReturnValue(loadPromise);
 
-    const { result, unmount } = await renderHook(() => useHasUnboundKey());
+    const { result, unmount } = await renderHook(() => useHasUserKey());
 
     expect(result.current.ready).toBe(false);
 
@@ -82,7 +106,7 @@ describe("useHasUnboundKey", () => {
     });
     load.mockReturnValue(loadPromise);
 
-    const { result, unmount } = await renderHook(() => useHasUnboundKey());
+    const { result, unmount } = await renderHook(() => useHasUserKey());
 
     expect(result.current.ready).toBe(false);
 
