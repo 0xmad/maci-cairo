@@ -1,5 +1,5 @@
 {
-  "name": "maci-mobile",
+  "name": "maci-voter",
   "main": "expo-router/entry",
   "version": "0.0.1",
   "private": true,
@@ -7,12 +7,13 @@
   "license": "MIT",
   "dependencies": {
     "@zk-kit/baby-jubjub": "^1.0.3",
-    "expo": "~57.0.23",
-    "expo-clipboard": "~8.0.8",
-    "expo-constants": "~57.0.18",
+    "expo": "57.0.25",
+    "expo-clipboard": "~57.0.2",
+    "expo-constants": "57.0.19",
     "expo-crypto": "~57.0.3",
     "expo-linking": "~57.0.10",
-    "expo-router": "~57.0.21",
+    "expo-local-authentication": "~57.0.3",
+    "expo-router": "57.0.23",
     "expo-secure-store": "~57.0.4",
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
@@ -29,17 +30,17 @@
   },
   "devDependencies": {
     "@testing-library/react-native": "^14.0.1",
-    "@types/jest": "^30.0.0",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
-    "jest": "^30.5.1",
+    "jest": "^29.7.0",
     "jest-expo": "^57.0.5",
     "test-renderer": "^1.2.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "types": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:coverage": "jest --runInBand --coverage"

@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { expoSecureStorePort } from "../expoSecureStorePort";
 
 jest.mock("expo-secure-store", () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 1,
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
@@ -23,7 +24,9 @@ describe("expoSecureStorePort", () => {
     getItemAsync.mockResolvedValue("99");
 
     await expect(expoSecureStorePort.getItem("maci.unbound.userPrivateKey")).resolves.toBe("99");
-    expect(getItemAsync).toHaveBeenCalledWith("maci.unbound.userPrivateKey");
+    expect(getItemAsync).toHaveBeenCalledWith("maci.unbound.userPrivateKey", {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
   });
 
   it("returns null when expo-secure-store has no entry", async () => {
@@ -37,7 +40,9 @@ describe("expoSecureStorePort", () => {
 
     await expoSecureStorePort.setItem("maci.unbound.userPrivateKey", "99");
 
-    expect(setItemAsync).toHaveBeenCalledWith("maci.unbound.userPrivateKey", "99");
+    expect(setItemAsync).toHaveBeenCalledWith("maci.unbound.userPrivateKey", "99", {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
   });
 
   it("deletes through expo-secure-store deleteItemAsync", async () => {
@@ -45,6 +50,8 @@ describe("expoSecureStorePort", () => {
 
     await expoSecureStorePort.deleteItem("maci.unbound.userPrivateKey");
 
-    expect(deleteItemAsync).toHaveBeenCalledWith("maci.unbound.userPrivateKey");
+    expect(deleteItemAsync).toHaveBeenCalledWith("maci.unbound.userPrivateKey", {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
   });
 });

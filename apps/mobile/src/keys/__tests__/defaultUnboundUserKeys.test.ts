@@ -6,6 +6,7 @@ import { BASE8_TIMES_7, bigintToBytes32 } from "../testFixtures";
 import { UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY } from "../unboundUserKey";
 
 jest.mock("expo-secure-store", () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 1,
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
@@ -32,7 +33,9 @@ describe("defaultUnboundUserKeys", () => {
     getItemAsync.mockResolvedValue(null);
 
     await expect(defaultUnboundUserKeys.load()).resolves.toBeNull();
-    expect(getItemAsync).toHaveBeenCalledWith(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY);
+    expect(getItemAsync).toHaveBeenCalledWith(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY, {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
   });
 
   it("creates a key with baby-jubjub crypto and persists it in secure store", async () => {
@@ -43,7 +46,9 @@ describe("defaultUnboundUserKeys", () => {
     const record = await defaultUnboundUserKeys.create();
 
     expect(record).toEqual({ privateKey: "7", publicKey: BASE8_TIMES_7 });
-    expect(setItemAsync).toHaveBeenCalledWith(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY, "7");
+    expect(setItemAsync).toHaveBeenCalledWith(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY, "7", {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
   });
 
   it("loads an existing unbound key from secure store", async () => {
@@ -60,6 +65,8 @@ describe("defaultUnboundUserKeys", () => {
 
     await defaultUnboundUserKeys.clear();
 
-    expect(deleteItemAsync).toHaveBeenCalledWith(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY);
+    expect(deleteItemAsync).toHaveBeenCalledWith(UNBOUND_USER_PRIVATE_KEY_STORAGE_KEY, {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
   });
 });

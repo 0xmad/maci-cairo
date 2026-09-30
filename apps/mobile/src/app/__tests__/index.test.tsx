@@ -8,6 +8,8 @@ import { formatUserPublicKeyPreview } from "../../keys/unboundUserKey";
 import Layout from "../_layout";
 import KeysRoute from "../keys";
 
+jest.mock("expo-local-authentication");
+
 jest.mock("../../keys/defaultUnboundUserKeys", () => ({
   defaultUnboundUserKeys: {
     load: jest.fn(),
