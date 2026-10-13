@@ -41,7 +41,7 @@ leaf.
 _Avoid_: User, account, voter (as this concept)
 
 **Subject**:
-The Starknet account a Policy judges.
+The Starknet account a Policy judges. Free for all does not judge one.
 _Avoid_: User, caller (in the glossary)
 
 **User public key**:
@@ -66,13 +66,18 @@ policies are new Checker/Enforcer implementations, not a third kind of
 contract.
 _Avoid_: Access control, gate, allowlist (as the type name)
 
+**Free for all**:
+The Policy under which Signup is not tied to a Subject. One Relayer account
+may register many user public keys.
+_Avoid_: public poll, open gate
+
 **Checker**:
 A stateless yes/no whether a Subject plus evidence satisfy the Policy.
 _Avoid_: Validator, policy (as a synonym for Checker alone)
 
 **Enforcer**:
-The stateful half of a Policy: whether this Subject has already been
-enforced, and the call to the Checker.
+The stateful half of a Policy. It calls the Checker. It may record that a
+Subject has already been enforced. Free for all does not.
 _Avoid_: Policy (as a synonym for Enforcer alone)
 
 **Vote-balance assigner**:
@@ -223,8 +228,12 @@ _Avoid_: Candidate count (as this limit)
 ### Clients
 
 **Voter client**:
-The application that holds one user private key per MACI, one Subject per install, and submits Signup and Ballots. It does not stand up a MACI or create Polls. It does not reuse a user private key across MACIs. It finds MACIs through a MACI registry, not through ops.
-_Avoid_: ops, Operator console, wallet (as the name of this app)
+The application that holds one user private key per MACI and no Starknet account. It sends its Signup and its Ballots to a Relayer over HTTP. A Signup or a Ballot is included only when it is on chain, and the voter client reads that from the chain. It does not stand up a MACI or create Polls. It does not reuse a user private key across MACIs. It finds MACIs through a MACI registry, not through ops.
+_Avoid_: ops, Operator console, wallet, Subject (as something this app holds)
+
+**Relayer**:
+The service that accepts a Signup or a Ballot from a voter client over HTTP and submits it from one Starknet account. For Free for all that account is not a Subject. The Relayer is not the record of inclusion.
+_Avoid_: Coordinator, Operator, paymaster, sponsor
 
 **App lock**:
 The voter client while it is refusing to show any of its screens, until the
