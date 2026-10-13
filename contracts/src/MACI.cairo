@@ -79,9 +79,10 @@ pub trait IMACI<TContractState> {
 
     /// Registers a Signup in the MACI state tree.
     ///
-    /// The public key must represent a valid BabyJubJub curve point and the
-    /// state tree must have available capacity. Vote balance is obtained from
-    /// the vote-balance assigner and bound into the state-tree leaf at Signup.
+    /// The public key must represent a valid BabyJubJub curve point, must not
+    /// already have a state-tree leaf, and the state tree must have available
+    /// capacity. Vote balance is obtained from the vote-balance assigner and
+    /// bound into the state-tree leaf at Signup.
     ///
     /// The supplied signup data is accepted as part of the signup interface.
     fn sign_up(ref self: TContractState, public_key: PublicKey, sign_up_data: ByteArray);
@@ -150,6 +151,9 @@ pub mod Errors {
     /// The supplied public key is not a valid BabyJubJub curve point.
     pub const INVALID_PUBLIC_KEY: felt252 = 'Invalid public key';
 
+    /// The user public key already has a state-tree leaf.
+    pub const PUBLIC_KEY_ALREADY_SIGNED_UP: felt252 = 'Public key already signed up';
+
     /// The vote-balance assigner returned zero.
     pub const ZERO_VOTE_BALANCE: felt252 = 'Zero vote balance';
 
@@ -214,6 +218,8 @@ pub mod MACI {
         polls: Map<u256, ContractAddress>,
         /// Dispatcher for the external LeanIMT state tree.
         state_tree: ILeanIMTDispatcher,
+        /// User public keys that already have a state-tree leaf.
+        signed_up_public_keys: Map<(u256, u256), bool>,
         /// Historical state tree roots recorded after each signup.
         ///
         /// The initial padding root is stored at index `0`.
@@ -344,7 +350,8 @@ pub mod MACI {
         ///
         /// The signup fails if the state tree has reached its maximum
         /// capacity, if the supplied public key is not on the BabyJubJub
-        /// curve, or if the configured enforcer rejects the caller.
+        /// curve, if that public key already has a state-tree leaf, or if
+        /// the configured enforcer rejects the caller.
         ///
         /// The configured enforcer is called with the caller's address and
         /// the supplied signup data, then the vote-balance assigner returns the
@@ -363,6 +370,10 @@ pub mod MACI {
 
             assert(size < max_signups, Errors::TOO_MANY_SIGNUPS);
             assert(BabyJubJub::is_on_curve(public_key.x, public_key.y), Errors::INVALID_PUBLIC_KEY);
+            assert(
+                !self.signed_up_public_keys.read((public_key.x, public_key.y)),
+                Errors::PUBLIC_KEY_ALREADY_SIGNED_UP,
+            );
 
             self.enforcer.read().enforce(starknet::get_caller_address(), sign_up_data.clone());
 
@@ -374,6 +385,7 @@ pub mod MACI {
             assert(vote_balance != 0, Errors::ZERO_VOTE_BALANCE);
             assert(vote_balance < 2_u256.pow(251), Errors::VOTE_BALANCE_TOO_LARGE);
 
+            self.signed_up_public_keys.write((public_key.x, public_key.y), true);
             let root = state_tree.insert(hash_state_leaf(public_key, vote_balance));
             self.state_roots_on_signup.push(root);
 

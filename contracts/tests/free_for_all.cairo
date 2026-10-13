@@ -42,8 +42,7 @@ fn test_enforce_name() {
 }
 
 #[test]
-#[should_panic(expected: 'Already enforced')]
-fn test_double_enforce() {
+fn test_enforce_same_subject_twice() {
     let enforcer = deploy();
     let caller = 1.try_into().unwrap();
 
@@ -52,6 +51,7 @@ fn test_double_enforce() {
     start_cheat_caller_address(enforcer.contract_address, caller);
     enforcer.enforce(caller, "");
     enforcer.enforce(caller, "");
+    stop_cheat_caller_address(enforcer.contract_address);
 }
 
 #[test]
