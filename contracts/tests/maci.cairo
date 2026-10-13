@@ -45,6 +45,75 @@ mod ZeroVoteBalanceAssigner {
     }
 }
 
+/// Subject-judging Policy: only the two constructor subjects may sign up, once each.
+#[starknet::contract]
+mod SubjectJudgingEnforcer {
+    use maci_contracts::policies::interfaces::IEnforcer::IEnforcer;
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
+
+    #[storage]
+    struct Storage {
+        owner: starknet::ContractAddress,
+        subject_a: starknet::ContractAddress,
+        subject_b: starknet::ContractAddress,
+        enforced: Map<starknet::ContractAddress, bool>,
+    }
+
+    #[constructor]
+    fn constructor(
+        ref self: ContractState,
+        subject_a: starknet::ContractAddress,
+        subject_b: starknet::ContractAddress,
+    ) {
+        self.subject_a.write(subject_a);
+        self.subject_b.write(subject_b);
+    }
+
+    #[abi(embed_v0)]
+    impl Impl of IEnforcer<ContractState> {
+        fn set_target(ref self: ContractState, target: starknet::ContractAddress) {
+            self.owner.write(target);
+        }
+
+        fn enforce(
+            ref self: ContractState, subject: starknet::ContractAddress, evidence: ByteArray,
+        ) {
+            assert(starknet::get_caller_address() == self.owner.read(), 'Caller is not the owner');
+            assert(
+                subject == self.subject_a.read() || subject == self.subject_b.read(),
+                'Unsuccessful check',
+            );
+            assert(!self.enforced.read(subject), 'Already enforced');
+            self.enforced.write(subject, true);
+        }
+
+        fn name(self: @ContractState) -> ByteArray {
+            "SubjectJudging"
+        }
+    }
+}
+
+#[starknet::contract]
+mod CallerVoteBalanceAssigner {
+    use maci_contracts::vote_balance::interfaces::IVoteBalanceAssigner::IVoteBalanceAssigner;
+
+    #[storage]
+    struct Storage {}
+
+    #[abi(embed_v0)]
+    impl Impl of IVoteBalanceAssigner<ContractState> {
+        fn get(
+            self: @ContractState, subject: starknet::ContractAddress, evidence: ByteArray,
+        ) -> u256 {
+            let subject_felt: felt252 = subject.into();
+            subject_felt.into()
+        }
+    }
+}
+
 #[starknet::contract]
 mod OversizedVoteBalanceAssigner {
     use core::num::traits::Pow;
@@ -88,8 +157,35 @@ pub fn default_create_poll_args() -> CreatePollArgs {
     CreatePollArgs { start_date: 0, end_date: 1_000, poll_public_key: (0, 1) }
 }
 
+fn deploy_free_for_all_enforcer() -> ContractAddress {
+    let checker_contract = declare("FreeForAllChecker").unwrap_syscall().contract_class();
+    let enforcer_contract = declare("FreeForAllEnforcer").unwrap_syscall().contract_class();
+    let (checker_address, _) = checker_contract.deploy(@array![]).unwrap_syscall();
+    let (enforcer_address, _) = enforcer_contract
+        .deploy(@array![checker_address.into(), test_address().into()])
+        .unwrap_syscall();
+
+    enforcer_address
+}
+
 fn deploy_maci(
     vote_balance_assigner: ContractAddress,
+    state_tree_depth: u8,
+    vote_options: u256,
+    batch_size: u32,
+) -> (IMACIDispatcher, ILeanIMTDispatcher) {
+    deploy_maci_with_enforcer(
+        vote_balance_assigner,
+        deploy_free_for_all_enforcer(),
+        state_tree_depth,
+        vote_options,
+        batch_size,
+    )
+}
+
+fn deploy_maci_with_enforcer(
+    vote_balance_assigner: ContractAddress,
+    enforcer_address: ContractAddress,
     state_tree_depth: u8,
     vote_options: u256,
     batch_size: u32,
@@ -97,12 +193,6 @@ fn deploy_maci(
     let maci_contract = declare("MACI").unwrap_syscall().contract_class();
     let imt_contract = declare("LeanIMT").unwrap_syscall().contract_class();
     let (state_tree_address, _) = imt_contract.deploy(@array![]).unwrap_syscall();
-    let checker_contract = declare("FreeForAllChecker").unwrap_syscall().contract_class();
-    let enforcer_contract = declare("FreeForAllEnforcer").unwrap_syscall().contract_class();
-    let (checker_address, _) = checker_contract.deploy(@array![]).unwrap_syscall();
-    let (enforcer_address, _) = enforcer_contract
-        .deploy(@array![checker_address.into(), test_address().into()])
-        .unwrap_syscall();
     let poll_contract = declare("Poll").unwrap_syscall().contract_class();
     let poll_factory_contract = declare("PollFactory").unwrap_syscall().contract_class();
 
@@ -136,6 +226,26 @@ fn deploy_maci(
 pub fn deploy() -> (IMACIDispatcher, ILeanIMTDispatcher) {
     let assigner = deploy_constant_vote_balance_assigner();
     deploy_maci(assigner, 5, 5, 4)
+}
+
+fn deploy_subject_judging_maci(
+    vote_balance_assigner: ContractAddress,
+) -> (IMACIDispatcher, ContractAddress, ContractAddress) {
+    let enforcer = declare("SubjectJudgingEnforcer").unwrap_syscall().contract_class();
+    let subject_a: ContractAddress = 1.try_into().unwrap();
+    let subject_b: ContractAddress = 2.try_into().unwrap();
+    let mut enforcer_calldata = array![];
+    subject_a.serialize(ref enforcer_calldata);
+    subject_b.serialize(ref enforcer_calldata);
+    let (enforcer_address, _) = enforcer.deploy(@enforcer_calldata).unwrap_syscall();
+    let (maci, _) = deploy_maci_with_enforcer(vote_balance_assigner, enforcer_address, 5, 5, 4);
+
+    (maci, subject_a, subject_b)
+}
+
+fn sign_up_as(maci: IMACIDispatcher, caller: ContractAddress, public_key: PublicKey) {
+    start_cheat_caller_address(maci.contract_address, caller);
+    maci.sign_up(public_key, "");
 }
 
 #[test]
@@ -194,14 +304,73 @@ fn test_signup_invalid_public_key() {
 }
 
 #[test]
-#[should_panic(expected: 'Already enforced')]
-fn test_double_signup_same_address() {
+fn test_signup_accepts_distinct_keys_from_the_same_caller() {
     let (maci, _) = deploy();
-    let public_key1 = generate_public_key(9000);
-    let public_key2 = generate_public_key(9001);
+    let caller: ContractAddress = 1.try_into().unwrap();
 
-    maci.sign_up(public_key1, "");
-    maci.sign_up(public_key2, "");
+    sign_up_as(maci, caller, generate_public_key(9000));
+    sign_up_as(maci, caller, generate_public_key(9001));
+    stop_cheat_caller_address(maci.contract_address);
+
+    assert_eq!(maci.total_signups(), 2);
+}
+
+#[test]
+#[should_panic(expected: 'Public key already signed up')]
+fn test_signup_rejects_repeated_user_public_key_from_the_same_caller() {
+    let (maci, _) = deploy();
+    let caller: ContractAddress = 1.try_into().unwrap();
+    let public_key = generate_public_key(9000);
+
+    sign_up_as(maci, caller, public_key);
+    sign_up_as(maci, caller, public_key);
+}
+
+#[test]
+#[should_panic(expected: 'Public key already signed up')]
+fn test_signup_rejects_repeated_user_public_key() {
+    let (maci, _) = deploy();
+    let public_key = generate_public_key(9000);
+
+    sign_up_as(maci, 1.try_into().unwrap(), public_key);
+    sign_up_as(maci, 2.try_into().unwrap(), public_key);
+}
+
+#[test]
+#[should_panic(expected: 'Public key already signed up')]
+fn test_signup_rejects_repeated_user_public_key_with_different_vote_balance() {
+    let assigner_contract = declare("CallerVoteBalanceAssigner").unwrap_syscall().contract_class();
+    let (assigner, _) = assigner_contract.deploy(@array![]).unwrap_syscall();
+    let (maci, _) = deploy_maci(assigner, 5, 5, 4);
+    let public_key = generate_public_key(9000);
+
+    sign_up_as(maci, 1.try_into().unwrap(), public_key);
+    sign_up_as(maci, 2.try_into().unwrap(), public_key);
+}
+
+#[test]
+#[should_panic(expected: 'Public key already signed up')]
+fn test_signup_rejects_repeated_user_public_key_for_subject_policy() {
+    let assigner_contract = declare("CallerVoteBalanceAssigner").unwrap_syscall().contract_class();
+    let (assigner_address, _) = assigner_contract.deploy(@array![]).unwrap_syscall();
+    let (maci, subject_a, subject_b) = deploy_subject_judging_maci(assigner_address);
+    let public_key = generate_public_key(9000);
+
+    sign_up_as(maci, subject_a, public_key);
+    sign_up_as(maci, subject_b, public_key);
+}
+
+#[test]
+fn test_signup_accepts_distinct_user_public_key_for_subject_policy() {
+    let (maci, subject_a, subject_b) = deploy_subject_judging_maci(
+        deploy_constant_vote_balance_assigner(),
+    );
+
+    sign_up_as(maci, subject_a, generate_public_key(9000));
+    sign_up_as(maci, subject_b, generate_public_key(9001));
+    stop_cheat_caller_address(maci.contract_address);
+
+    assert_eq!(maci.total_signups(), 2);
 }
 
 
