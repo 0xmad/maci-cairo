@@ -22,6 +22,9 @@ pub mod PollFactory;
 /// and apply policy decisions throughout the library.
 pub mod policies;
 
+/// BabyJubJub user public key judged by a Policy and bound into a Signup.
+pub mod public_key;
+
 /// Tree data structures and related operations.
 ///
 /// Provides implementations and utilities for cryptographic tree structures, including

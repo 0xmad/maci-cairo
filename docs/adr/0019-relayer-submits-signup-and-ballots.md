@@ -9,11 +9,11 @@ how the client finds MACIs (ADR-0016).
 
 Free for all does not judge a Subject. One Relayer account may register many
 user public keys, up to Max Signups. `sign_up` rejects a user public key that
-is already in the state tree, for every Policy. MACI still calls the Enforcer
-and the vote-balance assigner with the caller. The Free for all Enforcer does
-not record that caller. The constant vote-balance assigner ignores it, so each
-Signup receives the configured vote balance. Subject-judging policies stay
-possible for some other client. Signup Evidence is empty. The Ballot request
+is already in the state tree, for every Policy. MACI calls the Enforcer with
+the user public key (ADR-0021) and the vote-balance assigner with that same
+key. The Free for all Enforcer does not record that key. The constant
+vote-balance assigner ignores the key, so each Signup receives the configured
+vote balance. Subject-judging policies stay possible for some other client. Signup Evidence is empty. The Ballot request
 is the encrypted Ballot and its proof. The Relayer never receives the user
 private key or cleartext Votes.
 

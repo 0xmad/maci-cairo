@@ -1,3 +1,4 @@
+use maci_contracts::public_key::PublicKey;
 use maci_contracts::vote_balance::interfaces::IVoteBalanceAssigner::{
     IVoteBalanceAssignerDispatcher, IVoteBalanceAssignerDispatcherTrait,
 };
@@ -15,9 +16,9 @@ fn deploy(vote_balance: u256) -> IVoteBalanceAssignerDispatcher {
 #[test]
 fn test_get_returns_configured_vote_balance() {
     let assigner = deploy(3);
-    let subject = 1.try_into().unwrap();
+    let user_public_key = PublicKey { x: 1, y: 2 };
 
-    assert_eq!(IVoteBalanceAssignerDispatcherTrait::get(assigner, subject, ""), 3);
+    assert_eq!(IVoteBalanceAssignerDispatcherTrait::get(assigner, user_public_key, ""), 3);
 }
 
 #[test]

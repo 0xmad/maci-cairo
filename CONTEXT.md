@@ -41,8 +41,8 @@ leaf.
 _Avoid_: User, account, voter (as this concept)
 
 **Subject**:
-The Starknet account a Policy judges. Free for all does not judge one.
-_Avoid_: User, caller (in the glossary)
+The user public key a Policy judges. Free for all does not judge one.
+_Avoid_: Starknet account, caller, chain account
 
 **User public key**:
 The BabyJubJub public key bound to a Signup.
@@ -50,8 +50,7 @@ _Avoid_: Public key (bare), coordinator key, chain account key
 
 **User private key**:
 The BabyJubJub scalar that derives the user public key and witnesses a Ballot.
-The voter client keeps it on the device where it was created. It is not the
-Subject's chain signer.
+The voter client keeps it on the device where it was created.
 _Avoid_: Wallet key, account key, AA signer, coordinator key
 
 **Evidence**:
@@ -82,9 +81,10 @@ _Avoid_: Policy (as a synonym for Enforcer alone)
 
 **Vote-balance assigner**:
 The configured contract MACI calls at Signup to obtain the vote balance
-bound into the leaf. It is read-only. MACI uses one, set when MACI is
-constructed. New assignment rules are new implementations of this role
-(and a new MACI), not a change to Policy, Checker, or Enforcer.
+bound into the leaf. It reads the user public key being registered. It is
+read-only. MACI uses one, set when MACI is constructed. New assignment rules
+are new implementations of this role (and a new MACI), not a change to
+Policy, Checker, or Enforcer.
 _Avoid_: Voice credit proxy, Policy
 (as this role)
 
@@ -229,7 +229,7 @@ _Avoid_: Candidate count (as this limit)
 
 **Voter client**:
 The application that holds one user private key per MACI and no Starknet account. It sends its Signup and its Ballots to a Relayer over HTTP. A Signup or a Ballot is included only when it is on chain, and the voter client reads that from the chain. It does not stand up a MACI or create Polls. It does not reuse a user private key across MACIs. It finds MACIs through a MACI registry, not through ops.
-_Avoid_: ops, Operator console, wallet, Subject (as something this app holds)
+_Avoid_: ops, Operator console, wallet, Starknet account (as something this app holds)
 
 **Relayer**:
 The service that accepts a Signup or a Ballot from a voter client over HTTP and submits it from one Starknet account. For Free for all that account is not a Subject. The Relayer is not the record of inclusion.
