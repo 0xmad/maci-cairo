@@ -1,6 +1,7 @@
 use maci_contracts::policies::interfaces::IEnforcer::{
     IEnforcerDispatcher, IEnforcerDispatcherTrait,
 };
+use maci_contracts::public_key::PublicKey;
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
     stop_cheat_caller_address, test_address,
@@ -22,6 +23,10 @@ fn deploy() -> IEnforcerDispatcher {
     deploy_with_owner(test_address())
 }
 
+fn user_public_key() -> PublicKey {
+    PublicKey { x: 1, y: 2 }
+}
+
 #[test]
 fn test_enforce_free_for_all() {
     let enforcer = deploy();
@@ -30,7 +35,7 @@ fn test_enforce_free_for_all() {
     enforcer.set_target(caller);
 
     start_cheat_caller_address(enforcer.contract_address, caller);
-    enforcer.enforce(caller, "");
+    enforcer.enforce(user_public_key(), "");
     stop_cheat_caller_address(enforcer.contract_address);
 }
 
@@ -49,8 +54,9 @@ fn test_enforce_same_subject_twice() {
     enforcer.set_target(caller);
 
     start_cheat_caller_address(enforcer.contract_address, caller);
-    enforcer.enforce(caller, "");
-    enforcer.enforce(caller, "");
+    let subject = user_public_key();
+    enforcer.enforce(subject, "");
+    enforcer.enforce(subject, "");
     stop_cheat_caller_address(enforcer.contract_address);
 }
 
@@ -61,7 +67,7 @@ fn test_enforce_not_owner() {
     let caller = 1.try_into().unwrap();
 
     enforcer.set_target(caller);
-    enforcer.enforce(caller, "");
+    enforcer.enforce(user_public_key(), "");
 }
 
 #[test]
@@ -71,7 +77,7 @@ fn test_constructor_owner_can_set_target() {
 
     start_cheat_caller_address(enforcer.contract_address, owner);
     enforcer.set_target(owner);
-    enforcer.enforce(owner, "");
+    enforcer.enforce(user_public_key(), "");
     stop_cheat_caller_address(enforcer.contract_address);
 }
 

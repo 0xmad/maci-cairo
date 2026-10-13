@@ -5,6 +5,7 @@
 #[starknet::contract]
 pub mod FreeForAllChecker {
     use crate::policies::interfaces::IChecker::IChecker;
+    use crate::public_key::PublicKey;
 
     #[storage]
     struct Storage {}
@@ -18,14 +19,12 @@ pub mod FreeForAllChecker {
         /// evaluate the supplied evidence.
         ///
         /// Arguments:
-        /// - `subject`: Contract address of the subject being checked.
+        /// - `subject`: User public key being checked.
         /// - `evidence`: Evidence supplied for the policy check. It is ignored.
         ///
         /// Returns:
         /// - `true` for every subject.
-        fn check(
-            self: @ContractState, subject: starknet::ContractAddress, evidence: ByteArray,
-        ) -> bool {
+        fn check(self: @ContractState, subject: PublicKey, evidence: ByteArray) -> bool {
             true
         }
     }

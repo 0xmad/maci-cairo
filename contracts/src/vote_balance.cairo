@@ -1,4 +1,4 @@
-/// Assigns the same vote balance to every Subject.
+/// Assigns the same vote balance to every Signup.
 pub mod ConstantInitialVoteBalance;
 /// Vote-balance assignment: the vote balance bound into a Signup leaf.
 ///

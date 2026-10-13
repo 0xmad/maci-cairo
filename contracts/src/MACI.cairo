@@ -1,17 +1,6 @@
 use starknet::{ClassHash, ContractAddress};
 use crate::PollFactory::CreatePollArgs;
-
-/// A BabyJubJub public key represented by its affine coordinates.
-///
-/// The coordinates must represent a valid point on the BabyJubJub curve
-/// before the key can be registered through `sign_up`.
-#[derive(Drop, Copy, Serde)]
-pub struct PublicKey {
-    /// The x-coordinate of the public key.
-    pub x: u256,
-    /// The y-coordinate of the public key.
-    pub y: u256,
-}
+pub use crate::public_key::PublicKey;
 
 /// Configuration parameters used to initialize the MACI contract.
 #[derive(Drop, Serde)]
@@ -351,11 +340,11 @@ pub mod MACI {
         /// The signup fails if the state tree has reached its maximum
         /// capacity, if the supplied public key is not on the BabyJubJub
         /// curve, if that public key already has a state-tree leaf, or if
-        /// the configured enforcer rejects the caller.
+        /// the configured enforcer rejects the user public key.
         ///
-        /// The configured enforcer is called with the caller's address and
-        /// the supplied signup data, then the vote-balance assigner returns the
-        /// vote balance bound into the leaf. The leaf is Poseidon(user public
+        /// The configured enforcer and the vote-balance assigner are called
+        /// with the user public key and the supplied signup data. The assigner
+        /// returns the vote balance bound into the leaf. The leaf is Poseidon(user public
         /// key, vote balance). The resulting root is recorded and a `Signup`
         /// event is emitted.
         ///
@@ -375,12 +364,9 @@ pub mod MACI {
                 Errors::PUBLIC_KEY_ALREADY_SIGNED_UP,
             );
 
-            self.enforcer.read().enforce(starknet::get_caller_address(), sign_up_data.clone());
+            self.enforcer.read().enforce(public_key, sign_up_data.clone());
 
-            let vote_balance = self
-                .vote_balance_assigner
-                .read()
-                .get(starknet::get_caller_address(), sign_up_data);
+            let vote_balance = self.vote_balance_assigner.read().get(public_key, sign_up_data);
 
             assert(vote_balance != 0, Errors::ZERO_VOTE_BALANCE);
             assert(vote_balance < 2_u256.pow(251), Errors::VOTE_BALANCE_TOO_LARGE);

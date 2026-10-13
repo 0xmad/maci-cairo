@@ -1,4 +1,5 @@
 use starknet::ContractAddress;
+use crate::public_key::PublicKey;
 
 /// Errors returned by enforcers.
 pub mod Errors {
@@ -21,13 +22,13 @@ pub trait IEnforcer<TContractState> {
     /// applies the policy if the check is successful.
     ///
     /// Arguments:
-    /// - `subject`: Contract address of the subject to enforce.
+    /// - `subject`: User public key to enforce.
     /// - `evidence`: Evidence supplied for the policy check.
     ///
     /// Errors:
     /// - `UNSUCCESSFUL_CHECK`: The configured checker rejected the subject.
     /// - `ALREADY_ENFORCED`: The subject has already been successfully enforced.
-    fn enforce(ref self: TContractState, subject: ContractAddress, evidence: ByteArray);
+    fn enforce(ref self: TContractState, subject: PublicKey, evidence: ByteArray);
 
     /// Sets the target address for the enforcer.
     ///

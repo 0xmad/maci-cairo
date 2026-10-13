@@ -1,4 +1,4 @@
-use starknet::ContractAddress;
+use crate::public_key::PublicKey;
 
 /// Interface for policy checkers.
 ///
@@ -12,11 +12,11 @@ pub trait IChecker<TContractState> {
     /// returns whether the check was successful.
     ///
     /// Arguments:
-    /// - `subject`: Contract address of the subject being checked.
+    /// - `subject`: User public key being checked.
     /// - `evidence`: Evidence supplied for the policy check.
     ///
     /// Returns:
     /// - `true` if the subject satisfies the policy.
     /// - `false` otherwise.
-    fn check(self: @TContractState, subject: ContractAddress, evidence: ByteArray) -> bool;
+    fn check(self: @TContractState, subject: PublicKey, evidence: ByteArray) -> bool;
 }
