@@ -30,6 +30,21 @@ describe("createServer", () => {
     await expect(res.json()).resolves.toEqual({ service: "Relayer" });
   });
 
+  test("POST /signup fails when the Relayer account is not configured", async () => {
+    server = await createServer(0);
+    const res = await fetch(`http://127.0.0.1:${server.port}/signup`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userPublicKey: { x: "1", y: "2" },
+        evidence: "",
+        maci: "0xabc",
+      }),
+    });
+
+    expect(res.status).toBe(500);
+  });
+
   test("close stops accepting connections", async () => {
     server = await createServer(0);
     const base = `http://127.0.0.1:${server.port}`;
